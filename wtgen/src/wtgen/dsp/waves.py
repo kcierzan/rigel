@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Literal
 
 import numpy as np
+from numpy import pi
 from numba import njit
 from numpy.typing import NDArray
 from scipy import signal
@@ -31,17 +32,17 @@ class RolloffMethod(str, Enum):
     none = "none"
 
 def generate_sine_wavetable(
-    frequency: float = 1 / (2 * np.pi),
+    frequency: float = 1 / (2 * pi),
 ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
     """Generate a sine wave wavetable."""
-    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
     return (
         t,
         signal.chirp(
             t,
             f0=frequency,
             f1=frequency,
-            t1=2 * np.pi,
+            t1=2 * pi,
             phi=270,
             method="linear",
         ),
@@ -51,7 +52,7 @@ def generate_sawtooth_wavetable(
     frequency: float = 1,
 ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
     """Generate a sawtooth wave wavetable."""
-    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
     return (t, signal.sawtooth(frequency * t))
 
 
@@ -59,7 +60,7 @@ def generate_square_wavetable(
     frequency: float = 1, duty: float = 0.5
 ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
     """Generate a square wave wavetable."""
-    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
     return (t, signal.square(frequency * t, duty=duty))
 
 
@@ -72,10 +73,10 @@ def generate_pulse_wavetable(
         frequency: Frequency of the pulse wave
         pulse_width: Pulse width (0.0 to 1.0), where 0.5 is 50% duty cycle
     """
-    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
 
     sawtooth1 = signal.sawtooth(frequency * t)
-    sawtooth2 = signal.sawtooth(frequency * t + 2 * np.pi * pulse_width)
+    sawtooth2 = signal.sawtooth(frequency * t + 2 * pi * pulse_width)
 
     pulse = sawtooth1 - sawtooth2
     return (t, pulse)
@@ -96,7 +97,7 @@ def generate_triangle_wavetable(
     Returns:
         Tuple of (time_values, waveform_samples)
     """
-    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
     return (t, signal.sawtooth(frequency * t, width=0.5))
 
 
@@ -292,7 +293,7 @@ def generate_polyblep_sawtooth_wavetable(
         Tuple of (time_array, bandlimited_sawtooth_wave)
     """
     WAVETABLE_SIZE = 2048
-    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
 
     dt = frequency / WAVETABLE_SIZE
     output = np.zeros(WAVETABLE_SIZE)
