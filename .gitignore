@@ -1,0 +1,79 @@
+# Lib
+nih-plug
+
+# Rust
+/target/
+Cargo.lock
+
+# DAW Plugin Bundles
+*.vst3/
+*.clap
+*.component
+*.aaxplugin
+*.dll
+*.so
+*.dylib
+
+# Audio Files
+*.wav
+*.aiff
+*.mp3
+*.flac
+*.ogg
+*.m4a
+
+# Plugin Validation
+validation_*
+*.log
+
+# DAW Project Files (testing)
+*.flp
+*.als
+*.logic
+*.rpp
+*.cwp
+*.ptx
+*.ses
+
+# IDE/Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+
+# Preset Files (temporary)
+presets/temp/
+*.preset.tmp
+
+# Build Artifacts
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Backup Files
+*.bak
+*.backup
+
+# Environment
+.env
+.env.local
+
+# Documentation Build
+/docs/_build/
+
+# Testing Output
+test_output/
+audio_tests/
+
+# Profiling
+*.prof
+perf.data*

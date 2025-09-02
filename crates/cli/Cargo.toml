@@ -1,0 +1,26 @@
+[package]
+name = "rigel-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI tool for generating test audio with Rigel synthesizer"
+rust-version.workspace = true
+
+[[bin]]
+name = "rigel"
+path = "src/main.rs"
+
+[dependencies]
+# Internal dependencies
+rigel-dsp = { path = "../dsp" }
+
+# CLI framework
+clap.workspace = true
+
+# Audio file I/O
+hound.workspace = true
+
+# Error handling
+anyhow.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "rigel-dsp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "No-std DSP core for Rigel wavetable synthesizer"
+rust-version.workspace = true
+
+[lib]
+name = "rigel_dsp"
+crate-type = ["lib"]
+
+[dependencies]
+libm = "0.2"
