@@ -1,0 +1,88 @@
+[project]
+name = "wtgen"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.16",
+    "numba>=0.60",
+    "matplotlib>=3.8",
+    "soundfile>=0.12",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.1",
+    "pytest-benchmark>=4.0",
+    "pytest-regressions>=2.5",
+    "ruff>=0.5",
+    "black>=24.0",
+    "mypy>=1.10",
+    "ipython>=9.5.0",
+    "kitcat>=1.2.1",
+]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "NPY", "PL", "PERF"]
+ignore = [
+    "PLR2004", # Magic values - too noisy for DSP/audio code
+    "PLR0912", # Too many branches - evolution/selection logic is complex
+    "PLR0913", # Too many arguments - common in DSP functions
+    "PLR0915", # Too many statements - complex functions are sometimes needed
+    "NPY002",  # Legacy numpy random - numba compatibility
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.31.1",
+    "black[jupyter]>=25.1.0",
+    "hypothesis>=6.138.2",
+    "ipython>=9.5.0",
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-xdist>=3.8.0",
+    "scipy-stubs>=1.16.1.0",
+    "types-setuptools>=80.9.0.20250809",
+]
+
+[tool.basedpyright]
+include = ["src"]
+exclude = ["tests", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+
+# Core type checking settings
+typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
+
+# Disable problematic warnings for scientific computing
+reportMissingTypeStubs = false
+reportUnknownParameterType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownMemberType = false
+reportAny = false
+reportMissingTypeArgument = false
+
+# Keep important warnings enabled
+reportGeneralTypeIssues = true
+reportOptionalMemberAccess = true
+reportOptionalSubscript = true
+reportOptionalOperand = true
+reportUntypedFunctionDecorator = true
+reportUntypedClassDecorator = true
+reportUntypedBaseClass = true
+reportUntypedNamedTuple = true
+
+# Disable additional noisy warnings
+reportUnusedCallResult = false # Common with matplotlib plotting

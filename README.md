@@ -94,7 +94,7 @@ cargo run --bin rigel -- morph --note 60 --duration 4.0 --morph-speed 0.5 --outp
 
 The plugin is built as a headless instrument plugin that can be loaded into any VST3 or CLAP compatible DAW:
 
-#### Building the VST3 Plugin
+#### Building the plugin library
 
 ```bash
 # Build the plugin for your current platform
@@ -106,23 +106,19 @@ cargo build --release -p rigel-plugin --target aarch64-apple-darwin
 
 The build will create:
 - **macOS**: `target/release/librigel_plugin.dylib` (or `target/aarch64-apple-darwin/release/librigel_plugin.dylib` for cross-compilation)
-- **Windows**: `target/release/rigel_plugin.dll`  
+- **Windows**: `target/release/rigel_plugin.dll`
 - **Linux**: `target/release/librigel_plugin.so`
 
-#### Creating the VST3 Bundle
+#### Creating plugin bundles
 
-To create a proper VST3 plugin bundle for macOS:
+Rigel uses [nih-plug-xtask](https://github.com/robbert-vdh/nih-plug/tree/master/nih_plug_xtask)
+and a cargo alias `xtask` for building the CLAP and VST3 bundles:
 
 ```bash
-# Create the VST3 bundle directory structure
-mkdir -p Rigel.vst3/Contents/MacOS
-
-# Copy the dylib to the bundle
-cp target/release/librigel_plugin.dylib Rigel.vst3/Contents/MacOS/
-
-# For aarch64 builds:
-cp target/aarch64-apple-darwin/release/librigel_plugin.dylib Rigel.vst3/Contents/MacOS/
+cargo xtask bundle rigel-plugin --release
 ```
+
+**N.B.**: `--target` and `--profile` flags are also supported when running `cargo xtask bundle`.
 
 #### Installing in Your DAW
 
@@ -142,7 +138,7 @@ cp target/aarch64-apple-darwin/release/librigel_plugin.dylib Rigel.vst3/Contents
 The heart of Rigel is a `no_std` DSP library designed for real-time audio processing:
 
 - **Real-time safe**: No allocations, no standard library dependencies
-- **Deterministic**: Consistent performance suitable for audio threads  
+- **Deterministic**: Consistent performance suitable for audio threads
 - **Portable**: Works on embedded systems and any Rust target
 - **Fast math**: Uses `libm` for efficient mathematical operations
 
@@ -156,14 +152,14 @@ Key components:
 
 A command-line interface for:
 - Testing DSP algorithms
-- Generating reference audio for development  
+- Generating reference audio for development
 - Batch audio processing
 - Algorithm validation and debugging
 
 ### Plugin (`rigel-plugin`)
 
 A NIH-plug based headless audio plugin providing:
-- VST3 and CLAP format support  
+- VST3 and CLAP format support
 - Cross-platform compatibility (macOS, Windows, Linux)
 - Real-time parameter control via DAW automation
 - DAW integration for music production
@@ -181,11 +177,11 @@ rigel/
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       └── lib.rs      # All DSP code in single file
-│   ├── cli/                # Command-line tool  
+│   ├── cli/                # Command-line tool
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       └── main.rs
-│   └── plugin/             # Plugin (planned)
+│   └── plugin/             # Plugin
 │       ├── Cargo.toml
 │       └── src/
 ├── README.md
@@ -200,7 +196,7 @@ The `no_std` DSP core can be built for various targets:
 ```bash
 # Standard desktop targets
 cargo build --target x86_64-apple-darwin     # macOS Intel
-cargo build --target aarch64-apple-darwin    # macOS Apple Silicon  
+cargo build --target aarch64-apple-darwin    # macOS Apple Silicon
 cargo build --target x86_64-pc-windows-msvc  # Windows
 
 # Embedded targets (DSP core only)
