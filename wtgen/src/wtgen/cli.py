@@ -10,15 +10,13 @@ from wtgen.dsp.waves import (
     RolloffMethod,
     WaveformType,
     generate_polyblep_sawtooth_wavetable,
-    harmonics_to_table,
-)
-from wtgen.export import load_wavetable_npz, save_wavetable_npz, save_wavetable_with_wav_export
-from wtgen.dsp.waves import (
     generate_pulse_wavetable,
     generate_sawtooth_wavetable,
     generate_square_wavetable,
     generate_triangle_wavetable,
+    harmonics_to_table,
 )
+from wtgen.export import load_wavetable_npz, save_wavetable_npz, save_wavetable_with_wav_export
 
 app = typer.Typer(help="Wavetable generation and processing CLI")
 

@@ -9,6 +9,7 @@ from wtgen.dsp.mipmap import build_mipmap
 from wtgen.dsp.process import align_to_zero_crossing
 from wtgen.dsp.waves import WAVETABLE_SIZE, generate_sawtooth_wavetable
 
+
 def plot_waveform(
     table: NDArray[np.floating], wave: NDArray[np.floating], title: str = "Waveform"
 ) -> None:

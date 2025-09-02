@@ -7,16 +7,6 @@
 - [x] Create README with build/run instructions
 - [x] Set up .gitignore for target/DAW bundles
 
-## Completed ✅
-
-All initial project setup tasks have been completed. The project now has:
-
-- A working `no_std` DSP core with monophonic synthesis
-- A CLI tool for generating test audio files
-- A headless NIH-plug based plugin with VST3/CLAP support
-- Clean project structure with minimal dependencies
-- Comprehensive documentation and build instructions
-
 ## Next Steps
 
 - [ ] Add wavetable synthesis capabilities to DSP core
