@@ -1,6 +1,6 @@
 import numpy as np
+from numpy import cos, pi
 from numpy.typing import NDArray
-from numpy import pi, cos
 
 # Type alias for mipmap levels
 MipmapLevel = NDArray[np.float32]
@@ -248,9 +248,7 @@ def _apply_blackman_rolloff(
             transition_pos = (k - cutoff_harmonic) / transition_bandwidth
             # Blackman window coefficients for extremely smooth rolloff
             attenuation = (
-                0.42
-                + 0.5 * cos(pi * transition_pos)
-                + 0.08 * cos(2 * pi * transition_pos)
+                0.42 + 0.5 * cos(pi * transition_pos) + 0.08 * cos(2 * pi * transition_pos)
             )
             spectrum[k] *= attenuation
             spectrum[N - k] *= attenuation

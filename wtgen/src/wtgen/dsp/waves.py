@@ -2,8 +2,8 @@ from enum import Enum
 from typing import Literal
 
 import numpy as np
-from numpy import pi
 from numba import njit
+from numpy import pi
 from numpy.typing import NDArray
 from scipy import signal
 
@@ -31,6 +31,7 @@ class RolloffMethod(str, Enum):
     hann = "hann"
     none = "none"
 
+
 def generate_sine_wavetable(
     frequency: float = 1 / (2 * pi),
 ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
@@ -47,6 +48,7 @@ def generate_sine_wavetable(
             method="linear",
         ),
     )
+
 
 def generate_sawtooth_wavetable(
     frequency: float = 1,
@@ -99,7 +101,6 @@ def generate_triangle_wavetable(
     """
     t = np.linspace(0, 2 * pi, WAVETABLE_SIZE)
     return (t, signal.sawtooth(frequency * t, width=0.5))
-
 
 
 @njit
