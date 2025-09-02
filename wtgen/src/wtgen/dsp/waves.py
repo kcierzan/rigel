@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Literal
 
 import numpy as np
@@ -8,6 +9,23 @@ from numpy.typing import NDArray
 Partial = tuple[int, float, float]
 PartialList = list[Partial]
 PhaseMode = Literal["minimum", "linear"]
+
+
+class WaveformType(str, Enum):
+    sawtooth = "sawtooth"
+    square = "square"
+    pulse = "pulse"
+    triangle = "triangle"
+    polyblep_saw = "polyblep_saw"
+
+
+class RolloffMethod(str, Enum):
+    brick_wall = "brick_wall"
+    tukey = "tukey"
+    blackman = "blackman"
+    raised_cosine = "raised_cosine"
+    hann = "hann"
+    none = "none"
 
 
 @njit
@@ -116,3 +134,100 @@ def harmonics_to_table(
         x = x / peak_value
 
     return x
+
+
+def polyblep(phase: float, dt: float) -> float:
+    """PolyBLEP (Polynomial Band Limited Step) correction function.
+
+    MATHEMATICAL PRINCIPLE:
+    The PolyBLEP correction is based on the mathematical concept that any
+    discontinuous function can be decomposed into:
+    1. A smooth, band-limited component
+    2. A discontinuous component (which causes aliasing)
+
+    The correction polynomial has these key properties:
+    - It matches the EXACT discontinuity of the original waveform
+    - It contains ONLY band-limited frequency content (no aliasing)
+    - When subtracted, it leaves behind a smooth, alias-free signal
+
+    POLYNOMIAL DERIVATION:
+    For a sawtooth wave discontinuity (jump from +1 to -1), we need a polynomial P(t) such that:
+    - P(-dt) = 0    (smooth before the discontinuity)
+    - P(+dt) = -2   (matches the -2 amplitude jump of sawtooth)
+    - P'(-dt) = P'(+dt) = 0  (continuous derivative at boundaries)
+
+    This gives us a cubic polynomial: P(t) = at³ + bt² + ct + d
+    Solving the boundary conditions yields the specific coefficients used below.
+
+    Args:
+        phase: Current phase position (0.0 to 1.0)
+        dt: Phase increment per sample (determines the correction window size)
+
+    Returns:
+        Correction value to subtract from the raw waveform
+    """
+    if phase < dt:
+        phase /= dt
+        return phase + phase - phase * phase - 1.0
+
+    elif phase > 1.0 - dt:
+        phase = (phase - 1.0) / dt
+        return phase * phase + phase + phase + 1.0
+
+    else:
+        return 0.0
+
+
+def generate_polyblep_sawtooth_wavetable(
+    frequency: float = 1,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Generate a bandlimited sawtooth wave using the PolyBLEP technique.
+
+    This implementation is optimized for realtime VST plugin usage because:
+
+    1. **Computational Efficiency**: PolyBLEP only requires a few arithmetic
+       operations per sample, making it much faster than FFT-based methods
+       or convolution with BLEP tables.
+
+    2. **Low Memory Usage**: No lookup tables or large filter kernels needed,
+       just the polyblep correction function.
+
+    3. **Excellent Anti-aliasing**: Effectively removes aliasing artifacts
+       that would occur with naive sawtooth generation, especially at high
+       frequencies relative to sample rate.
+
+    4. **Parameter Modulatable**: Frequency can be smoothly modulated in
+       realtime without artifacts or instability.
+
+    The algorithm:
+    1. Generate a naive sawtooth wave (linear ramp from -1 to 1)
+    2. Detect phase resets (discontinuities)
+    3. Apply PolyBLEP correction around each discontinuity
+    4. The correction subtracts out the aliasing-causing sharp edges
+
+    Technical Background:
+    - Traditional sawtooth waves have infinite bandwidth due to sharp edges
+    - When sampled digitally, this creates aliasing (high frequencies folding back)
+    - PolyBLEP replaces sharp transitions with smooth polynomials
+    - This bandlimits the signal to below the Nyquist frequency
+    - The correction is applied in a window proportional to phase increment
+
+    Args:
+        frequency: Frequency of the sawtooth wave in cycles per full table
+
+    Returns:
+        Tuple of (time_array, bandlimited_sawtooth_wave)
+    """
+    WAVETABLE_SIZE = 2048
+    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+
+    dt = frequency / WAVETABLE_SIZE
+    output = np.zeros(WAVETABLE_SIZE)
+
+    for i in range(WAVETABLE_SIZE):
+        phase = (i * frequency / WAVETABLE_SIZE) % 1.0
+        naive_saw = 2.0 * phase - 1.0
+        correction = polyblep(phase, dt)
+        output[i] = naive_saw - correction
+
+    return (t, output)

@@ -1437,6 +1437,7 @@ name = "wtgen"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "kitcat" },
     { name = "matplotlib" },
     { name = "numba" },
     { name = "numpy" },
@@ -1475,6 +1476,7 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=24.0" },
     { name = "ipython", marker = "extra == 'dev'", specifier = ">=9.5.0" },
+    { name = "kitcat", specifier = ">=1.2.1" },
     { name = "kitcat", marker = "extra == 'dev'", specifier = ">=1.2.1" },
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },

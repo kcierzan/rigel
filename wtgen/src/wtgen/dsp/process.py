@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
+from scipy import signal
 
 
 def dc_remove(base_wavetable: NDArray[np.floating]) -> NDArray[np.floating]:
@@ -14,20 +15,54 @@ def dc_remove(base_wavetable: NDArray[np.floating]) -> NDArray[np.floating]:
     return base_wavetable - np.mean(base_wavetable)
 
 
+def _estimate_inter_sample_peak(wavetable: NDArray[np.floating]) -> float:
+    """Estimate the true peak value accounting for inter-sample peaks.
+
+    Uses upsampling and filtering to detect peaks that occur between samples
+    which could cause clipping during playback with interpolation.
+
+    Args:
+        wavetable: Input wavetable to analyze
+
+    Returns:
+        Estimated true peak value (always >= sample peak)
+    """
+    if len(wavetable) < 2:
+        return np.max(np.abs(wavetable)) if len(wavetable) > 0 else 0.0
+
+    # Upsample by factor of 4 to catch inter-sample peaks
+    oversample_factor = 4
+    upsampled = signal.resample(wavetable, len(wavetable) * oversample_factor)
+
+    # The true peak is the maximum of the upsampled version
+    true_peak = np.max(np.abs(upsampled))
+    sample_peak = np.max(np.abs(wavetable))
+
+    # Return the larger of the two (true peak should always be >= sample peak)
+    return max(true_peak, sample_peak)
+
+
 def normalize(base_wavetable: NDArray[np.floating], peak: float = 0.999) -> NDArray[np.floating]:
-    """Normalize wavetable amplitude to a specified peak level.
+    """Normalize wavetable amplitude to a specified peak level, preventing inter-sample clipping.
+
+    This function accounts for inter-sample peaks that can occur during playback
+    when using interpolation, ensuring the true peak (including interpolated values)
+    does not exceed the target peak level.
 
     Args:
         base_wavetable: Input wavetable array to normalize
         peak: Target peak amplitude (default: 0.999 to avoid clipping)
 
     Returns:
-        Normalized wavetable with specified peak amplitude
+        Normalized wavetable with specified peak amplitude, safe from inter-sample clipping
     """
-    max_amplitude = np.max(np.abs(base_wavetable))
-    if max_amplitude <= 1e-12:  # Handle near-zero signals (inclusive of boundary)
+    if len(base_wavetable) == 0:
+        return base_wavetable
+
+    true_peak = _estimate_inter_sample_peak(base_wavetable)
+    if true_peak <= 1e-12:  # Handle near-zero signals (inclusive of boundary)
         return np.zeros_like(base_wavetable)
-    return (base_wavetable / max_amplitude) * peak
+    return (base_wavetable / true_peak) * peak
 
 
 def normalize_to_range(
