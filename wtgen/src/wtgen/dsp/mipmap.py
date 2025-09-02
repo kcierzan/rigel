@@ -10,7 +10,8 @@ def build_mipmap(
     base_wavetable: NDArray[np.floating],
     num_octaves: int = 10,
     sample_rate: float = 44100.0,
-    rolloff_method: str = "raised_cosine"
+    rolloff_method: str = "raised_cosine",
+    decimate: bool = False,
 ) -> MipmapChain:
     """
     Build a mipmap chain from a base wavetable with smooth bandlimiting to avoid Gibbs phenomenon.
@@ -20,6 +21,7 @@ def build_mipmap(
         num_octaves: Number of octave levels to generate (default 10 for full MIDI range)
         sample_rate: Sample rate in Hz (default 44100.0)
         rolloff_method: Method for smooth rolloff ("raised_cosine", "tukey", "hann", "blackman", "brick_wall")
+        decimate: Whether to decimate each level by half (2048→1024→512...)
 
     Returns:
         List of wavetables with progressively reduced bandwidth,
@@ -77,9 +79,7 @@ def build_mipmap(
         N = len(spectrum)
 
         # Apply smooth rolloff instead of brick wall filtering
-        smooth_spectrum = _apply_smooth_rolloff(
-            spectrum, max_safe_harmonics, N, rolloff_method
-        )
+        smooth_spectrum = _apply_smooth_rolloff(spectrum, max_safe_harmonics, N, rolloff_method)
 
         # Convert back to time domain
         bandlimited_level = np.fft.ifft(smooth_spectrum).real
@@ -112,7 +112,23 @@ def build_mipmap(
         # Final safety clamp (should not be needed with improved logic above)
         normalized_level = np.clip(normalized_level, -1.0, 1.0)
 
-        mipmap_levels.append(normalized_level.astype(np.float32))
+        # Apply decimation if requested
+        if decimate and octave_level > 0:
+            # Calculate target size for this level (halve size each level)
+            target_size = len(base_wavetable) // (2**octave_level)
+            target_size = max(target_size, 64)  # Don't go below 64 samples
+
+            if target_size < len(normalized_level):
+                # Decimate using numpy.interp for smooth resampling
+                indices = np.linspace(0, len(normalized_level) - 1, target_size)
+                decimated_level = np.interp(
+                    indices, np.arange(len(normalized_level)), normalized_level
+                )
+                mipmap_levels.append(decimated_level.astype(np.float32))
+            else:
+                mipmap_levels.append(normalized_level.astype(np.float32))
+        else:
+            mipmap_levels.append(normalized_level.astype(np.float32))
 
     # Apply consistent phase alignment to all mipmap levels
     # aligned_levels = ensure_consistent_phase_alignment(mipmap_levels)
@@ -120,11 +136,151 @@ def build_mipmap(
     return mipmap_levels
 
 
+def _apply_raised_cosine_rolloff(
+    spectrum: NDArray[np.complexfloating], cutoff_harmonic: int, transition_bandwidth: int, N: int
+) -> None:
+    """
+    Apply raised cosine rolloff to spectrum.
+
+    Raised cosine rolloff provides a smooth S-curve transition that effectively
+    eliminates Gibbs phenomenon artifacts. Mathematical form: 0.5 * (1 + cos(π * t))
+
+    Args:
+        spectrum: Complex FFT spectrum (modified in-place)
+        cutoff_harmonic: Harmonic number where rolloff begins
+        transition_bandwidth: Number of harmonics for the rolloff transition
+        N: Length of spectrum
+    """
+    for k in range(1, N // 2):  # Process positive frequencies only
+        if k <= cutoff_harmonic:
+            # Passband - no attenuation
+            continue
+        elif k <= cutoff_harmonic + transition_bandwidth:
+            # Transition band - raised cosine rolloff
+            transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+            attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
+            spectrum[k] *= attenuation
+            spectrum[N - k] *= attenuation  # Mirror for negative frequencies
+        else:
+            # Stopband - full attenuation
+            spectrum[k] = 0
+            spectrum[N - k] = 0
+
+
+def _apply_tukey_rolloff(
+    spectrum: NDArray[np.complexfloating], cutoff_harmonic: int, transition_bandwidth: int, N: int
+) -> None:
+    """
+    Apply Tukey window rolloff to spectrum.
+
+    Tukey window provides a flat passband with cosine rolloff, offering the
+    sharpest transition while still being smooth. Uses cosine taper: cos²(π/2 * t)
+
+    Args:
+        spectrum: Complex FFT spectrum (modified in-place)
+        cutoff_harmonic: Harmonic number where rolloff begins
+        transition_bandwidth: Number of harmonics for the rolloff transition
+        N: Length of spectrum
+    """
+    for k in range(1, N // 2):
+        if k <= cutoff_harmonic:
+            continue
+        elif k <= cutoff_harmonic + transition_bandwidth:
+            transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+            # Cosine taper: cos²(π/2 * t) for t from 0 to 1
+            attenuation = np.cos(np.pi * transition_pos / 2.0) ** 2
+            spectrum[k] *= attenuation
+            spectrum[N - k] *= attenuation
+        else:
+            spectrum[k] = 0
+            spectrum[N - k] = 0
+
+
+def _apply_hann_rolloff(
+    spectrum: NDArray[np.complexfloating], cutoff_harmonic: int, transition_bandwidth: int, N: int
+) -> None:
+    """
+    Apply Hann window rolloff to spectrum.
+
+    Hann window rolloff provides a good balance of smoothness and transition width.
+    Uses Hann window: 0.5 * (1 + cos(π * t)) applied as rolloff.
+
+    Args:
+        spectrum: Complex FFT spectrum (modified in-place)
+        cutoff_harmonic: Harmonic number where rolloff begins
+        transition_bandwidth: Number of harmonics for the rolloff transition
+        N: Length of spectrum
+    """
+    for k in range(1, N // 2):
+        if k <= cutoff_harmonic:
+            continue
+        elif k <= cutoff_harmonic + transition_bandwidth:
+            transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+            # Hann window: 0.5 * (1 + cos(π * t)) but applied as rolloff
+            attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
+            spectrum[k] *= attenuation
+            spectrum[N - k] *= attenuation
+        else:
+            spectrum[k] = 0
+            spectrum[N - k] = 0
+
+
+def _apply_blackman_rolloff(
+    spectrum: NDArray[np.complexfloating], cutoff_harmonic: int, transition_bandwidth: int, N: int
+) -> None:
+    """
+    Apply Blackman window rolloff to spectrum.
+
+    Blackman window rolloff provides very smooth, minimal ripple with the widest
+    transition band. Best for eliminating Gibbs phenomenon but with wider transition.
+
+    Args:
+        spectrum: Complex FFT spectrum (modified in-place)
+        cutoff_harmonic: Harmonic number where rolloff begins
+        transition_bandwidth: Number of harmonics for the rolloff transition
+        N: Length of spectrum
+    """
+    for k in range(1, N // 2):
+        if k <= cutoff_harmonic:
+            continue
+        elif k <= cutoff_harmonic + transition_bandwidth:
+            transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+            # Blackman window coefficients for extremely smooth rolloff
+            attenuation = (
+                0.42
+                + 0.5 * np.cos(np.pi * transition_pos)
+                + 0.08 * np.cos(2 * np.pi * transition_pos)
+            )
+            spectrum[k] *= attenuation
+            spectrum[N - k] *= attenuation
+        else:
+            spectrum[k] = 0
+            spectrum[N - k] = 0
+
+
+def _apply_brick_wall_rolloff(
+    spectrum: NDArray[np.complexfloating], cutoff_harmonic: int, transition_bandwidth: int, N: int
+) -> None:
+    """
+    Apply brick wall (hard cutoff) rolloff to spectrum.
+
+    Original brick wall method for comparison - causes Gibbs phenomenon.
+    Provided mainly for legacy compatibility and comparison purposes.
+
+    Args:
+        spectrum: Complex FFT spectrum (modified in-place)
+        cutoff_harmonic: Harmonic number where rolloff begins
+        transition_bandwidth: Number of harmonics for rolloff transition (unused)
+        N: Length of spectrum
+    """
+    for k in range(1, N // 2):
+        if k > cutoff_harmonic:
+            spectrum[k] = 0
+            spectrum[N - k] = 0
+
+
 def _apply_smooth_rolloff(
-    spectrum: NDArray[np.complexfloating],
-    cutoff_harmonic: int,
-    N: int,
-    method: str
+    spectrum: NDArray[np.complexfloating], cutoff_harmonic: int, N: int, method: str
 ) -> NDArray[np.complexfloating]:
     """
     Apply smooth rolloff to spectrum to avoid Gibbs phenomenon.
@@ -148,78 +304,17 @@ def _apply_smooth_rolloff(
     # Wider transitions = smoother rolloff = less Gibbs phenomenon
     transition_bandwidth = max(3, cutoff_harmonic // 3)  # At least 3, up to 33% of cutoff
 
-    if method == "raised_cosine":
-        # Raised cosine rolloff - smooth S-curve transition
-        # Mathematical form: 0.5 * (1 + cos(π * t)) for t from 0 to 1
-        for k in range(1, N // 2):  # Process positive frequencies only
-            if k <= cutoff_harmonic:
-                # Passband - no attenuation
-                continue
-            elif k <= cutoff_harmonic + transition_bandwidth:
-                # Transition band - raised cosine rolloff
-                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
-                attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
-                smooth_spectrum[k] *= attenuation
-                smooth_spectrum[N - k] *= attenuation  # Mirror for negative frequencies
-            else:
-                # Stopband - full attenuation
-                smooth_spectrum[k] = 0
-                smooth_spectrum[N - k] = 0
+    # Dispatch to appropriate rolloff method
+    rolloff_methods = {
+        "raised_cosine": _apply_raised_cosine_rolloff,
+        "tukey": _apply_tukey_rolloff,
+        "hann": _apply_hann_rolloff,
+        "blackman": _apply_blackman_rolloff,
+        "brick_wall": _apply_brick_wall_rolloff,
+    }
 
-    elif method == "tukey":
-        # Tukey window - flat passband with cosine rolloff
-        # Provides the sharpest transition while still being smooth
-        for k in range(1, N // 2):
-            if k <= cutoff_harmonic:
-                continue
-            elif k <= cutoff_harmonic + transition_bandwidth:
-                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
-                # Cosine taper: cos²(π/2 * t) for t from 0 to 1
-                attenuation = np.cos(np.pi * transition_pos / 2.0) ** 2
-                smooth_spectrum[k] *= attenuation
-                smooth_spectrum[N - k] *= attenuation
-            else:
-                smooth_spectrum[k] = 0
-                smooth_spectrum[N - k] = 0
-
-    elif method == "hann":
-        # Hann window rolloff - good balance of smoothness and transition width
-        for k in range(1, N // 2):
-            if k <= cutoff_harmonic:
-                continue
-            elif k <= cutoff_harmonic + transition_bandwidth:
-                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
-                # Hann window: 0.5 * (1 + cos(π * t)) but applied as rolloff
-                attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
-                smooth_spectrum[k] *= attenuation
-                smooth_spectrum[N - k] *= attenuation
-            else:
-                smooth_spectrum[k] = 0
-                smooth_spectrum[N - k] = 0
-
-    elif method == "blackman":
-        # Blackman window rolloff - very smooth, minimal ripple, widest transition
-        # Best for eliminating Gibbs phenomenon but with wider transition band
-        for k in range(1, N // 2):
-            if k <= cutoff_harmonic:
-                continue
-            elif k <= cutoff_harmonic + transition_bandwidth:
-                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
-                # Blackman window coefficients for extremely smooth rolloff
-                attenuation = (0.42 + 0.5 * np.cos(np.pi * transition_pos) +
-                             0.08 * np.cos(2 * np.pi * transition_pos))
-                smooth_spectrum[k] *= attenuation
-                smooth_spectrum[N - k] *= attenuation
-            else:
-                smooth_spectrum[k] = 0
-                smooth_spectrum[N - k] = 0
-
-    else:  # brick_wall or unknown method
-        # Original brick wall method for comparison - causes Gibbs phenomenon
-        for k in range(1, N // 2):
-            if k > cutoff_harmonic:
-                smooth_spectrum[k] = 0
-                smooth_spectrum[N - k] = 0
+    rolloff_function = rolloff_methods.get(method, _apply_brick_wall_rolloff)
+    rolloff_function(smooth_spectrum, cutoff_harmonic, transition_bandwidth, N)
 
     return smooth_spectrum
 
@@ -240,7 +335,7 @@ def analyze_mipmap_quality(mipmap_chain: MipmapChain, method_name: str = "") -> 
         "levels": len(mipmap_chain),
         "gibbs_artifacts": [],
         "rms_levels": [],
-        "peak_levels": []
+        "peak_levels": [],
     }
 
     for level_idx, level in enumerate(mipmap_chain):
@@ -264,10 +359,12 @@ def analyze_mipmap_quality(mipmap_chain: MipmapChain, method_name: str = "") -> 
         # High ratio suggests Gibbs phenomenon artifacts
         oscillation_ratio = derivative_std / (derivative_mean + 1e-12)
 
-        results["gibbs_artifacts"].append({
-            "level": level_idx,
-            "oscillation_ratio": oscillation_ratio,
-            "has_artifacts": oscillation_ratio > 3.0  # Threshold for artifact detection
-        })
+        results["gibbs_artifacts"].append(
+            {
+                "level": level_idx,
+                "oscillation_ratio": oscillation_ratio,
+                "has_artifacts": oscillation_ratio > 3.0,  # Threshold for artifact detection
+            }
+        )
 
     return results
