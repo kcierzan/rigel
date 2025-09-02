@@ -1,14 +1,14 @@
 [workspace]
-members = ["crates/dsp", "crates/cli", "crates/plugin"]
+members = ["crates/dsp", "crates/cli", "crates/plugin", "crates/xtask"]
 resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Kyle Cierzan <kyle@example.com>"]
+authors = ["Kyle Cierzan <kcierzan@gmail.com>"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/kylecierzan/rigel"
-homepage = "https://github.com/kylecierzan/rigel"
+repository = "https://github.com/kcierzan/rigel"
+homepage = "https://github.com/kcierz/rigel"
 description = "Advanced wavetable synthesizer with separate DSP core"
 rust-version = "1.70"
 

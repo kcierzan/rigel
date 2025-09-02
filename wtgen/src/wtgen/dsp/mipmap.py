@@ -1,0 +1,273 @@
+import numpy as np
+from numpy.typing import NDArray
+
+# Type alias for mipmap levels
+MipmapLevel = NDArray[np.float32]
+MipmapChain = list[MipmapLevel]
+
+
+def build_mipmap(
+    base_wavetable: NDArray[np.floating],
+    num_octaves: int = 10,
+    sample_rate: float = 44100.0,
+    rolloff_method: str = "raised_cosine"
+) -> MipmapChain:
+    """
+    Build a mipmap chain from a base wavetable with smooth bandlimiting to avoid Gibbs phenomenon.
+
+    Args:
+        base_wavetable: Base wavetable for one cycle (full bandwidth)
+        num_octaves: Number of octave levels to generate (default 10 for full MIDI range)
+        sample_rate: Sample rate in Hz (default 44100.0)
+        rolloff_method: Method for smooth rolloff ("raised_cosine", "tukey", "hann", "blackman", "brick_wall")
+
+    Returns:
+        List of wavetables with progressively reduced bandwidth,
+        using smooth rolloff to eliminate Gibbs phenomenon artifacts
+
+    Notes:
+        Uses smooth spectral domain rolloff for all levels to prevent both aliasing
+        and Gibbs phenomenon artifacts across the complete MIDI range (0-127).
+
+        Rolloff methods:
+        - "raised_cosine": Smooth S-curve transition (recommended)
+        - "tukey": Flat passband with cosine rolloff edges
+        - "hann": Hann window rolloff
+        - "blackman": Blackman window rolloff (smoothest, widest transition)
+        - "brick_wall": Original hard cutoff method (for comparison)
+
+        Level selection for playback should be:
+        level = max(
+            0, min(num_octaves, int(np.log2(fundamental_freq / (sample_rate / table_size))))
+        )
+    """
+    table_size = float(len(base_wavetable))
+    nyquist = sample_rate / 2
+
+    # Target RMS level for consistent synthesizer behavior
+    TARGET_RMS = 0.35  # This provides good headroom while maximizing signal level
+
+    mipmap_levels: MipmapChain = []
+
+    for octave_level in range(0, num_octaves + 1):
+        # Improved frequency calculation for smoother transitions
+        # Each level should handle frequencies up to a specific cutoff
+        base_freq = sample_rate / table_size
+        max_freq_in_level = base_freq * (2**octave_level)
+
+        # More gradual safety margins to prevent abrupt transitions
+        if octave_level == 0:
+            safety_margin = 0.45  # Allow more harmonics for level 0
+        elif octave_level == 1:
+            safety_margin = 0.40  # Gentle transition for level 1
+        elif octave_level <= 3:
+            safety_margin = 0.35  # Moderate filtering for low-mid levels
+        elif octave_level <= 6:
+            safety_margin = 0.25  # More aggressive for mid levels
+        else:
+            safety_margin = 0.15  # Most aggressive for high levels
+
+        # Calculate maximum safe harmonics for this level
+        cutoff_freq = safety_margin * nyquist / max_freq_in_level
+        max_safe_harmonics = int(cutoff_freq)
+        max_safe_harmonics = max(1, max_safe_harmonics)  # Always keep at least fundamental
+
+        # Apply smooth spectral domain bandlimiting
+        spectrum = np.fft.fft(base_wavetable)
+        N = len(spectrum)
+
+        # Apply smooth rolloff instead of brick wall filtering
+        smooth_spectrum = _apply_smooth_rolloff(
+            spectrum, max_safe_harmonics, N, rolloff_method
+        )
+
+        # Convert back to time domain
+        bandlimited_level = np.fft.ifft(smooth_spectrum).real
+
+        # Remove any DC offset that may have been introduced during filtering
+        bandlimited_level = bandlimited_level - np.mean(bandlimited_level)
+
+        # Improved RMS normalization with clipping prevention
+        current_rms = np.sqrt(np.mean(bandlimited_level**2))
+        if current_rms > 1e-12:
+            # First, find the maximum possible scale factor without clipping
+            current_peak = np.max(np.abs(bandlimited_level))
+            max_scale_for_no_clipping = 1.0 / current_peak if current_peak > 0 else 1.0
+
+            # Calculate the scale factor needed for target RMS
+            rms_scale_factor = TARGET_RMS / current_rms
+
+            # Use the smaller of the two scale factors to prevent clipping
+            # while getting as close to target RMS as possible
+            final_scale_factor = min(rms_scale_factor, max_scale_for_no_clipping)
+            normalized_level = bandlimited_level * final_scale_factor
+
+            # If we had to reduce the scale factor to prevent clipping,
+            # the final RMS will be lower than target, but this is necessary
+            # to maintain waveform integrity
+        else:
+            # Handle silent waveforms
+            normalized_level = bandlimited_level
+
+        # Final safety clamp (should not be needed with improved logic above)
+        normalized_level = np.clip(normalized_level, -1.0, 1.0)
+
+        mipmap_levels.append(normalized_level.astype(np.float32))
+
+    # Apply consistent phase alignment to all mipmap levels
+    # aligned_levels = ensure_consistent_phase_alignment(mipmap_levels)
+
+    return mipmap_levels
+
+
+def _apply_smooth_rolloff(
+    spectrum: NDArray[np.complexfloating],
+    cutoff_harmonic: int,
+    N: int,
+    method: str
+) -> NDArray[np.complexfloating]:
+    """
+    Apply smooth rolloff to spectrum to avoid Gibbs phenomenon.
+
+    Instead of abruptly cutting off harmonics (which causes ringing), this function
+    applies smooth transitions that eliminate the sharp edges in frequency domain
+    that cause Gibbs phenomenon artifacts in the time domain.
+
+    Args:
+        spectrum: Complex FFT spectrum
+        cutoff_harmonic: Harmonic number where rolloff begins
+        N: Length of spectrum
+        method: Rolloff method to use
+
+    Returns:
+        Spectrum with smooth rolloff applied, free from Gibbs artifacts
+    """
+    smooth_spectrum = spectrum.copy()
+
+    # Define transition bandwidth (how many harmonics for the rolloff)
+    # Wider transitions = smoother rolloff = less Gibbs phenomenon
+    transition_bandwidth = max(3, cutoff_harmonic // 3)  # At least 3, up to 33% of cutoff
+
+    if method == "raised_cosine":
+        # Raised cosine rolloff - smooth S-curve transition
+        # Mathematical form: 0.5 * (1 + cos(π * t)) for t from 0 to 1
+        for k in range(1, N // 2):  # Process positive frequencies only
+            if k <= cutoff_harmonic:
+                # Passband - no attenuation
+                continue
+            elif k <= cutoff_harmonic + transition_bandwidth:
+                # Transition band - raised cosine rolloff
+                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+                attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
+                smooth_spectrum[k] *= attenuation
+                smooth_spectrum[N - k] *= attenuation  # Mirror for negative frequencies
+            else:
+                # Stopband - full attenuation
+                smooth_spectrum[k] = 0
+                smooth_spectrum[N - k] = 0
+
+    elif method == "tukey":
+        # Tukey window - flat passband with cosine rolloff
+        # Provides the sharpest transition while still being smooth
+        for k in range(1, N // 2):
+            if k <= cutoff_harmonic:
+                continue
+            elif k <= cutoff_harmonic + transition_bandwidth:
+                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+                # Cosine taper: cos²(π/2 * t) for t from 0 to 1
+                attenuation = np.cos(np.pi * transition_pos / 2.0) ** 2
+                smooth_spectrum[k] *= attenuation
+                smooth_spectrum[N - k] *= attenuation
+            else:
+                smooth_spectrum[k] = 0
+                smooth_spectrum[N - k] = 0
+
+    elif method == "hann":
+        # Hann window rolloff - good balance of smoothness and transition width
+        for k in range(1, N // 2):
+            if k <= cutoff_harmonic:
+                continue
+            elif k <= cutoff_harmonic + transition_bandwidth:
+                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+                # Hann window: 0.5 * (1 + cos(π * t)) but applied as rolloff
+                attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
+                smooth_spectrum[k] *= attenuation
+                smooth_spectrum[N - k] *= attenuation
+            else:
+                smooth_spectrum[k] = 0
+                smooth_spectrum[N - k] = 0
+
+    elif method == "blackman":
+        # Blackman window rolloff - very smooth, minimal ripple, widest transition
+        # Best for eliminating Gibbs phenomenon but with wider transition band
+        for k in range(1, N // 2):
+            if k <= cutoff_harmonic:
+                continue
+            elif k <= cutoff_harmonic + transition_bandwidth:
+                transition_pos = (k - cutoff_harmonic) / transition_bandwidth
+                # Blackman window coefficients for extremely smooth rolloff
+                attenuation = (0.42 + 0.5 * np.cos(np.pi * transition_pos) +
+                             0.08 * np.cos(2 * np.pi * transition_pos))
+                smooth_spectrum[k] *= attenuation
+                smooth_spectrum[N - k] *= attenuation
+            else:
+                smooth_spectrum[k] = 0
+                smooth_spectrum[N - k] = 0
+
+    else:  # brick_wall or unknown method
+        # Original brick wall method for comparison - causes Gibbs phenomenon
+        for k in range(1, N // 2):
+            if k > cutoff_harmonic:
+                smooth_spectrum[k] = 0
+                smooth_spectrum[N - k] = 0
+
+    return smooth_spectrum
+
+
+def analyze_mipmap_quality(mipmap_chain: MipmapChain, method_name: str = "") -> dict:
+    """
+    Analyze the quality of a mipmap chain, detecting Gibbs phenomenon artifacts.
+
+    Args:
+        mipmap_chain: List of mipmap levels to analyze
+        method_name: Name of the method used (for reporting)
+
+    Returns:
+        Dictionary with quality metrics including Gibbs artifact detection
+    """
+    results = {
+        "method": method_name,
+        "levels": len(mipmap_chain),
+        "gibbs_artifacts": [],
+        "rms_levels": [],
+        "peak_levels": []
+    }
+
+    for level_idx, level in enumerate(mipmap_chain):
+        # Calculate RMS and peak levels
+        rms = np.sqrt(np.mean(level**2))
+        peak = np.max(np.abs(level))
+
+        results["rms_levels"].append(rms)
+        results["peak_levels"].append(peak)
+
+        # Detect Gibbs phenomenon by looking for high-frequency oscillations
+        # Take the derivative to emphasize rapid changes
+        derivative = np.diff(level)
+
+        # Look for excessive high-frequency content (potential Gibbs artifacts)
+        # High standard deviation in the derivative indicates oscillations/ripple
+        derivative_std = np.std(derivative)
+        derivative_mean = np.mean(np.abs(derivative))
+
+        # Ratio of std to mean indicates oscillatory behavior
+        # High ratio suggests Gibbs phenomenon artifacts
+        oscillation_ratio = derivative_std / (derivative_mean + 1e-12)
+
+        results["gibbs_artifacts"].append({
+            "level": level_idx,
+            "oscillation_ratio": oscillation_ratio,
+            "has_artifacts": oscillation_ratio > 3.0  # Threshold for artifact detection
+        })
+
+    return results
