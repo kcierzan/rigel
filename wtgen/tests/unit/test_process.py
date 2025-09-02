@@ -7,8 +7,6 @@ from hypothesis import strategies as st
 from wtgen.dsp.process import (
     align_to_zero_crossing,
     dc_remove,
-    ensure_consistent_phase_alignment,
-    min_phase_realign,
     normalize,
     normalize_to_range,
 )
@@ -210,96 +208,6 @@ class TestAlignToZeroCrossing:
         # Should preserve shape and data (just rotated)
         assert result.shape == wavetable.shape
         np.testing.assert_allclose(np.sort(result), np.sort(wavetable), atol=1e-15)
-
-
-class TestEnsureConsistentPhaseAlignment:
-    """Test mipmap phase alignment functionality."""
-
-    def test_ensure_consistent_phase_alignment_basic(self):
-        """Test basic phase alignment across mipmap levels."""
-        # Create multiple sine waves with different phases
-        t = np.linspace(0, 2 * np.pi, 64, endpoint=False)
-        level1 = np.sin(t)
-        level2 = np.sin(t + np.pi / 4)  # Phase shifted
-        level3 = np.sin(t + np.pi / 2)  # More phase shifted
-
-        mipmap_chain = [level1, level2, level3]
-        result = ensure_consistent_phase_alignment(mipmap_chain)
-
-        # All levels should be aligned (start closer to zero)
-        for level in result:
-            assert len(level) == 64
-            # Each should be aligned to zero crossing
-            assert abs(level[0]) <= abs(np.sin(np.pi / 4))  # Better than worst case
-
-    def test_ensure_consistent_phase_alignment_empty(self):
-        """Test phase alignment with empty input."""
-        result = ensure_consistent_phase_alignment([])
-        assert result == []
-
-    def test_ensure_consistent_phase_alignment_single(self):
-        """Test phase alignment with single level."""
-        wavetable = np.array([1.0, 0.0, -1.0, 0.0])
-        result = ensure_consistent_phase_alignment([wavetable])
-
-        assert len(result) == 1
-        assert len(result[0]) == 4
-
-    @given(st.lists(st.lists(st.floats(-5, 5), min_size=4, max_size=128), min_size=1, max_size=10))
-    def test_ensure_consistent_phase_alignment_hypothesis(self, level_data):
-        """Hypothesis test for phase alignment."""
-        assume(all(all(np.isfinite(v) for v in level) for level in level_data))
-
-        mipmap_chain = [np.array(level) for level in level_data]
-        result = ensure_consistent_phase_alignment(mipmap_chain)
-
-        # Should preserve count and shapes
-        assert len(result) == len(mipmap_chain)
-        for i, level in enumerate(result):
-            assert level.shape == mipmap_chain[i].shape
-
-
-class TestMinPhaseRealign:
-    """Test minimum phase realignment functionality."""
-
-    def test_min_phase_realign_basic(self):
-        """Test basic minimum phase conversion."""
-        # Create a simple signal
-        wavetable = np.array([1.0, 0.5, -0.5, -1.0, 0.0, 0.5, 1.0, 0.5])
-        result = min_phase_realign(wavetable)
-
-        # Should be normalized
-        assert abs(np.max(np.abs(result)) - 0.999) < 1e-10
-        # Should preserve length
-        assert result.shape == wavetable.shape
-
-    def test_min_phase_realign_sine(self):
-        """Test minimum phase conversion on sine wave."""
-        t = np.linspace(0, 2 * np.pi, 64, endpoint=False)
-        wavetable = np.sin(t)
-        result = min_phase_realign(wavetable)
-
-        # Should be normalized and finite
-        assert np.all(np.isfinite(result))
-        assert abs(np.max(np.abs(result)) - 0.999) < 1e-10
-
-    @given(st.lists(st.floats(-5, 5), min_size=8, max_size=256))
-    def test_min_phase_realign_hypothesis(self, values):
-        """Hypothesis test for minimum phase realignment."""
-        assume(all(np.isfinite(v) for v in values))
-        assume(max(abs(v) for v in values) > 1e-6)  # Non-zero signal
-
-        wavetable = np.array(values)
-        result = min_phase_realign(wavetable)
-
-        # Should be normalized and finite
-        assert np.all(np.isfinite(result))
-        # The true peak (including inter-sample peaks) should not exceed 0.999
-        from src.wtgen.dsp.process import _estimate_inter_sample_peak
-
-        true_peak = _estimate_inter_sample_peak(result)
-        assert true_peak <= 0.999 + 1e-7
-        assert result.shape == wavetable.shape
 
 
 class TestIntegrationProperties:

@@ -131,9 +131,6 @@ def build_mipmap(
         else:
             mipmap_levels.append(normalized_level.astype(np.float32))
 
-    # Apply consistent phase alignment to all mipmap levels
-    # aligned_levels = ensure_consistent_phase_alignment(mipmap_levels)
-
     return mipmap_levels
 
 
