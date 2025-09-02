@@ -13,7 +13,7 @@ from wtgen.dsp.waves import (
     harmonics_to_table,
 )
 from wtgen.export import load_wavetable_npz, save_wavetable_npz, save_wavetable_with_wav_export
-from wtgen.plotting import (
+from wtgen.dsp.waves import (
     generate_pulse_wavetable,
     generate_sawtooth_wavetable,
     generate_square_wavetable,

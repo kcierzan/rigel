@@ -4,6 +4,9 @@ from typing import Literal
 import numpy as np
 from numba import njit
 from numpy.typing import NDArray
+from scipy import signal
+
+WAVETABLE_SIZE = 2048
 
 # Type alias for harmonic partials: (harmonic_number, amplitude, phase_radians)
 Partial = tuple[int, float, float]
@@ -26,6 +29,76 @@ class RolloffMethod(str, Enum):
     raised_cosine = "raised_cosine"
     hann = "hann"
     none = "none"
+
+def generate_sine_wavetable(
+    frequency: float = 1 / (2 * np.pi),
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Generate a sine wave wavetable."""
+    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    return (
+        t,
+        signal.chirp(
+            t,
+            f0=frequency,
+            f1=frequency,
+            t1=2 * np.pi,
+            phi=270,
+            method="linear",
+        ),
+    )
+
+def generate_sawtooth_wavetable(
+    frequency: float = 1,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Generate a sawtooth wave wavetable."""
+    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    return (t, signal.sawtooth(frequency * t))
+
+
+def generate_square_wavetable(
+    frequency: float = 1, duty: float = 0.5
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Generate a square wave wavetable."""
+    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    return (t, signal.square(frequency * t, duty=duty))
+
+
+def generate_pulse_wavetable(
+    frequency: float = 1, pulse_width: float = 0.5
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Generate a pulse wave as the difference of two sawtooth waves.
+
+    Args:
+        frequency: Frequency of the pulse wave
+        pulse_width: Pulse width (0.0 to 1.0), where 0.5 is 50% duty cycle
+    """
+    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+
+    sawtooth1 = signal.sawtooth(frequency * t)
+    sawtooth2 = signal.sawtooth(frequency * t + 2 * np.pi * pulse_width)
+
+    pulse = sawtooth1 - sawtooth2
+    return (t, pulse)
+
+
+def generate_triangle_wavetable(
+    frequency: float = 1,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Generate a triangle wave wavetable.
+
+    Triangle waves have a characteristic shape that rises linearly from -1 to +1
+    and then falls linearly from +1 to -1. They contain only odd harmonics with
+    amplitudes that fall off as 1/n² (much faster than sawtooth waves).
+
+    Args:
+        frequency: Frequency of the triangle wave
+
+    Returns:
+        Tuple of (time_values, waveform_samples)
+    """
+    t = np.linspace(0, 2 * np.pi, WAVETABLE_SIZE)
+    return (t, signal.sawtooth(frequency * t, width=0.5))
+
 
 
 @njit
