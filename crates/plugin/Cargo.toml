@@ -1,0 +1,28 @@
+[package]
+name = "rigel-plugin"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Rigel wavetable synthesizer plugin (VST3/CLAP)"
+rust-version.workspace = true
+
+[lib]
+name = "rigel_plugin"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+# Internal dependencies
+rigel-dsp = { path = "../dsp" }
+
+# Plugin framework
+nih_plug.workspace = true
+nih_plug_iced.workspace = true
+
+# GUI dependencies
+atomic_float = "0.1"
+
+[features]
+default = []
