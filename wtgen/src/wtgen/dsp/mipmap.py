@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
+from numpy import pi, cos
 
 # Type alias for mipmap levels
 MipmapLevel = NDArray[np.float32]
@@ -158,7 +159,7 @@ def _apply_raised_cosine_rolloff(
         elif k <= cutoff_harmonic + transition_bandwidth:
             # Transition band - raised cosine rolloff
             transition_pos = (k - cutoff_harmonic) / transition_bandwidth
-            attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
+            attenuation = 0.5 * (1.0 + cos(pi * transition_pos))
             spectrum[k] *= attenuation
             spectrum[N - k] *= attenuation  # Mirror for negative frequencies
         else:
@@ -188,7 +189,7 @@ def _apply_tukey_rolloff(
         elif k <= cutoff_harmonic + transition_bandwidth:
             transition_pos = (k - cutoff_harmonic) / transition_bandwidth
             # Cosine taper: cos²(π/2 * t) for t from 0 to 1
-            attenuation = np.cos(np.pi * transition_pos / 2.0) ** 2
+            attenuation = cos(pi * transition_pos / 2.0) ** 2
             spectrum[k] *= attenuation
             spectrum[N - k] *= attenuation
         else:
@@ -217,7 +218,7 @@ def _apply_hann_rolloff(
         elif k <= cutoff_harmonic + transition_bandwidth:
             transition_pos = (k - cutoff_harmonic) / transition_bandwidth
             # Hann window: 0.5 * (1 + cos(π * t)) but applied as rolloff
-            attenuation = 0.5 * (1.0 + np.cos(np.pi * transition_pos))
+            attenuation = 0.5 * (1.0 + cos(pi * transition_pos))
             spectrum[k] *= attenuation
             spectrum[N - k] *= attenuation
         else:
@@ -248,8 +249,8 @@ def _apply_blackman_rolloff(
             # Blackman window coefficients for extremely smooth rolloff
             attenuation = (
                 0.42
-                + 0.5 * np.cos(np.pi * transition_pos)
-                + 0.08 * np.cos(2 * np.pi * transition_pos)
+                + 0.5 * cos(pi * transition_pos)
+                + 0.08 * cos(2 * pi * transition_pos)
             )
             spectrum[k] *= attenuation
             spectrum[N - k] *= attenuation
