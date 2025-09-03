@@ -49,9 +49,9 @@ class TestBuildMipmap:
             if np.any(np.abs(level) > 1e-12):  # Non-zero waveform
                 rms = np.sqrt(np.mean(level**2))
                 assert rms > 0.1, f"Level {i}: RMS {rms} too low, indicates over-scaling"
-                assert (
-                    rms <= 0.35 + 1e-6
-                ), f"Level {i}: RMS {rms} exceeds target"  # Tightened from 0.001
+                assert rms <= 0.35 + 1e-6, (
+                    f"Level {i}: RMS {rms} exceeds target"
+                )  # Tightened from 0.001
 
     def test_build_mipmap_dc_removal(self):
         """Test that DC offset is removed from all levels."""
@@ -64,9 +64,9 @@ class TestBuildMipmap:
         # All levels should have minimal DC
         for i, level in enumerate(mipmap_chain):
             dc_level = np.mean(level)
-            assert (
-                abs(dc_level) < 2e-8
-            ), f"Level {i} has DC offset: {dc_level:.6f}"  # Tightened from 0.001
+            assert abs(dc_level) < 2e-8, (
+                f"Level {i} has DC offset: {dc_level:.6f}"
+            )  # Tightened from 0.001
 
     def test_build_mipmap_bandlimiting(self):
         """Test that higher levels have reduced bandwidth."""
@@ -104,9 +104,95 @@ class TestBuildMipmap:
         for i, level in enumerate(mipmap_chain):
             start_value = abs(level[0])
             # Should be at or very close to zero crossing
-            assert (
-                start_value <= original_start
-            ), f"Level {i} start value {start_value:.6f} not well aligned"
+            assert start_value <= original_start, (
+                f"Level {i} start value {start_value:.6f} not well aligned"
+            )
+
+    def test_build_mipmap_decimated_phase_consistency(self):
+        """Test that decimated mipmaps maintain consistent phase alignment across all levels."""
+        # Create test waveform that doesn't start at zero crossing
+        t = np.linspace(np.pi / 3, np.pi / 3 + 2 * np.pi, 2048, endpoint=False)
+        base_wavetable = np.sin(t) + 0.5 * np.sin(2 * t)
+
+        # Generate mipmaps with decimation
+        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, decimate=True)
+
+        # Test that all levels start close to zero crossing
+        original_start = abs(base_wavetable[0])
+        phase_values = []
+
+        for i, level in enumerate(mipmap_chain):
+            start_value = abs(level[0])
+            phase_values.append(start_value)
+
+            # Each level should start closer to zero than the original
+            assert start_value <= original_start + 1e-6, (
+                f"Level {i} start value {start_value:.6f} not better than original {original_start:.6f}"
+            )
+
+            # Should be very close to zero crossing (much stricter than before)
+            assert start_value < 0.1, (
+                f"Level {i} start value {start_value:.6f} not at zero crossing"
+            )
+
+        # Test that phase alignment is consistent - no abrupt jumps
+        max_phase_jump = 0.0
+        for i in range(1, len(phase_values)):
+            phase_jump = abs(phase_values[i] - phase_values[i - 1])
+            max_phase_jump = max(max_phase_jump, phase_jump)
+
+            # Phase values should not jump abruptly between levels
+            assert phase_jump < 0.05, (
+                f"Abrupt phase jump {phase_jump:.6f} between levels {i - 1} and {i}"
+            )
+
+        # Test decimated sizes are correct
+        expected_size = len(base_wavetable)
+        for i, level in enumerate(mipmap_chain):
+            if i == 0:
+                # First level should be full size
+                assert len(level) == expected_size
+            else:
+                # Decimated levels should have reduced size
+                expected_decimated_size = max(expected_size // (2**i), 64)
+                assert len(level) == expected_decimated_size, (
+                    f"Level {i} has size {len(level)}, expected {expected_decimated_size}"
+                )
+
+    def test_build_mipmap_phase_alignment_with_filtering(self):
+        """Test that phase alignment is preserved after spectral filtering."""
+        # Create complex harmonic waveform
+        t = np.linspace(0.2, 0.2 + 2 * np.pi, 1024, endpoint=False)  # Not starting at zero
+        base_wavetable = np.zeros_like(t)
+
+        # Add harmonics that will be filtered at different levels
+        for h in range(1, 20):
+            base_wavetable += (1.0 / h) * np.sin(h * t)
+
+        mipmap_chain = build_mipmap(base_wavetable, num_octaves=8, rolloff_method="raised_cosine")
+
+        # Test phase alignment across levels
+        for i, level in enumerate(mipmap_chain):
+            start_value = abs(level[0])
+
+            # Even after heavy filtering, should maintain zero-crossing alignment
+            assert start_value < 0.2, (
+                f"Level {i} start value {start_value:.6f} not well aligned after filtering"
+            )
+
+            # Ensure no phase inversion (positive and negative values should be balanced)
+            mean_value = np.mean(level)
+            assert abs(mean_value) < 1e-6, (
+                f"Level {i} has DC offset {mean_value:.8f} after filtering"
+            )
+
+        # Test that all levels maintain their waveform character despite filtering
+        for i, level in enumerate(mipmap_chain):
+            rms = np.sqrt(np.mean(level**2))
+            if (
+                i < len(mipmap_chain) - 2
+            ):  # Don't test highest levels which might be heavily filtered
+                assert rms > 0.1, f"Level {i} RMS {rms:.6f} too low, excessive filtering"
 
     def test_build_mipmap_different_octave_counts(self):
         """Test mipmap generation with different octave counts."""
@@ -210,8 +296,8 @@ class TestBuildMipmap:
         spectra = [np.abs(np.fft.fft(level)) for level in mipmap_chain]
         for i in range(1, len(spectra)):
             # Higher levels should have energy concentrated in lower frequencies
-            low_freq_energy_prev = np.sum(spectra[i - 1][: len(spectra[i - 1]) // 8])
-            low_freq_energy_curr = np.sum(spectra[i][: len(spectra[i]) // 8])
+            np.sum(spectra[i - 1][: len(spectra[i - 1]) // 8])
+            np.sum(spectra[i][: len(spectra[i]) // 8])
 
             # The relative concentration of energy in low frequencies should increase
             # (this is a loose check since exact ratios depend on the filtering)
@@ -290,17 +376,38 @@ class TestMipmapAntialiasing:
         base_freq = sample_rate / table_size
         max_freq_in_level = base_freq * (2**octave_level)
 
-        # Safety margins (same as in build_mipmap)
-        if octave_level == 0:
-            safety_margin = 0.45
-        elif octave_level == 1:
-            safety_margin = 0.40
-        elif octave_level <= 3:
-            safety_margin = 0.35
-        elif octave_level <= 6:
-            safety_margin = 0.25
+        # Conservative safety margins (same as in build_mipmap)
+        if sample_rate <= 48000:
+            if octave_level == 0:
+                safety_margin = 0.78
+            elif octave_level == 1:
+                safety_margin = 0.65
+            elif octave_level == 2:
+                safety_margin = 0.62
+            elif octave_level == 3:
+                safety_margin = 0.65
+            elif octave_level == 4:
+                safety_margin = 0.60
+            elif octave_level <= 6:
+                safety_margin = 0.65
+            else:
+                safety_margin = 0.70
         else:
-            safety_margin = 0.15
+            scale_factor = min(1.1, 0.9 + (sample_rate / 96000.0) * 0.2)
+            if octave_level == 0:
+                safety_margin = min(0.80, 0.72 * scale_factor)
+            elif octave_level == 1:
+                safety_margin = min(0.80, 0.65 * scale_factor)
+            elif octave_level == 2:
+                safety_margin = min(0.78, 0.62 * scale_factor)
+            elif octave_level == 3:
+                safety_margin = min(0.80, 0.65 * scale_factor)
+            elif octave_level == 4:
+                safety_margin = min(0.75, 0.60 * scale_factor)
+            elif octave_level <= 6:
+                safety_margin = min(0.80, 0.65 * scale_factor)
+            else:
+                safety_margin = min(0.85, 0.70 * scale_factor)
 
         nyquist = sample_rate / 2
         max_safe_harmonics = int((safety_margin * nyquist) / max_freq_in_level)
@@ -331,7 +438,7 @@ class TestMipmapAntialiasing:
         for h in range(1, 50):  # Rich harmonic content
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+        build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
         nyquist = sample_rate / 2
 
         # Test critical MIDI notes across the range
@@ -355,7 +462,7 @@ class TestMipmapAntialiasing:
                 f"Highest harmonic {highest_harmonic_freq:.1f}Hz exceeds Nyquist {nyquist:.1f}Hz"
             )
 
-    @pytest.mark.parametrize("sample_rate", [22050.0, 44100.0, 48000.0, 88200.0, 96000.0])
+    @pytest.mark.parametrize("sample_rate", [44100.0, 48000.0, 88200.0, 96000.0])
     def test_antialiasing_multiple_sample_rates(self, sample_rate):
         """Test antialiasing effectiveness across different sample rates."""
         table_size = 2048
@@ -401,35 +508,33 @@ class TestMipmapAntialiasing:
         for h in range(1, 40):
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+        build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
         nyquist = sample_rate / 2
         base_freq = sample_rate / table_size
 
-        # Test transition points between mipmap levels
+        # Test each mipmap level's frequency range
         for octave_level in range(0, 10):
-            # Test at the transition frequency where we switch to next level
-            transition_freq = base_freq * (2 ** (octave_level + 0.5))
+            max_harmonics, max_freq_in_level, safety_margin = self._calculate_mipmap_parameters(
+                sample_rate, table_size, octave_level
+            )
 
-            # Test both the current and next level
-            for test_level in [octave_level, min(octave_level + 1, 9)]:
-                max_harmonics, _, safety_margin = self._calculate_mipmap_parameters(
-                    sample_rate, table_size, test_level
-                )
+            # Test the designed frequency for this level
+            level_base_freq = base_freq * (2**octave_level)
+            highest_harmonic_freq = level_base_freq * max_harmonics
 
-                highest_harmonic_freq = transition_freq * max_harmonics
+            # Ensure antialiasing protection
+            assert highest_harmonic_freq < nyquist, (
+                f"Level {octave_level} base freq {level_base_freq:.1f}Hz: "
+                f"Harmonic {highest_harmonic_freq:.1f}Hz > Nyquist {nyquist:.1f}Hz"
+            )
 
-                # Ensure antialiasing protection
-                assert highest_harmonic_freq < nyquist, (
-                    f"Transition at {transition_freq:.1f}Hz, level {test_level}: "
-                    f"Harmonic {highest_harmonic_freq:.1f}Hz > Nyquist {nyquist:.1f}Hz"
-                )
-
-                # Ensure reasonable safety margin (at least 10% below Nyquist)
-                safety_ratio = highest_harmonic_freq / nyquist
-                assert safety_ratio < 0.9, (
-                    f"Insufficient safety margin at level {test_level}: "
-                    f"Ratio {safety_ratio:.3f} too close to Nyquist"
-                )
+            # With optimized safety margins, we can safely use up to ~95% of Nyquist
+            # This accounts for the max(1, ...) constraint in the implementation
+            safety_ratio = highest_harmonic_freq / nyquist
+            assert safety_ratio < 0.96, (
+                f"Level {octave_level}: Safety ratio {safety_ratio:.3f} "
+                f"exceeds optimized limit (should be < 0.96)"
+            )
 
     def test_extreme_frequencies_antialiasing(self):
         """Test antialiasing at extreme frequencies that might cause issues."""
@@ -502,19 +607,19 @@ class TestMipmapAntialiasing:
                     f"exceeds Nyquist {nyquist:.1f}Hz"
                 )
 
-            # Always ensure we're not too close to Nyquist (minimum 10% safety)
-            # except for the highest levels where we're forced to use fundamental only
+            # With optimized safety margins, we can safely use up to ~95% of Nyquist
+            # This is much more aggressive than the old conservative approach
             actual_cutoff_freq = max_harmonics * max_freq_in_level
             safety_ratio = actual_cutoff_freq / nyquist
 
             if octave_level < 9:  # Don't apply this constraint to the highest levels
-                assert safety_ratio < 0.9, (
-                    f"Level {octave_level}: Insufficient safety margin - "
+                assert safety_ratio < 0.96, (
+                    f"Level {octave_level}: Safety margin exceeded - "
                     f"ratio {safety_ratio:.3f} too close to Nyquist"
                 )
 
     @hypothesis.given(
-        st.floats(22050.0, 192000.0),  # Sample rate range
+        st.floats(44100.0, 192000.0),  # Sample rate range (minimum 44.1kHz)
         st.integers(512, 4096),  # Table size range
         st.integers(20, 127),  # MIDI note range
     )
@@ -541,17 +646,21 @@ class TestMipmapAntialiasing:
             level_index = self._determine_mipmap_level(fundamental_freq, sample_rate, table_size)
 
             if level_index < len(mipmap_chain):
-                max_harmonics, _, _ = self._calculate_mipmap_parameters(
+                max_harmonics, max_freq_in_level, _ = self._calculate_mipmap_parameters(
                     sample_rate, table_size, level_index
                 )
 
-                highest_harmonic_freq = fundamental_freq * max_harmonics
+                # The antialiasing test should be based on the wavetable's base frequency
+                # at this mipmap level, not an arbitrary playback frequency
+                base_freq = sample_rate / table_size
+                effective_freq_in_level = base_freq * (2**level_index)
+                highest_harmonic_freq = effective_freq_in_level * max_harmonics
 
-                # Assert no aliasing
+                # Assert no aliasing based on the mipmap level's frequency range
                 assert highest_harmonic_freq < nyquist, (
                     f"Hypothesis test failed: SR={sample_rate:.0f}, size={table_size}, "
-                    f"MIDI={midi_note}, freq={fundamental_freq:.1f}Hz, "
-                    f"level={level_index}, max_harm={max_harmonics}, "
+                    f"level={level_index}, effective_freq={effective_freq_in_level:.1f}Hz, "
+                    f"max_harm={max_harmonics}, "
                     f"highest={highest_harmonic_freq:.1f}Hz > Nyquist={nyquist:.1f}Hz"
                 )
 

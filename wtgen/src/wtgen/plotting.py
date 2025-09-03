@@ -181,12 +181,12 @@ def compare_mipmap_methods() -> None:
 
     methods = ["tukey", "blackman", "raised_cosine", "hann", "none"]
     colors = ["blue", "red", "green", "yellow", "purple"]
-    for i, (method, color) in enumerate(zip(methods, colors, strict=False)):
+    for _i, (method, color) in enumerate(zip(methods, colors, strict=False)):
         mips = build_mipmap(base_sawtooth, num_octaves=3, rolloff_method=method)
         axes[1, 1].plot(
             t[zoom_start:zoom_end],
             mips[2][zoom_start:zoom_end],
-            label=f'{method.replace("_", " ").title()}',
+            label=f"{method.replace('_', ' ').title()}",
             color=color,
             linewidth=2,
             alpha=0.4,

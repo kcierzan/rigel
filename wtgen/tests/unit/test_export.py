@@ -300,7 +300,7 @@ class TestLoadWavetableNpz:
         tables = {}
 
         # Different wave types and sizes
-        for i, (name, size) in enumerate([("sine", 2048), ("square", 1024), ("noise", 512)]):
+        for _i, (name, size) in enumerate([("sine", 2048), ("square", 1024), ("noise", 512)]):
             if name == "sine":
                 wave = np.sin(2 * np.pi * np.linspace(0, 1, size, endpoint=False))
             elif name == "square":
@@ -385,7 +385,7 @@ class TestSaveMipmapsAsWav:
         wave = np.random.randn(512).astype(np.float32) * 0.5  # Keep within [-0.5, 0.5]
         tables = {"test": [wave]}
 
-        for bit_depth, expected_dtype in [(16, np.int16), (24, np.int32), (32, np.int32)]:
+        for bit_depth, _expected_dtype in [(16, np.int16), (24, np.int32), (32, np.int32)]:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 tmp_path = Path(tmp_dir)
 
