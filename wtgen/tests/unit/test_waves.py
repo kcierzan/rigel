@@ -88,9 +88,9 @@ class TestHarmonicsToTable:
         assert np.all(result >= -1.0), "Values below -1.0 detected (clipping)"
         assert np.all(result <= 1.0), "Values above 1.0 detected (clipping)"
         assert np.max(np.abs(result)) <= 1.01, "Peak values exceed safe range"
-        assert (
-            np.max(np.abs(result)) >= 0.5
-        ), "Should actually use significant range"  # Should actually use significant range
+        assert np.max(np.abs(result)) >= 0.5, (
+            "Should actually use significant range"
+        )  # Should actually use significant range
 
     def test_phase_mode_linear(self):
         """Test linear phase mode."""

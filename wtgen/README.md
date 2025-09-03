@@ -80,7 +80,7 @@ uv run python -m wtgen.cli info sawtooth.npz
 # Example output:
 # Wavetable: sawtooth.npz
 #   Mipmap levels: 9
-#   Table size: 2048  
+#   Table size: 2048
 #   Waveform: WaveformType.sawtooth
 #   Rolloff: RolloffMethod.tukey
 #   Frequency: 1.0
@@ -126,7 +126,7 @@ wtgen automatically generates bandlimited mipmaps for alias-free playback across
 Mipmaps are pre-computed, progressively band-limited versions of the base wavetable:
 
 - **Level 0**: Full spectrum (highest notes)
-- **Level 1**: Limited to Nyquist/2 (one octave down)  
+- **Level 1**: Limited to Nyquist/2 (one octave down)
 - **Level 2**: Limited to Nyquist/4 (two octaves down)
 - **Level N**: Limited to Nyquist/(2^N) (N octaves down)
 
@@ -140,13 +140,13 @@ import numpy as np
 def select_mipmap_level(fundamental_freq, sample_rate, num_levels):
     """Select appropriate mipmap level for given fundamental frequency."""
     nyquist = sample_rate / 2
-    
+
     # Find the highest level where fundamental * max_harmonic < nyquist
     for level in range(num_levels):
         max_safe_freq = nyquist / (2 ** level)
         if fundamental_freq * 16 < max_safe_freq:  # Assume ~16 harmonics max
             return level
-    
+
     return num_levels - 1  # Use most filtered level
 ```
 
@@ -161,7 +161,7 @@ uv run python -m wtgen.cli generate sawtooth \
   --rolloff blackman \
   --size 4096
 
-# Balanced: good quality, reasonable size  
+# Balanced: good quality, reasonable size
 uv run python -m wtgen.cli generate sawtooth \
   --octaves 8 \
   --rolloff tukey \
@@ -211,7 +211,7 @@ for mipmap in mipmaps:
     processed_mipmaps.append(processed)
 
 # Save to file
-np.savez_compressed('my_wavetable.npz', 
+np.savez_compressed('my_wavetable.npz',
                    mipmaps=np.array(processed_mipmaps, dtype=np.float32))
 ```
 
@@ -237,7 +237,7 @@ wavetable = harmonics_to_table(custom_partials, table_size=2048)
 ```python
 from wtgen.plotting import (
     generate_sawtooth_wavetable,
-    generate_square_wavetable, 
+    generate_square_wavetable,
     generate_pulse_wavetable,
     generate_triangle_wavetable
 )
@@ -259,7 +259,7 @@ rolloff_methods = ['tukey', 'hann', 'blackman', 'raised_cosine']
 
 for method in rolloff_methods:
     mipmaps = build_mipmap(
-        wavetable, 
+        wavetable,
         num_octaves=10,
         rolloff_method=method,
         sample_rate=44100  # Optional: specify sample rate
@@ -439,8 +439,8 @@ Each test module includes Hypothesis-powered fuzz testing that:
 ### Code Formatting
 
 ```bash
-uv run black .
 uv run ruff check --fix .
+uv run ruff format
 ```
 
 ### Type Checking

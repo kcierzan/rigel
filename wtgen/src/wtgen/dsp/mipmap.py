@@ -1,10 +1,14 @@
+from typing import Any, TypeAlias
+
 import numpy as np
 from numpy import cos, pi
 from numpy.typing import NDArray
 
+from wtgen.dsp.process import align_to_zero_crossing
+
 # Type alias for mipmap levels
-MipmapLevel = NDArray[np.float32]
-MipmapChain = list[MipmapLevel]
+MipmapLevel: TypeAlias = NDArray[np.float32]
+MipmapChain: TypeAlias = list[MipmapLevel]
 
 
 def build_mipmap(
@@ -21,7 +25,8 @@ def build_mipmap(
         base_wavetable: Base wavetable for one cycle (full bandwidth)
         num_octaves: Number of octave levels to generate (default 10 for full MIDI range)
         sample_rate: Sample rate in Hz (default 44100.0)
-        rolloff_method: Method for smooth rolloff ("raised_cosine", "tukey", "hann", "blackman", "brick_wall")
+        rolloff_method: Method for smooth rolloff ("raised_cosine", "tukey", "hann", "blackman",
+            "brick_wall")
         decimate: Whether to decimate each level by half (2048→1024→512...)
 
     Returns:
@@ -52,23 +57,54 @@ def build_mipmap(
 
     mipmap_levels: MipmapChain = []
 
+    # Apply zero-crossing alignment to base wavetable first
+    # This ensures the lowest mip starts at 0,0 ideally
+    aligned_base = align_to_zero_crossing(base_wavetable)
+
     for octave_level in range(0, num_octaves + 1):
         # Improved frequency calculation for smoother transitions
         # Each level should handle frequencies up to a specific cutoff
         base_freq = sample_rate / table_size
         max_freq_in_level = base_freq * (2**octave_level)
 
-        # More gradual safety margins to prevent abrupt transitions
-        if octave_level == 0:
-            safety_margin = 0.45  # Allow more harmonics for level 0
-        elif octave_level == 1:
-            safety_margin = 0.40  # Gentle transition for level 1
-        elif octave_level <= 3:
-            safety_margin = 0.35  # Moderate filtering for low-mid levels
-        elif octave_level <= 6:
-            safety_margin = 0.25  # More aggressive for mid levels
+        # Conservative safety margins to prevent aliasing at 44.1kHz
+        # Higher sample rates provide more headroom but we prioritize safety
+        if sample_rate <= 48000:
+            # Conservative margins for standard sample rates, tested for critical MIDI notes
+            if octave_level == 0:
+                safety_margin = 0.78  # Tested safe for MIDI 21
+            elif octave_level == 1:
+                safety_margin = 0.65  # Tested safe for MIDI 36
+            elif octave_level == 2:
+                safety_margin = 0.62  # Tested safe for MIDI 48
+            elif octave_level == 3:
+                safety_margin = 0.65  # Conservative for level 3
+            elif octave_level == 4:
+                safety_margin = 0.60  # More conservative for level 4
+            elif octave_level <= 6:
+                safety_margin = 0.65  # Conservative for mid levels
+            else:
+                safety_margin = 0.70  # Conservative for higher levels
         else:
-            safety_margin = 0.15  # Most aggressive for high levels
+            # Higher sample rates: use conservative base margins but allow some scaling
+            # The key insight is that MIDI frequencies don't scale with sample rate
+            scale_factor = min(
+                1.1, 0.9 + (sample_rate / 96000.0) * 0.2
+            )  # Much more conservative scaling
+            if octave_level == 0:
+                safety_margin = min(0.80, 0.72 * scale_factor)  # Very conservative for level 0
+            elif octave_level == 1:
+                safety_margin = min(0.80, 0.65 * scale_factor)
+            elif octave_level == 2:
+                safety_margin = min(0.78, 0.62 * scale_factor)
+            elif octave_level == 3:
+                safety_margin = min(0.80, 0.65 * scale_factor)
+            elif octave_level == 4:
+                safety_margin = min(0.75, 0.60 * scale_factor)
+            elif octave_level <= 6:
+                safety_margin = min(0.80, 0.65 * scale_factor)
+            else:
+                safety_margin = min(0.85, 0.70 * scale_factor)
 
         # Calculate maximum safe harmonics for this level
         cutoff_freq = safety_margin * nyquist / max_freq_in_level
@@ -76,7 +112,7 @@ def build_mipmap(
         max_safe_harmonics = max(1, max_safe_harmonics)  # Always keep at least fundamental
 
         # Apply smooth spectral domain bandlimiting
-        spectrum = np.fft.fft(base_wavetable)
+        spectrum = np.fft.fft(aligned_base)
         N = len(spectrum)
 
         # Apply smooth rolloff instead of brick wall filtering
@@ -87,6 +123,10 @@ def build_mipmap(
 
         # Remove any DC offset that may have been introduced during filtering
         bandlimited_level = bandlimited_level - np.mean(bandlimited_level)
+
+        # Apply zero-crossing alignment to maintain consistent phase across all levels
+        # This ensures each mipmap level starts at a zero crossing
+        bandlimited_level = align_to_zero_crossing(bandlimited_level)
 
         # Improved RMS normalization with clipping prevention
         current_rms = np.sqrt(np.mean(bandlimited_level**2))
@@ -120,11 +160,14 @@ def build_mipmap(
             target_size = max(target_size, 64)  # Don't go below 64 samples
 
             if target_size < len(normalized_level):
-                # Decimate using numpy.interp for smooth resampling
-                indices = np.linspace(0, len(normalized_level) - 1, target_size)
-                decimated_level = np.interp(
-                    indices, np.arange(len(normalized_level)), normalized_level
-                )
+                # Decimate by taking every Nth sample to preserve phase alignment
+                # This maintains better phase relationships than interpolation
+                decimation_factor = len(normalized_level) // target_size
+                decimated_level = normalized_level[::decimation_factor][:target_size]
+
+                # Apply zero-crossing alignment after decimation to ensure consistent phase
+                decimated_level = align_to_zero_crossing(decimated_level)
+
                 mipmap_levels.append(decimated_level.astype(np.float32))
             else:
                 mipmap_levels.append(normalized_level.astype(np.float32))
@@ -315,7 +358,7 @@ def _apply_smooth_rolloff(
     return smooth_spectrum
 
 
-def analyze_mipmap_quality(mipmap_chain: MipmapChain, method_name: str = "") -> dict:
+def analyze_mipmap_quality(mipmap_chain: MipmapChain, method_name: str = "") -> dict[str, Any]:
     """
     Analyze the quality of a mipmap chain, detecting Gibbs phenomenon artifacts.
 
@@ -326,7 +369,7 @@ def analyze_mipmap_quality(mipmap_chain: MipmapChain, method_name: str = "") -> 
     Returns:
         Dictionary with quality metrics including Gibbs artifact detection
     """
-    results = {
+    results: dict[str, Any] = {
         "method": method_name,
         "levels": len(mipmap_chain),
         "gibbs_artifacts": [],

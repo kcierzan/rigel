@@ -4,6 +4,7 @@ from typing import Annotated
 import numpy as np
 import typer
 
+from wtgen.dsp.eq import apply_parametric_eq_fft, apply_tilt_eq_fft, parse_eq_string
 from wtgen.dsp.mipmap import build_mipmap
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import (
@@ -57,6 +58,27 @@ def generate(
     wav_bit_depth: Annotated[
         int, typer.Option("--wav-bit-depth", help="Bit depth for .wav files (16, 24, or 32)")
     ] = 16,
+    eq: Annotated[
+        str | None,
+        typer.Option(
+            "--eq",
+            help="EQ settings as 'freq:gain:q,freq:gain:q,...' (freq in Hz, gain in dB, q=factor)",
+        ),
+    ] = None,
+    high_tilt: Annotated[
+        str | None,
+        typer.Option(
+            "--high-tilt",
+            help="High-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
+        ),
+    ] = None,
+    low_tilt: Annotated[
+        str | None,
+        typer.Option(
+            "--low-tilt",
+            help="Low-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
+        ),
+    ] = None,
 ) -> None:
     """Generate wavetable mipmaps and export to .npz format."""
 
@@ -90,6 +112,60 @@ def generate(
         # Simple resampling - could be improved with proper interpolation
         indices = np.linspace(0, len(wave) - 1, size)
         wave = np.interp(indices, np.arange(len(wave)), wave)
+
+    # Apply EQ to base wavetable before bandlimiting if specified
+    if eq:
+        try:
+            eq_bands = parse_eq_string(eq)
+            typer.echo(f"Applying parametric EQ with {len(eq_bands)} bands to base wavetable...")
+            wave = apply_parametric_eq_fft(wave, eq_bands, preserve_rms=True, preserve_phase=True)
+        except ValueError as e:
+            typer.echo(f"Error parsing EQ settings: {e}", err=True)
+            raise typer.Exit(1)
+
+    # Apply high-frequency tilt EQ if specified
+    if high_tilt:
+        try:
+            parts = high_tilt.split(":")
+            if len(parts) != 2:
+                raise ValueError("High tilt must be in format 'start_ratio:gain_db'")
+            start_ratio = float(parts[0])
+            gain_db = float(parts[1])
+
+            if not 0.0 <= start_ratio <= 1.0:
+                raise ValueError("Start ratio must be between 0.0 and 1.0")
+
+            typer.echo(
+                f"Applying high-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
+            )
+            wave = apply_tilt_eq_fft(
+                wave, start_ratio, gain_db, "high", preserve_rms=True, preserve_phase=True
+            )
+        except ValueError as e:
+            typer.echo(f"Error parsing high tilt settings: {e}", err=True)
+            raise typer.Exit(1)
+
+    # Apply low-frequency tilt EQ if specified
+    if low_tilt:
+        try:
+            parts = low_tilt.split(":")
+            if len(parts) != 2:
+                raise ValueError("Low tilt must be in format 'start_ratio:gain_db'")
+            start_ratio = float(parts[0])
+            gain_db = float(parts[1])
+
+            if not 0.0 <= start_ratio <= 1.0:
+                raise ValueError("Start ratio must be between 0.0 and 1.0")
+
+            typer.echo(
+                f"Applying low-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
+            )
+            wave = apply_tilt_eq_fft(
+                wave, start_ratio, gain_db, "low", preserve_rms=True, preserve_phase=True
+            )
+        except ValueError as e:
+            typer.echo(f"Error parsing low tilt settings: {e}", err=True)
+            raise typer.Exit(1)
 
     # Build mipmaps
     typer.echo(f"Building mipmaps with {rolloff} rolloff...")
@@ -152,7 +228,7 @@ def generate(
     else:
         save_wavetable_npz(output, tables, meta, compress=True)
 
-        typer.echo(f" Exported {len(processed_mipmaps)} mipmap levels to {output}")
+        typer.echo(f"Exported {len(processed_mipmaps)} mipmap levels to {output}")
 
 
 @app.command()
@@ -186,6 +262,27 @@ def harmonic(
     wav_bit_depth: Annotated[
         int, typer.Option("--wav-bit-depth", help="Bit depth for .wav files (16, 24, or 32)")
     ] = 16,
+    eq: Annotated[
+        str | None,
+        typer.Option(
+            "--eq",
+            help="EQ settings as 'freq:gain:q,freq:gain:q,...' (freq in Hz, gain in dB, q=factor)",
+        ),
+    ] = None,
+    high_tilt: Annotated[
+        str | None,
+        typer.Option(
+            "--high-tilt",
+            help="High-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
+        ),
+    ] = None,
+    low_tilt: Annotated[
+        str | None,
+        typer.Option(
+            "--low-tilt",
+            help="Low-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
+        ),
+    ] = None,
 ) -> None:
     """Generate wavetable from harmonic partials."""
 
@@ -207,7 +304,7 @@ def harmonic(
                 partial_list.append((harmonic, amplitude, phase))
         except ValueError as e:
             typer.echo(f"Error parsing partials: {e}", err=True)
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
     else:
         # Default: sawtooth-like harmonics
         partial_list = [(i, 1.0 / i, 0.0) for i in range(1, 17)]
@@ -216,6 +313,62 @@ def harmonic(
 
     # Generate base waveform from harmonics
     wave = harmonics_to_table(partial_list, size)
+
+    # Apply EQ to base wavetable before bandlimiting if specified
+    if eq:
+        try:
+            eq_bands = parse_eq_string(eq)
+            typer.echo(f"Applying parametric EQ with {len(eq_bands)} bands to base wavetable...")
+            from wtgen.dsp.eq import apply_parametric_eq_fft
+
+            wave = apply_parametric_eq_fft(wave, eq_bands, preserve_rms=True, preserve_phase=True)
+        except ValueError as e:
+            typer.echo(f"Error parsing EQ settings: {e}", err=True)
+            raise typer.Exit(1)
+
+    # Apply high-frequency tilt EQ if specified
+    if high_tilt:
+        try:
+            parts = high_tilt.split(":")
+            if len(parts) != 2:
+                raise ValueError("High tilt must be in format 'start_ratio:gain_db'")
+            start_ratio = float(parts[0])
+            gain_db = float(parts[1])
+
+            if not 0.0 <= start_ratio <= 1.0:
+                raise ValueError("Start ratio must be between 0.0 and 1.0")
+
+            typer.echo(
+                f"Applying high-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
+            )
+            wave = apply_tilt_eq_fft(
+                wave, start_ratio, gain_db, "high", preserve_rms=True, preserve_phase=True
+            )
+        except ValueError as e:
+            typer.echo(f"Error parsing high tilt settings: {e}", err=True)
+            raise typer.Exit(1)
+
+    # Apply low-frequency tilt EQ if specified
+    if low_tilt:
+        try:
+            parts = low_tilt.split(":")
+            if len(parts) != 2:
+                raise ValueError("Low tilt must be in format 'start_ratio:gain_db'")
+            start_ratio = float(parts[0])
+            gain_db = float(parts[1])
+
+            if not 0.0 <= start_ratio <= 1.0:
+                raise ValueError("Start ratio must be between 0.0 and 1.0")
+
+            typer.echo(
+                f"Applying low-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
+            )
+            wave = apply_tilt_eq_fft(
+                wave, start_ratio, gain_db, "low", preserve_rms=True, preserve_phase=True
+            )
+        except ValueError as e:
+            typer.echo(f"Error parsing low tilt settings: {e}", err=True)
+            raise typer.Exit(1)
 
     # Build mipmaps
     typer.echo(f"Building mipmaps with {rolloff} rolloff...")

@@ -5,6 +5,7 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from wtgen.dsp.process import (
+    _estimate_inter_sample_peak,
     align_to_zero_crossing,
     dc_remove,
     normalize,
@@ -56,7 +57,6 @@ class TestNormalize:
         wavetable = np.array([2.0, -4.0, 1.0])
         result = normalize(wavetable)
         # The true peak (including inter-sample peaks) should not exceed 0.999
-        from src.wtgen.dsp.process import _estimate_inter_sample_peak
 
         true_peak = _estimate_inter_sample_peak(result)
         assert true_peak <= 0.999 + 1e-10
@@ -66,7 +66,6 @@ class TestNormalize:
         wavetable = np.array([2.0, -4.0, 1.0])
         result = normalize(wavetable, peak=0.5)
         # The true peak (including inter-sample peaks) should not exceed 0.5
-        from src.wtgen.dsp.process import _estimate_inter_sample_peak
 
         true_peak = _estimate_inter_sample_peak(result)
         assert true_peak <= 0.5 + 1e-10
@@ -91,8 +90,6 @@ class TestNormalize:
 
         if max_val > 1e-12:  # Non-zero signal
             # The true peak (including inter-sample peaks) should not exceed the target
-            from src.wtgen.dsp.process import _estimate_inter_sample_peak
-
             true_peak = _estimate_inter_sample_peak(result)
             assert true_peak <= 0.999 + 1e-10  # Allow small numerical tolerance
 
@@ -223,7 +220,6 @@ class TestIntegrationProperties:
 
         # Should have zero mean and the true peak should not exceed 0.999
         assert abs(np.mean(step1)) < 1e-15
-        from src.wtgen.dsp.process import _estimate_inter_sample_peak
 
         true_peak = _estimate_inter_sample_peak(step2)
         assert true_peak <= 0.999 + 1e-12
