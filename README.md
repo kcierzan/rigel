@@ -12,6 +12,12 @@ Rigel is designed as a modular wavetable synthesizer consisting of:
 
 The architecture prioritizes real-time safety with a `no_std` DSP core that avoids allocations and uses only deterministic operations suitable for audio processing.
 
+### wtgen
+
+The project also features a Python environment at `wtgen/` for DSP experimentation,
+prototyping, and research. `wtgen` is under development but can be used to generate
+`.npz` and `.wav` format wavetables that Rigel will soon support.
+
 ## Features
 
 ### Current

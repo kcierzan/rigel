@@ -132,7 +132,7 @@ impl Plugin for RigelPlugin {
     const NAME: &'static str = "Rigel";
     const VENDOR: &'static str = "Kyle Cierzan";
     const URL: &'static str = env!("CARGO_PKG_HOMEPAGE");
-    const EMAIL: &'static str = "kyle@example.com";
+    const EMAIL: &'static str = "kcierzan@gmail.com";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
