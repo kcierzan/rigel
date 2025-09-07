@@ -21,10 +21,10 @@ Generate wavetables from standard waveform types:
 
 ```bash
 # Generate a basic sawtooth wavetable (default: 8 octaves, 2048 samples)
-uv run python -m wtgen.cli generate sawtooth --output sawtooth.npz
+uv run wtgen generate sawtooth --output sawtooth.npz
 
 # Generate a square wave with custom parameters
-uv run python -m wtgen.cli generate square \
+uv run wtgen generate square \
   --output square_wave.npz \
   --octaves 6 \
   --duty 0.3 \
@@ -32,20 +32,37 @@ uv run python -m wtgen.cli generate square \
   --size 1024
 
 # Generate a pulse wave with specific frequency
-uv run python -m wtgen.cli generate pulse \
+uv run wtgen wtgen.cli generate pulse \
   --output pulse.npz \
   --frequency 2.0 \
   --duty 0.1 \
   --octaves 10
 
 # Generate a triangle wave (smooth, contains only odd harmonics)
-uv run python -m wtgen.cli generate triangle \
+uv run wtgen generate triangle \
   --output triangle.npz \
   --octaves 8 \
   --rolloff blackman
 
+# Generate decimated sawtooth mipmaps with a custom high harmonic tilt
+# starting at 50% of nyquist boosting to 6dB by nyquist, creating
+# wave files in addition to .npz archives
+uv run wtgen generate sawtooth \
+    --output test_saw.npz \
+    --octaves 8 \
+    --high-tilt 0.5:6.0 \
+    --output-wav \
+    --decimate
+
+# Generate square mipmaps with a 6dB boost @ 60hz [Q1.0]
+# and a 2dB cut @ 5k [Q0.3]
+uv run wtgen generate square \
+    --output test_saw.npz \
+    --octaves 8 \
+    --eq 60:6.0:1.0,5000:-2.0:0.3
+
 # Generate a polyblep sawtooth (band-limited)
-uv run python -m wtgen.cli generate polyblep_saw --output polyblep.npz
+uv run wtgen generate polyblep_saw --output polyblep.npz
 ```
 
 ### Generate Harmonic Wavetables
@@ -54,16 +71,16 @@ Create wavetables from custom harmonic content:
 
 ```bash
 # Generate using default sawtooth harmonics (1/n series)
-uv run python -m wtgen.cli harmonic --output harmonic_saw.npz
+uv run wtgen harmonic --output harmonic_saw.npz
 
 # Create custom harmonic content (harmonic:amplitude:phase format)
-uv run python -m wtgen.cli harmonic \
+uv run wtgen harmonic \
   --output custom_harmonic.npz \
   --partials "1:1.0:0.0,2:0.5:0.0,3:0.33:0.0,4:0.25:0.0" \
   --octaves 8
 
 # Create a simple sine wave with a 3rd harmonic
-uv run python -m wtgen.cli harmonic \
+uv run wtgen harmonic \
   --output sine_plus_third.npz \
   --partials "1:1.0:0.0,3:0.2:1.57" \
   --rolloff tukey
@@ -75,7 +92,7 @@ Analyze and display information about generated wavetables:
 
 ```bash
 # Show detailed information about a wavetable
-uv run python -m wtgen.cli info sawtooth.npz
+uv run wtgen info sawtooth.npz
 
 # Example output:
 # Wavetable: sawtooth.npz
@@ -156,19 +173,19 @@ Control the quality vs. computational cost trade-off:
 
 ```bash
 # High quality: more levels, smoother transitions
-uv run python -m wtgen.cli generate sawtooth \
+uv run wtgen generate sawtooth \
   --octaves 12 \
   --rolloff blackman \
   --size 4096
 
 # Balanced: good quality, reasonable size
-uv run python -m wtgen.cli generate sawtooth \
+uv run wtgen generate sawtooth \
   --octaves 8 \
   --rolloff tukey \
   --size 2048
 
 # Compact: fewer levels, smaller files
-uv run python -m wtgen.cli generate sawtooth \
+uv run wtgen generate sawtooth \
   --octaves 5 \
   --rolloff hann \
   --size 1024
@@ -432,8 +449,6 @@ Each test module includes Hypothesis-powered fuzz testing that:
 - ✅ **DC offset removal** throughout processing chain
 - ✅ **Antialiasing effectiveness** across full MIDI range (0-127)
 - ✅ **Phase coherence** preservation
-- ✅ **Range normalization** with zero-mean constraint
-- ✅ **Energy balancing** without DC introduction
 - ✅ **Spectral bandlimiting** for alias prevention
 
 ### Code Formatting
