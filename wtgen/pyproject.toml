@@ -18,16 +18,7 @@ dependencies = [
 [project.scripts]
 wtgen = "wtgen.cli:app"
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.1",
-    "pytest-benchmark>=4.0",
-    "pytest-regressions>=2.5",
-    "ruff>=0.5",
-    "mypy>=1.10",
-    "ipython>=9.5.0",
-    "kitcat>=1.2.1",
-]
+
 
 [tool.ruff]
 line-length = 100
@@ -49,8 +40,11 @@ dev = [
     "ipython>=9.5.0",
     "mypy>=1.17.1",
     "pytest>=8.4.1",
+    "pytest-benchmark>=4.0",
     "pytest-cov>=6.2.1",
+    "pytest-regressions>=2.5",
     "pytest-xdist>=3.8.0",
+    "ruff>=0.12.8",
     "scipy-stubs>=1.16.1.0",
     "types-setuptools>=80.9.0.20250809",
 ]

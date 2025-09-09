@@ -314,7 +314,7 @@ freqs = scipy.fft.fftfreq(len(spectrum))
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management. Install dependencies with:
 
 ```bash
-uv sync --extra dev
+uv sync --group dev
 ```
 
 For testing, you also need to install the package in development mode:
@@ -328,7 +328,7 @@ uv pip install -e .
 Make sure you have the development dependencies installed:
 
 ```bash
-uv sync --extra dev
+uv sync --group dev
 uv pip install -e .
 ```
 
