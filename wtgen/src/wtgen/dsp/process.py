@@ -15,7 +15,7 @@ def dc_remove(base_wavetable: NDArray[np.floating]) -> NDArray[np.floating]:
     return base_wavetable - np.mean(base_wavetable)
 
 
-def _estimate_inter_sample_peak(wavetable: NDArray[np.floating]) -> float:
+def estimate_inter_sample_peak(wavetable: NDArray[np.floating]) -> float:
     """Estimate the true peak value accounting for inter-sample peaks.
 
     Uses upsampling and filtering to detect peaks that occur between samples
@@ -59,7 +59,7 @@ def normalize(base_wavetable: NDArray[np.floating], peak: float = 0.999) -> NDAr
     if len(base_wavetable) == 0:
         return base_wavetable
 
-    true_peak = _estimate_inter_sample_peak(base_wavetable)
+    true_peak = estimate_inter_sample_peak(base_wavetable)
     if true_peak <= 1e-12:  # Handle near-zero signals (inclusive of boundary)
         return np.zeros_like(base_wavetable)
     return (base_wavetable / true_peak) * peak

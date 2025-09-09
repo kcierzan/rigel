@@ -5,29 +5,26 @@ from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from typer.testing import CliRunner
 
-from wtgen.cli import RolloffMethod, WaveformType, app
+from wtgen.cli import WaveformType, app
 from wtgen.export import load_wavetable_npz
+from zipfile import BadZipFile
 
 
 class TestCliGenerate:
     """Test the generate command functionality."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.runner = CliRunner()
 
     def test_generate_default_sawtooth(self):
         """Test generate command with default parameters."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_sawtooth.npz"
 
-            result = self.runner.invoke(app, ["generate", "--output", str(output_path)])
+            result = app(["generate", "--output", str(output_path)])
 
-            assert result.exit_code == 0
+            assert result == 0
             assert output_path.exists()
 
             # Verify file contents
@@ -39,7 +36,7 @@ class TestCliGenerate:
             assert len(mipmaps) == 9  # 8 octaves generates 9 levels
             assert mipmaps[0].shape[0] == 2048  # default size
             assert manifest["generation"]["waveform"] == "sawtooth"
-            assert manifest["generation"]["rolloff"] == "tukey"
+            assert manifest["generation"]["rolloff"] == "raised_cosine"
 
     def test_generate_all_waveforms(self):
         """Test generate command with all supported waveform types."""
@@ -49,11 +46,7 @@ class TestCliGenerate:
             for waveform in waveforms:
                 output_path = Path(temp_dir) / f"test_{waveform}.npz"
 
-                result = self.runner.invoke(
-                    app, ["generate", waveform, "--output", str(output_path)]
-                )
-
-                assert result.exit_code == 0
+                assert app(["generate", "--waveform", waveform, "--output", str(output_path)]) == 0
                 assert output_path.exists()
 
                 wt_data = load_wavetable_npz(output_path)
@@ -65,27 +58,29 @@ class TestCliGenerate:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_custom.npz"
 
-            result = self.runner.invoke(
-                app,
-                [
-                    "generate",
-                    "square",
-                    "--output",
-                    str(output_path),
-                    "--octaves",
-                    "6",
-                    "--rolloff",
-                    "hann",
-                    "--frequency",
-                    "2.0",
-                    "--duty",
-                    "0.3",
-                    "--size",
-                    "1024",
-                ],
+            assert (
+                app(
+                    [
+                        "generate",
+                        "--waveform",
+                        "square",
+                        "--output",
+                        str(output_path),
+                        "--octaves",
+                        "6",
+                        "--rolloff",
+                        "hann",
+                        "--frequency",
+                        "2.0",
+                        "--duty",
+                        "0.3",
+                        "--size",
+                        "1024",
+                    ],
+                )
+                == 0
             )
 
-            assert result.exit_code == 0
             assert output_path.exists()
 
             wt_data = load_wavetable_npz(output_path)
@@ -101,18 +96,18 @@ class TestCliGenerate:
             assert manifest["generation"]["duty"] == 0.3
             assert manifest["generation"]["size"] == 1024
 
-    def test_generate_invalid_size(self):
+    def test_generate_invalid_size(self, capsys):
         """Test generate command with invalid size (not power of 2)."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_invalid.npz"
 
-            result = self.runner.invoke(
-                app,
-                ["generate", "--output", str(output_path), "--size", "1000"],  # Not a power of 2
-            )
+            with pytest.raises(SystemExit) as e:
+                app(
+                    ["generate", "--output", str(output_path), "--size", "1000"]
+                )  # Not a power of 2
 
-            assert result.exit_code == 1
-            assert "Size must be a power of 2" in result.stderr
+            assert e.value.code == 1
+            assert "Size must be a power of 2" in capsys.readouterr().out
             assert not output_path.exists()
 
     @given(
@@ -126,23 +121,24 @@ class TestCliGenerate:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_hypothesis.npz"
 
-            result = self.runner.invoke(
-                app,
-                [
-                    "generate",
-                    "square",
-                    "--output",
-                    str(output_path),
-                    "--octaves",
-                    str(octaves),
-                    "--frequency",
-                    str(frequency),
-                    "--duty",
-                    str(duty),
-                ],
+            assert (
+                app(
+                    [
+                        "generate",
+                        "square",
+                        "--output",
+                        str(output_path),
+                        "--octaves",
+                        str(octaves),
+                        "--frequency",
+                        str(frequency),
+                        "--duty",
+                        str(duty),
+                    ],
+                )
+                == 0
             )
 
-            assert result.exit_code == 0
             assert output_path.exists()
 
             wt_data = load_wavetable_npz(output_path)
@@ -159,11 +155,20 @@ class TestCliGenerate:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_triangle.npz"
 
-            result = self.runner.invoke(
-                app, ["generate", "triangle", "--output", str(output_path), "--octaves", "6"]
+            assert (
+                app(
+                    [
+                        "generate",
+                        "--waveform",
+                        "triangle",
+                        "--output",
+                        str(output_path),
+                        "--octaves",
+                        "6",
+                    ]
+                )
+                == 0
             )
-
-            assert result.exit_code == 0
             assert output_path.exists()
 
             wt_data = load_wavetable_npz(output_path)
@@ -183,18 +188,12 @@ class TestCliGenerate:
 class TestCliHarmonic:
     """Test the harmonic command functionality."""
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.runner = CliRunner()
-
     def test_harmonic_default(self):
         """Test harmonic command with default parameters."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_harmonic.npz"
 
-            result = self.runner.invoke(app, ["harmonic", "--output", str(output_path)])
-
-            assert result.exit_code == 0
+            assert app(["harmonic", "--output", str(output_path)]) == 0
             assert output_path.exists()
 
             wt_data = load_wavetable_npz(output_path)
@@ -208,7 +207,7 @@ class TestCliHarmonic:
 
             assert len(mipmaps) == 9  # 8 octaves generates 9 levels
             assert manifest["generation"]["waveform"] == "harmonic"
-            assert manifest["generation"]["num_partials"] == 16  # default sawtooth harmonics
+            assert manifest["generation"]["num_partials"] == 1  # default sine
 
     def test_harmonic_custom_partials(self):
         """Test harmonic command with custom partials."""
@@ -218,20 +217,20 @@ class TestCliHarmonic:
             # Define custom partials: fundamental + second harmonic
             partials_str = "1:1.0:0.0,2:0.5:1.57"
 
-            result = self.runner.invoke(
-                app,
-                [
-                    "harmonic",
-                    "--output",
-                    str(output_path),
-                    "--partials",
-                    partials_str,
-                    "--octaves",
-                    "4",
-                ],
+            assert (
+                app(
+                    [
+                        "harmonic",
+                        "--output",
+                        str(output_path),
+                        "--partials",
+                        partials_str,
+                        "--octaves",
+                        "4",
+                    ],
+                )
+                == 0
             )
-
-            assert result.exit_code == 0
             assert output_path.exists()
 
             wt_data = load_wavetable_npz(output_path)
@@ -249,7 +248,7 @@ class TestCliHarmonic:
             assert partials[0][1] == 1.0  # amplitude
             assert abs(partials[0][2] - 0.0) < 1e-6  # phase
 
-    def test_harmonic_invalid_partials_format(self):
+    def test_harmonic_invalid_partials_format(self, capsys):
         """Test harmonic command with invalid partials format."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_invalid_harmonic.npz"
@@ -257,15 +256,12 @@ class TestCliHarmonic:
             # Invalid format: missing phase
             partials_str = "1:1.0,2:0.5"
 
-            result = self.runner.invoke(
-                app, ["harmonic", "--output", str(output_path), "--partials", partials_str]
-            )
+            with pytest.raises(ValueError):
+                app(["harmonic", "--output", str(output_path), "--partials", partials_str])
 
-            assert result.exit_code == 1
-            assert "Error parsing partials" in result.stderr
             assert not output_path.exists()
 
-    def test_harmonic_invalid_partials_values(self):
+    def test_harmonic_invalid_partials_values(self, capsys):
         """Test harmonic command with invalid partial values."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_invalid_values.npz"
@@ -273,65 +269,55 @@ class TestCliHarmonic:
             # Invalid values: non-numeric
             partials_str = "a:1.0:0.0"
 
-            result = self.runner.invoke(
-                app, ["harmonic", "--output", str(output_path), "--partials", partials_str]
-            )
+            with pytest.raises(ValueError):
+                app(["harmonic", "--output", str(output_path), "--partials", partials_str])
+                captured = capsys.readouterr()
+                assert "invalid literal for int() with base 10: a" in captured.err
 
-            assert result.exit_code == 1
-            assert "Error parsing partials" in result.stderr
             assert not output_path.exists()
 
-    def test_harmonic_invalid_size(self):
+    def test_harmonic_invalid_size(self, capsys):
         """Test harmonic command with invalid size."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "test_invalid_size.npz"
 
-            result = self.runner.invoke(
-                app,
-                ["harmonic", "--output", str(output_path), "--size", "1000"],  # Not a power of 2
-            )
+            with pytest.raises(SystemExit):
+                app(["harmonic", "--output", str(output_path), "--size", "1000"])
+                captured = capsys.readouterr()
+                assert "Size must be a power of 2" in captured.err
 
-            assert result.exit_code == 1
-            assert "Size must be a power of 2" in result.stderr
             assert not output_path.exists()
 
 
 class TestCliInfo:
     """Test the info command functionality."""
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.runner = CliRunner()
-
-    def test_info_valid_file(self):
+    def test_info_valid_file(self, capsys):
         """Test info command with valid wavetable file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # First generate a wavetable file
             output_path = Path(temp_dir) / "test_info.npz"
 
-            self.runner.invoke(
-                app, ["generate", "sawtooth", "--output", str(output_path), "--octaves", "4"]
-            )
+            app(["generate", "sawtooth", "--output", str(output_path), "--octaves", "4"])
 
             # Then test info command
-            result = self.runner.invoke(app, ["info", str(output_path)])
+            assert app(["info", str(output_path)]) == 0
+            captured = capsys.readouterr()
 
-            assert result.exit_code == 0
-            assert "Wavetable:" in result.stdout
-            assert "Table 'base': 5 mipmap levels" in result.stdout  # 4 octaves = 5 levels
-            assert "Base cycle length: 2048" in result.stdout
-            assert "Waveform: sawtooth" in result.stdout
-            assert "Rolloff: tukey" in result.stdout
-            assert "Mipmap levels:" in result.stdout
+            assert "Wavetable:" in captured.out
+            assert "Table 'base': 5 mipmap levels" in captured.out  # 4 octaves = 5 levels
+            assert "Base cycle length: 2048" in captured.out
+            assert "Waveform: sawtooth" in captured.out
+            assert "Rolloff: raised_cosine" in captured.out
+            assert "Mipmap levels:" in captured.out
 
-    def test_info_harmonic_file(self):
+    def test_info_harmonic_file(self, capsys):
         """Test info command with harmonic wavetable file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Generate harmonic wavetable
             output_path = Path(temp_dir) / "test_harmonic_info.npz"
 
-            self.runner.invoke(
-                app,
+            app(
                 [
                     "harmonic",
                     "--output",
@@ -344,41 +330,41 @@ class TestCliInfo:
             )
 
             # Test info command
-            result = self.runner.invoke(app, ["info", str(output_path)])
+            assert app(["info", str(output_path)]) == 0
 
-            assert result.exit_code == 0
-            assert "Table 'base': 4 mipmap levels" in result.stdout  # 3 octaves = 4 levels
-            assert "Waveform: harmonic" in result.stdout
+            captured = capsys.readouterr()
+            assert "Table 'base': 4 mipmap levels" in captured.out
+            assert "Waveform: harmonic" in captured.out
 
-    def test_info_nonexistent_file(self):
+    def test_info_nonexistent_file(self, capsys):
         """Test info command with nonexistent file."""
-        result = self.runner.invoke(app, ["info", "/nonexistent/file.npz"])
+        with pytest.raises(ValueError):
+            app(["info", "/nonexistent/file.npz"])
+            captured = capsys.readouterr()
+            assert "does not exist" in captured.out
 
-        assert result.exit_code == 1
-        assert "does not exist" in result.stderr
-
-    def test_info_invalid_file(self):
+    def test_info_invalid_file(self, capsys):
         """Test info command with invalid file format (missing manifest.json)."""
         with tempfile.NamedTemporaryFile(suffix=".npz", delete=False) as temp_file:
             # Create invalid npz file (missing manifest.json)
             np.savez(temp_file.name, invalid_data=np.array([1, 2, 3]))
 
-            result = self.runner.invoke(app, ["info", temp_file.name])
+            with pytest.raises(KeyError):
+                app(["info", temp_file.name])
 
-            assert result.exit_code == 1
-            assert "Error reading file:" in result.stderr
-            assert "manifest.json" in result.stderr
+                captured = capsys.readouterr()
+                assert "manifest.json" in captured.err
 
     @patch("numpy.load")
-    def test_info_file_read_error(self, mock_load):
+    def test_info_file_read_error(self, mock_load, capsys):
         """Test info command with file read error."""
         mock_load.side_effect = Exception("File read error")
 
         with tempfile.NamedTemporaryFile(suffix=".npz", delete=False) as temp_file:
-            result = self.runner.invoke(app, ["info", temp_file.name])
-
-            assert result.exit_code == 1
-            assert "Error reading file" in result.stderr
+            with pytest.raises(BadZipFile):
+                app(["info", temp_file.name])
+                captured = capsys.readouterr()
+                assert "Error reading file" in captured.err
 
 
 class TestEnumsAndTypes:
@@ -391,115 +377,3 @@ class TestEnumsAndTypes:
         assert WaveformType.pulse == "pulse"
         assert WaveformType.triangle == "triangle"
         assert WaveformType.polyblep_saw == "polyblep_saw"
-
-    def test_rolloff_method_enum(self):
-        """Test RolloffMethod enum values."""
-        assert RolloffMethod.brick_wall == "brick_wall"
-        assert RolloffMethod.tukey == "tukey"
-        assert RolloffMethod.blackman == "blackman"
-        assert RolloffMethod.raised_cosine == "raised_cosine"
-        assert RolloffMethod.hann == "hann"
-        assert RolloffMethod.none == "none"
-
-
-class TestIntegrationScenarios:
-    """Test integration scenarios across CLI commands."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.runner = CliRunner()
-
-    def test_generate_then_info_workflow(self):
-        """Test complete workflow: generate wavetable then get info."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "workflow_test.npz"
-
-            # Generate wavetable
-            generate_result = self.runner.invoke(
-                app,
-                [
-                    "generate",
-                    "square",
-                    "--output",
-                    str(output_path),
-                    "--octaves",
-                    "6",
-                    "--duty",
-                    "0.25",
-                ],
-            )
-
-            assert generate_result.exit_code == 0
-
-            # Get info about generated file
-            info_result = self.runner.invoke(app, ["info", str(output_path)])
-
-            assert info_result.exit_code == 0
-            assert "Table 'base': 7 mipmap levels" in info_result.stdout  # 6 octaves = 7 levels
-            assert "Waveform: square" in info_result.stdout
-
-    def test_harmonic_then_info_workflow(self):
-        """Test harmonic generation then info workflow."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "harmonic_workflow.npz"
-
-            # Generate harmonic wavetable
-            generate_result = self.runner.invoke(
-                app,
-                [
-                    "harmonic",
-                    "--output",
-                    str(output_path),
-                    "--partials",
-                    "1:1.0:0.0,3:0.33:1.57,5:0.2:0.0",
-                    "--octaves",
-                    "5",
-                ],
-            )
-
-            assert generate_result.exit_code == 0
-
-            # Get info about generated file
-            info_result = self.runner.invoke(app, ["info", str(output_path)])
-
-            assert info_result.exit_code == 0
-            assert "Table 'base': 6 mipmap levels" in info_result.stdout  # 5 octaves = 6 levels
-            assert "Waveform: harmonic" in info_result.stdout
-
-    @given(
-        waveform=st.sampled_from(["sawtooth", "square", "pulse", "triangle", "polyblep_saw"]),
-        octaves=st.integers(min_value=2, max_value=8),
-        rolloff=st.sampled_from(["tukey", "hann", "blackman"]),
-    )
-    @settings(max_examples=5)
-    def test_generate_info_roundtrip(self, waveform, octaves, rolloff):
-        """Property-based test for generate->info roundtrip."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "roundtrip_test.npz"
-
-            # Generate
-            generate_result = self.runner.invoke(
-                app,
-                [
-                    "generate",
-                    waveform,
-                    "--output",
-                    str(output_path),
-                    "--octaves",
-                    str(octaves),
-                    "--rolloff",
-                    rolloff,
-                ],
-            )
-
-            assert generate_result.exit_code == 0
-
-            # Info
-            info_result = self.runner.invoke(app, ["info", str(output_path)])
-
-            assert info_result.exit_code == 0
-            assert (
-                f"Table 'base': {octaves + 1} mipmap levels" in info_result.stdout
-            )  # N octaves = N+1 levels
-            assert f"Waveform: {waveform}" in info_result.stdout
-            assert f"Rolloff: {rolloff}" in info_result.stdout

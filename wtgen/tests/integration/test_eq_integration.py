@@ -12,7 +12,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from wtgen.dsp.eq import apply_parametric_eq_fft, create_eq_band
-from wtgen.dsp.mipmap import build_mipmap
+from wtgen.dsp.mipmap import Mipmap
+from wtgen.dsp.fir import RolloffMethod
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import generate_sawtooth_wavetable, harmonics_to_table
 from wtgen.export import load_wavetable_npz, save_wavetable_npz
@@ -27,14 +28,14 @@ class TestEQWithMipmapPipeline:
         _, base_wave = generate_sawtooth_wavetable(1.0)
 
         # Version 1: EQ after mipmap generation (wrong way)
-        mipmaps_first = build_mipmap(base_wave, num_octaves=3, decimate=False)
+        mipmaps_first = Mipmap(base_wave, num_octaves=3, decimate=False).generate()
         eq_bands = [create_eq_band(1000.0, 6.0, 2.0)]
 
         # Version 2: EQ before mipmap generation (correct way)
         eq_wave = apply_parametric_eq_fft(
             base_wave, eq_bands, preserve_rms=True, preserve_phase=True
         )
-        mipmaps_eq_first = build_mipmap(eq_wave, num_octaves=3, decimate=False)
+        mipmaps_eq_first = Mipmap(eq_wave, num_octaves=3, decimate=False).generate()
 
         # Both should produce valid mipmaps
         assert len(mipmaps_first) == len(mipmaps_eq_first)
@@ -51,12 +52,12 @@ class TestEQWithMipmapPipeline:
         _, base_wave = generate_sawtooth_wavetable(1.0)
 
         # Build mipmaps without EQ
-        mipmaps_no_eq = build_mipmap(base_wave, num_octaves=4, decimate=False)
+        mipmaps_no_eq = Mipmap(base_wave, num_octaves=4, decimate=False).generate()
 
         # Apply EQ and build mipmaps
         eq_bands = [create_eq_band(2000.0, 3.0, 1.5)]
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands, preserve_rms=True)
-        mipmaps_with_eq = build_mipmap(eq_wave, num_octaves=4, decimate=False)
+        mipmaps_with_eq = Mipmap(eq_wave, num_octaves=4, decimate=False).generate()
 
         # Both should produce the same number of mipmap levels
         assert len(mipmaps_with_eq) == len(mipmaps_no_eq)
@@ -82,7 +83,7 @@ class TestEQWithMipmapPipeline:
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands, preserve_phase=True)
 
         # Build mipmaps
-        mipmaps = build_mipmap(eq_wave, num_octaves=2, decimate=False)
+        mipmaps = Mipmap(eq_wave, num_octaves=2, decimate=False).generate()
 
         # Process through full pipeline
         processed_mipmaps = []
@@ -100,10 +101,12 @@ class TestEQWithMipmapPipeline:
         eq_bands = [create_eq_band(3000.0, 5.0, 1.0)]
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
-        rolloff_methods = ["raised_cosine", "tukey", "hann", "blackman"]
+        rolloff_methods: list[RolloffMethod] = ["raised_cosine", "tukey", "hann", "blackman"]
 
         for method in rolloff_methods:
-            mipmaps = build_mipmap(eq_wave, num_octaves=2, rolloff_method=method, decimate=False)
+            mipmaps = Mipmap(
+                eq_wave, num_octaves=2, rolloff_method=method, decimate=False
+            ).generate()
 
             # Should generate valid mipmaps regardless of rolloff method
             assert len(mipmaps) == 3
@@ -118,7 +121,7 @@ class TestEQWithMipmapPipeline:
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
         # Build mipmaps with decimation
-        mipmaps = build_mipmap(eq_wave, num_octaves=3, decimate=True)
+        mipmaps = Mipmap(eq_wave, num_octaves=3, decimate=True).generate()
 
         # Should have decreasing sizes
         assert len(mipmaps[0]) >= len(mipmaps[1])
@@ -145,7 +148,7 @@ class TestEQWithMipmapPipeline:
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
         # Build mipmaps
-        mipmaps = build_mipmap(eq_wave, num_octaves=num_octaves, decimate=False)
+        mipmaps = Mipmap(eq_wave, num_octaves=num_octaves, decimate=False).generate()
 
         # Process each level
         processed = []
@@ -177,7 +180,7 @@ class TestEQWithHarmonics:
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands, preserve_rms=True)
 
         # Build mipmaps
-        mipmaps = build_mipmap(eq_wave, num_octaves=3, decimate=False)
+        mipmaps = Mipmap(eq_wave, num_octaves=3, decimate=False).generate()
 
         # Should maintain harmonic relationships through bandlimiting
         for level in mipmaps:
@@ -200,7 +203,7 @@ class TestEQWithHarmonics:
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
         # Build mipmaps
-        mipmaps = build_mipmap(eq_wave, num_octaves=4, decimate=False)
+        mipmaps = Mipmap(eq_wave, num_octaves=4, decimate=False).generate()
 
         # Process through pipeline
         processed = []
@@ -226,7 +229,7 @@ class TestEQExportCompatibility:
             _, base_wave = generate_sawtooth_wavetable(1.0)
             eq_bands = [create_eq_band(2000.0, 3.0)]
             eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
-            mipmaps = build_mipmap(eq_wave, num_octaves=2, decimate=False)
+            mipmaps = Mipmap(eq_wave, num_octaves=2, decimate=False).generate()
 
             # Process mipmaps
             processed = []
@@ -262,7 +265,7 @@ class TestEQExportCompatibility:
             _, base_wave = generate_sawtooth_wavetable(1.0)
             eq_bands = [create_eq_band(1500.0, -2.0, 1.5)]
             eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
-            mipmaps = build_mipmap(eq_wave, num_octaves=1, decimate=False)
+            mipmaps = Mipmap(eq_wave, num_octaves=1, decimate=False).generate()
 
             processed = []
             for mip in mipmaps:

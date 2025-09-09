@@ -10,8 +10,9 @@ dependencies = [
     "numba>=0.60",
     "matplotlib>=3.8",
     "soundfile>=0.12",
-    "typer>=0.12",
     "kitcat>=1.2.1",
+    "cyclopts>=3.23.1",
+    "rich>=14.1.0",
 ]
 
 [project.scripts]
@@ -27,9 +28,6 @@ dev = [
     "ipython>=9.5.0",
     "kitcat>=1.2.1",
 ]
-
-[tool.black]
-line-length = 100
 
 [tool.ruff]
 line-length = 100
