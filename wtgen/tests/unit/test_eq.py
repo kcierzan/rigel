@@ -20,7 +20,7 @@ from wtgen.dsp.eq import (
     create_low_tilt_eq,
     parse_eq_string,
 )
-from wtgen.dsp.mipmap import build_mipmap
+from wtgen.dsp.mipmap import Mipmap
 from wtgen.dsp.process import align_to_zero_crossing
 from wtgen.dsp.waves import generate_sawtooth_wavetable
 
@@ -323,7 +323,7 @@ class TestEQIntegration:
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
         # Build mipmaps from EQ'd waveform
-        mipmaps = build_mipmap(eq_wave, num_octaves=2, decimate=False)
+        mipmaps = Mipmap(eq_wave, num_octaves=2, decimate=False).generate()
 
         # Should generate valid mipmaps
         assert len(mipmaps) == 3  # 0, 1, 2
@@ -625,7 +625,7 @@ class TestTiltEQIntegration:
         eq_wave = apply_tilt_eq_fft(base_wave, 0.4, 4.0, "high")
 
         # Build mipmaps from tilted waveform
-        mipmaps = build_mipmap(eq_wave, num_octaves=2, decimate=False)
+        mipmaps = Mipmap(eq_wave, num_octaves=2, decimate=False).generate()
 
         # Should generate valid mipmaps
         assert len(mipmaps) == 3  # 0, 1, 2

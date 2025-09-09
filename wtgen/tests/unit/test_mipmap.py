@@ -6,19 +6,18 @@ import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from wtgen.dsp.mipmap import MipmapChain, MipmapLevel, build_mipmap
+from wtgen.dsp.mipmap import MipmapChain, MipmapLevel, Mipmap
 
 
 class TestBuildMipmap:
     """Test mipmap generation functionality."""
 
-    def test_build_mipmap_basic(self):
+    def test_Mipmap_basic(self):
         """Test basic mipmap generation."""
         # Create a simple test wavetable
         t = np.linspace(0, 2 * np.pi, 2048, endpoint=False)
         base_wavetable = np.sin(t) + 0.3 * np.sin(3 * t)  # Fundamental + 3rd harmonic
-
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=5)
+        mipmap_chain = Mipmap(base_wavetable=base_wavetable, num_octaves=5).generate()
 
         # Should return the expected number of levels
         assert len(mipmap_chain) == 6  # 0 to 5 inclusive
@@ -28,13 +27,12 @@ class TestBuildMipmap:
             assert len(level) == len(base_wavetable)
             assert level.dtype == np.float32
 
-    def test_build_mipmap_rms_normalization_with_clipping_prevention(self):
+    def test_Mipmap_rms_normalization_with_clipping_prevention(self):
         """Test that all mipmap levels use RMS normalization but prevent clipping."""
         # Create a test waveform with known characteristics
         t = np.linspace(0, 2 * np.pi, 256, endpoint=False)
         base_wavetable = 2.5 * np.sin(t) + 1.8 * np.sin(3 * t)  # Large amplitudes
-
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=5)
+        mipmap_chain = Mipmap(base_wavetable=base_wavetable, num_octaves=5).generate()
 
         for i, level in enumerate(mipmap_chain):
             # Critical clipping prevention checks
@@ -53,13 +51,12 @@ class TestBuildMipmap:
                     f"Level {i}: RMS {rms} exceeds target"
                 )  # Tightened from 0.001
 
-    def test_build_mipmap_dc_removal(self):
+    def test_Mipmap_dc_removal(self):
         """Test that DC offset is removed from all levels."""
         # Create wavetable with DC offset
         t = np.linspace(0, 2 * np.pi, 512, endpoint=False)
         base_wavetable = np.sin(t) + 0.5  # Add DC offset
-
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=4)
+        mipmap_chain = Mipmap(base_wavetable=base_wavetable, num_octaves=4).generate()
 
         # All levels should have minimal DC
         for i, level in enumerate(mipmap_chain):
@@ -68,7 +65,7 @@ class TestBuildMipmap:
                 f"Level {i} has DC offset: {dc_level:.6f}"
             )  # Tightened from 0.001
 
-    def test_build_mipmap_bandlimiting(self):
+    def test_Mipmap_bandlimiting(self):
         """Test that higher levels have reduced bandwidth."""
         # Create rich harmonic content
         t = np.linspace(0, 2 * np.pi, 2048, endpoint=False)
@@ -78,7 +75,7 @@ class TestBuildMipmap:
         for h in range(1, 20):
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=6)
+        mipmap_chain = Mipmap(base_wavetable=base_wavetable, num_octaves=6).generate()
 
         # Higher levels should have less high-frequency content
         # We can test this by comparing spectral energy above certain frequencies
@@ -89,14 +86,14 @@ class TestBuildMipmap:
             # Energy should be preserved in low frequencies but reduced overall for higher levels
             assert len(spec_low) == len(spec_high)
 
-    def test_build_mipmap_phase_alignment(self):
+    def test_Mipmap_phase_alignment(self):
         """Test that all levels start at zero crossings."""
         t = np.linspace(
             np.pi / 4, np.pi / 4 + 2 * np.pi, 1024, endpoint=False
         )  # Start away from zero
         base_wavetable = np.sin(t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=5)
+        mipmap_chain = Mipmap(base_wavetable=base_wavetable, num_octaves=5).generate()
 
         # All levels should start closer to zero than the original
         original_start = abs(base_wavetable[0])
@@ -108,14 +105,16 @@ class TestBuildMipmap:
                 f"Level {i} start value {start_value:.6f} not well aligned"
             )
 
-    def test_build_mipmap_decimated_phase_consistency(self):
+    def test_Mipmap_decimated_phase_consistency(self):
         """Test that decimated mipmaps maintain consistent phase alignment across all levels."""
         # Create test waveform that doesn't start at zero crossing
         t = np.linspace(np.pi / 3, np.pi / 3 + 2 * np.pi, 2048, endpoint=False)
         base_wavetable = np.sin(t) + 0.5 * np.sin(2 * t)
 
         # Generate mipmaps with decimation
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, decimate=True)
+        mipmap_chain = Mipmap(
+            base_wavetable=base_wavetable, num_octaves=10, decimate=True
+        ).generate()
 
         # Test that all levels start close to zero crossing
         original_start = abs(base_wavetable[0])
@@ -159,7 +158,7 @@ class TestBuildMipmap:
                     f"Level {i} has size {len(level)}, expected {expected_decimated_size}"
                 )
 
-    def test_build_mipmap_phase_alignment_with_filtering(self):
+    def test_Mipmap_phase_alignment_with_filtering(self):
         """Test that phase alignment is preserved after spectral filtering."""
         # Create complex harmonic waveform
         t = np.linspace(0.2, 0.2 + 2 * np.pi, 1024, endpoint=False)  # Not starting at zero
@@ -169,7 +168,9 @@ class TestBuildMipmap:
         for h in range(1, 20):
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=8, rolloff_method="raised_cosine")
+        mipmap_chain = Mipmap(
+            base_wavetable, num_octaves=8, rolloff_method="raised_cosine"
+        ).generate()
 
         # Test phase alignment across levels
         for i, level in enumerate(mipmap_chain):
@@ -194,13 +195,13 @@ class TestBuildMipmap:
             ):  # Don't test highest levels which might be heavily filtered
                 assert rms > 0.1, f"Level {i} RMS {rms:.6f} too low, excessive filtering"
 
-    def test_build_mipmap_different_octave_counts(self):
+    def test_Mipmap_different_octave_counts(self):
         """Test mipmap generation with different octave counts."""
         t = np.linspace(0, 2 * np.pi, 512, endpoint=False)
         base_wavetable = np.sin(t)
 
         for num_octaves in [1, 3, 5, 8, 10, 12]:
-            mipmap_chain = build_mipmap(base_wavetable, num_octaves=num_octaves)
+            mipmap_chain = Mipmap(base_wavetable, num_octaves=num_octaves).generate()
 
             # Should have correct number of levels
             assert len(mipmap_chain) == num_octaves + 1
@@ -210,20 +211,20 @@ class TestBuildMipmap:
                 assert np.all(np.isfinite(level))
                 assert len(level) == len(base_wavetable)
 
-    def test_build_mipmap_zero_signal(self):
+    def test_Mipmap_zero_signal(self):
         """Test mipmap generation with zero input signal."""
         base_wavetable = np.zeros(256)
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=3)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=3).generate()
 
         # Should handle gracefully
         assert len(mipmap_chain) == 4
         for level in mipmap_chain:
             assert np.all(np.abs(level) < 1e-10)  # Should remain zero
 
-    def test_build_mipmap_constant_signal(self):
+    def test_Mipmap_constant_signal(self):
         """Test mipmap generation with constant (DC) signal."""
         base_wavetable = np.ones(256) * 2.0  # Constant signal
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=3)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=3).generate()
 
         # Should handle gracefully and remove DC
         assert len(mipmap_chain) == 4
@@ -232,7 +233,7 @@ class TestBuildMipmap:
 
     @given(st.lists(st.floats(-10, 10), min_size=64, max_size=2048))
     @settings(deadline=None)  # Disable deadline for this test
-    def test_build_mipmap_hypothesis(self, values):
+    def test_Mipmap_hypothesis(self, values):
         """Hypothesis test for mipmap generation including clipping prevention checks."""
         assume(all(np.isfinite(v) for v in values))
         assume(len(values) >= 64)  # Minimum reasonable size
@@ -242,7 +243,7 @@ class TestBuildMipmap:
             values = values[:2048]
 
         base_wavetable = np.array(values, dtype=np.float64)
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=3)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=3).generate()
 
         # Basic validity checks
         assert len(mipmap_chain) == 4
@@ -259,7 +260,7 @@ class TestBuildMipmap:
             max_abs_value = np.max(np.abs(level))
             assert max_abs_value <= 1.0 + 1e-6, f"Peak value {max_abs_value} exceeds 1.0"
 
-    def test_build_mipmap_complex_waveform(self):
+    def test_Mipmap_complex_waveform(self):
         """Test mipmap generation with complex harmonic content."""
         # Create a complex waveform resembling a sawtooth
         t = np.linspace(0, 2 * np.pi, 2048, endpoint=False)
@@ -269,7 +270,7 @@ class TestBuildMipmap:
         for h in range(1, 50):
             base_wavetable += ((-1) ** (h + 1)) * (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=10).generate()
 
         # Should maintain key properties
         assert len(mipmap_chain) == 11
@@ -305,12 +306,12 @@ class TestBuildMipmap:
             # The relative concentration of energy in low frequencies should increase
             # (this is a loose check since exact ratios depend on the filtering)  # Tightened from 0.002
 
-    def test_build_mipmap_no_clipping(self):
+    def test_Mipmap_no_clipping(self):
         """Test that mipmap generation prevents clipping with RMS normalization."""
         # Create a waveform with extreme values
         extreme_waveform = np.array([100.0, -50.0, 75.0, -200.0] * 64, dtype=np.float64)
 
-        mipmap_chain = build_mipmap(extreme_waveform, num_octaves=3)
+        mipmap_chain = Mipmap(extreme_waveform, num_octaves=3).generate()
 
         for i, level in enumerate(mipmap_chain):
             # Critical clipping prevention checks
@@ -326,13 +327,13 @@ class TestBuildMipmap:
                 rms = np.sqrt(np.mean(level**2))
                 assert rms > 0.1, f"Level {i}: RMS {rms} too low"
 
-    def test_build_mipmap_spectral_characteristics(self):
+    def test_Mipmap_spectral_characteristics(self):
         """Test spectral characteristics of mipmap levels."""
         # Create test signal with known frequency content
         t = np.linspace(0, 2 * np.pi, 1024, endpoint=False)
         base_wavetable = np.sin(t) + 0.5 * np.sin(5 * t) + 0.25 * np.sin(10 * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=5)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=5).generate()
 
         # Each level should have reduced high-frequency content
         for _i, level in enumerate(mipmap_chain):
@@ -345,13 +346,13 @@ class TestBuildMipmap:
             assert np.isfinite(high_freq_energy)
             assert high_freq_energy >= 0
 
-    def test_build_mipmap_midi_range_coverage(self):
+    def test_Mipmap_midi_range_coverage(self):
         """Test that mipmap covers full MIDI range appropriately."""
         t = np.linspace(0, 2 * np.pi, 2048, endpoint=False)
         base_wavetable = np.sin(t) + 0.3 * np.sin(3 * t)
 
         # Test with full MIDI range coverage
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=10).generate()
 
         # Should have 11 levels (0-10)
         assert len(mipmap_chain) == 11
@@ -376,7 +377,7 @@ class TestMipmapAntialiasing:
         base_freq = sample_rate / table_size
         max_freq_in_level = base_freq * (2**octave_level)
 
-        # Conservative safety margins (same as in build_mipmap)
+        # Conservative safety margins (same as in Mipmap)
         if sample_rate <= 48000:
             if octave_level == 0:
                 safety_margin = 0.78
@@ -438,7 +439,7 @@ class TestMipmapAntialiasing:
         for h in range(1, 50):  # Rich harmonic content
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+        Mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
         nyquist = sample_rate / 2
 
         # Test critical MIDI notes across the range
@@ -473,7 +474,7 @@ class TestMipmapAntialiasing:
         for h in range(1, 30):
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate).generate()
         nyquist = sample_rate / 2
 
         # Test MIDI range appropriate for this sample rate
@@ -508,7 +509,7 @@ class TestMipmapAntialiasing:
         for h in range(1, 40):
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+        Mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
         nyquist = sample_rate / 2
         base_freq = sample_rate / table_size
 
@@ -545,7 +546,7 @@ class TestMipmapAntialiasing:
         t = np.linspace(0, 2 * np.pi, table_size, endpoint=False)
         base_wavetable = np.sin(t) + 0.5 * np.sin(3 * t) + 0.25 * np.sin(5 * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate).generate()
         nyquist = sample_rate / 2
 
         # Test extreme frequencies
@@ -634,7 +635,9 @@ class TestMipmapAntialiasing:
         base_wavetable = np.sin(t) + 0.3 * np.sin(3 * t)
 
         try:
-            mipmap_chain = build_mipmap(base_wavetable, num_octaves=10, sample_rate=sample_rate)
+            mipmap_chain = Mipmap(
+                base_wavetable, num_octaves=10, sample_rate=sample_rate
+            ).generate()
             nyquist = sample_rate / 2
 
             fundamental_freq = self._midi_to_frequency(midi_note)
@@ -684,7 +687,7 @@ class TestMipmapAntialiasing:
         for h in original_harmonics:
             base_wavetable += (1.0 / h) * np.sin(h * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=8, sample_rate=sample_rate)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=8, sample_rate=sample_rate).generate()
 
         # Analyze spectral content of each level
         for level_idx, level in enumerate(mipmap_chain):
@@ -739,7 +742,7 @@ class TestMipmapEdgeCases:
     def test_single_sample_wavetable(self):
         """Test with single sample wavetable."""
         base_wavetable = np.array([1.0])
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=2)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=2).generate()
 
         # Should handle gracefully
         assert len(mipmap_chain) == 3
@@ -750,7 +753,7 @@ class TestMipmapEdgeCases:
     def test_very_small_wavetable(self):
         """Test with very small wavetable."""
         base_wavetable = np.array([1.0, -1.0, 0.5, -0.5])
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=2)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=2).generate()
 
         # Should handle gracefully
         assert len(mipmap_chain) == 3
@@ -765,7 +768,7 @@ class TestMipmapEdgeCases:
         t = np.linspace(0, 2 * np.pi, size, endpoint=False)
         base_wavetable = np.sin(t) + 0.3 * np.sin(3 * t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=3)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=3).generate()
 
         # Should handle large sizes
         assert len(mipmap_chain) == 4
@@ -778,7 +781,7 @@ class TestMipmapEdgeCases:
         t = np.linspace(0, 2 * np.pi, 256, endpoint=False)
         base_wavetable = np.sin(t)
 
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=0)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=0).generate()
 
         # Should return just the base level
         assert len(mipmap_chain) == 1
@@ -788,7 +791,7 @@ class TestMipmapEdgeCases:
         """Test with extreme input values."""
         # Very large values
         base_wavetable = np.array([1000.0, -500.0, 2000.0, -1500.0] * 64)
-        mipmap_chain = build_mipmap(base_wavetable, num_octaves=3)
+        mipmap_chain = Mipmap(base_wavetable, num_octaves=3).generate()
 
         # Should normalize and handle extreme values
         for level in mipmap_chain:
@@ -803,7 +806,7 @@ class TestMipmapEdgeCases:
         # The function should handle this gracefully or the test should expect an exception
         # For now, let's test that it doesn't crash catastrophically
         try:
-            mipmap_chain = build_mipmap(base_wavetable, num_octaves=2)
+            mipmap_chain = Mipmap(base_wavetable, num_octaves=2).generate()
             # If it succeeds, results should at least be finite where possible
             for level in mipmap_chain:
                 finite_mask = np.isfinite(level)

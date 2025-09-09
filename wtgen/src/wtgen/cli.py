@@ -1,14 +1,15 @@
+import sys
 from pathlib import Path
 from typing import Annotated
 
 import numpy as np
-import typer
+from cyclopts import App, Parameter
+from rich.console import Console
 
 from wtgen.dsp.eq import apply_parametric_eq_fft, apply_tilt_eq_fft, parse_eq_string
-from wtgen.dsp.mipmap import build_mipmap
+from wtgen.dsp.mipmap import Mipmap, RolloffMethod
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import (
-    RolloffMethod,
     WaveformType,
     generate_polyblep_sawtooth_wavetable,
     generate_pulse_wavetable,
@@ -17,80 +18,152 @@ from wtgen.dsp.waves import (
     generate_triangle_wavetable,
     harmonics_to_table,
 )
-from wtgen.export import load_wavetable_npz, save_wavetable_npz, save_wavetable_with_wav_export
+from wtgen.export import (
+    create_wavetable_metadata,
+    handle_wavetable_export,
+    load_wavetable_npz,
+)
+from wtgen.types import (
+    BitDepth,
+    ExportParams,
+    HarmonicPartial,
+    ProcessingParams,
+)
 
-app = typer.Typer(help="Wavetable generation and processing CLI")
+app = App(name="wtgen", help="A utility for generating and analyzing wavetables")
+console = Console()
 
 
-@app.command()
-def generate(
-    waveform: Annotated[
-        WaveformType, typer.Argument(help="Waveform type to generate")
-    ] = WaveformType.sawtooth,
-    output: Annotated[Path, typer.Option("--output", "-o", help="Output .npz file path")] = Path(
-        "wavetable.npz"
-    ),
-    octaves: Annotated[int, typer.Option("--octaves", "-n", help="Number of mipmap octaves")] = 8,
-    rolloff: Annotated[
-        RolloffMethod, typer.Option("--rolloff", "-r", help="Rolloff method for bandlimiting")
-    ] = RolloffMethod.tukey,
-    frequency: Annotated[
-        float, typer.Option("--frequency", "-f", help="Base frequency for waveform")
-    ] = 1.0,
-    duty: Annotated[
-        float, typer.Option("--duty", "-d", help="Duty cycle for square/pulse waves (0.0-1.0)")
-    ] = 0.5,
-    size: Annotated[int, typer.Option("--size", "-s", help="Wavetable size (power of 2)")] = 2048,
-    decimate: Annotated[
-        bool, typer.Option("--decimate", help="Decimate each mipmap level (2048→1024→512...)")
-    ] = False,
-    export_wav: Annotated[
-        bool,
-        typer.Option("--export-wav", help="Also export mipmap levels as individual .wav files"),
-    ] = False,
-    wav_dir: Annotated[
-        Path | None,
-        typer.Option("--wav-dir", help="Directory for .wav files (default: <output_name>_wav)"),
-    ] = None,
-    wav_sample_rate: Annotated[
-        int, typer.Option("--wav-sample-rate", help="Sample rate for .wav files")
-    ] = 44100,
-    wav_bit_depth: Annotated[
-        int, typer.Option("--wav-bit-depth", help="Bit depth for .wav files (16, 24, or 32)")
-    ] = 16,
-    eq: Annotated[
-        str | None,
-        typer.Option(
-            "--eq",
-            help="EQ settings as 'freq:gain:q,freq:gain:q,...' (freq in Hz, gain in dB, q=factor)",
-        ),
-    ] = None,
-    high_tilt: Annotated[
-        str | None,
-        typer.Option(
-            "--high-tilt",
-            help="High-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
-        ),
-    ] = None,
-    low_tilt: Annotated[
-        str | None,
-        typer.Option(
-            "--low-tilt",
-            help="Low-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
-        ),
-    ] = None,
-) -> None:
-    """Generate wavetable mipmaps and export to .npz format."""
+def print_error(message) -> None:
+    console.print(message, style="bold red")
 
+
+def power_of_two_integer(type_, size: int) -> None:
+    """Validate that size is a power of 2."""
     if size & (size - 1) != 0:
-        typer.echo("Error: Size must be a power of 2", err=True)
-        raise typer.Exit(1)
+        raise ValueError("Size must be a power of 2")
 
-    if wav_bit_depth not in [16, 24, 32]:
-        typer.echo("Error: WAV bit depth must be 16, 24, or 32", err=True)
-        raise typer.Exit(1)
 
-    typer.echo(f"Generating {waveform} wavetable with {octaves} octaves...")
+def parse_partials_string(partials: str) -> list[HarmonicPartial]:
+    """Parse partials string into HarmonicPartial objects."""
+    partial_list = []
+    for partial_str in partials.split(","):
+        parts = partial_str.split(":")
+        if len(parts) != 3:
+            raise ValueError(f"Invalid partial format: {partial_str}")
+        harmonic = int(parts[0])
+        amplitude = float(parts[1])
+        phase = float(parts[2])
+        partial_list.append(HarmonicPartial(harmonic, amplitude, phase))
+    return partial_list
+
+
+def apply_processing(wave: np.ndarray, processing: ProcessingParams) -> np.ndarray:
+    """Apply EQ and tilt processing to a waveform."""
+    if processing.eq:
+        eq_bands = parse_eq_string(processing.eq)
+        console.print(f"Applying parametric EQ with {len(eq_bands)} bands to base wavetable...")
+        wave = apply_parametric_eq_fft(wave, eq_bands, preserve_rms=True, preserve_phase=True)
+
+    if processing.high_tilt:
+        parts = processing.high_tilt.split(":")
+        if len(parts) != 2:
+            raise ValueError("High tilt must be in format 'start_ratio:gain_db'")
+        start_ratio = float(parts[0])
+        gain_db = float(parts[1])
+
+        if not 0.0 <= start_ratio <= 1.0:
+            raise ValueError("Start ratio must be between 0.0 and 1.0")
+
+        console.print(
+            f"Applying [yellow]high-frequency[/] tilt: [yellow]start={start_ratio:.2f}, gain={gain_db:+.1f}dB[/]"
+        )
+        wave = apply_tilt_eq_fft(
+            wave, start_ratio, gain_db, "high", preserve_rms=True, preserve_phase=True
+        )
+
+    if processing.low_tilt:
+        parts = processing.low_tilt.split(":")
+        if len(parts) != 2:
+            raise ValueError("Low tilt must be in format 'start_ratio:gain_db'")
+        start_ratio = float(parts[0])
+        gain_db = float(parts[1])
+
+        if not 0.0 <= start_ratio <= 1.0:
+            raise ValueError("Start ratio must be between 0.0 and 1.0")
+
+        console.print(
+            f"Applying [magenta]low-frequency[/] tilt: [magenta]start={start_ratio:.2f}, gain={gain_db:+.1f}dB[/]"
+        )
+        wave = apply_tilt_eq_fft(
+            wave, start_ratio, gain_db, "low", preserve_rms=True, preserve_phase=True
+        )
+
+    return wave
+
+
+@app.command
+def generate(
+    waveform: WaveformType = WaveformType.sawtooth,
+    output: Path = Path("wavetable.npz"),
+    octaves: int = 8,
+    rolloff: RolloffMethod = "raised_cosine",
+    frequency: float = 1.0,
+    duty: float = 0.5,
+    size: Annotated[int, Parameter(validator=power_of_two_integer)] = 2048,
+    decimate: bool = False,
+    export_wav: bool = False,
+    wav_dir: Path | None = None,
+    wav_sample_rate: int = 44100,
+    wav_bit_depth: BitDepth = 16,
+    eq: str | None = None,
+    high_tilt: str | None = None,
+    low_tilt: str | None = None,
+) -> int:
+    """
+    Generate wavetable mipmaps and export to .npz or .wav format.
+
+    Parameters
+    ----------
+    waveform: WaveformType
+        The base wave shape for the wavetable (default: sawtooth)
+    output: Path
+        The output destination for the .npz file (default: wavetable.npz)
+    octaves: int
+        The number of mipmap octaves (default: 8)
+    rolloff_method: RolloffMethod
+        The rolloff method for FIR bandlimiting (default: raised_cosine)
+    frequency: float
+        The base frequency of the wavetable (default: 1.0)
+    duty: float
+        The duty cycle for square/pulse waveforms (default: 0.5)
+    size: int
+        The length of the wavetable in samples. Must be a power of 2 (default: 2048)
+    decimate: bool
+        Whether to decimate the wavetable for each octave above base (default: False)
+    export_wav: bool
+        Whether to export the wavetable also in .wav format
+    wav_dir: Path | None
+        The output directory of the .wav wavetables (default: <output>.wav)
+    wav_sample_rate: int
+        The sample rate for .wav wavetables in Hz (default: 44100)
+    wav_bit_depth: BitDepth
+        The bit depths for .wav wavetables (default: 16)
+    eq: str | None
+        EQ settings in the format 'freq:gain:q,freq:gain:q' (freq in Hz, gain in dB, q=factor)
+    high_tilt: str | None
+        High frequency tilt spectral shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+    low_tilt: str | None
+        Low frequency spectral tilt shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+    """
+    export_params = ExportParams(
+        export_wav=export_wav,
+        wav_dir=wav_dir,
+        wav_sample_rate=wav_sample_rate,
+        wav_bit_depth=wav_bit_depth,
+    )
+
+    console.print(f"Generating {waveform} wavetable with {octaves} octaves...")
 
     # Generate base waveform
     if waveform == "sawtooth":
@@ -104,8 +177,8 @@ def generate(
     elif waveform == "polyblep_saw":
         _, wave = generate_polyblep_sawtooth_wavetable(frequency)
     else:
-        typer.echo(f"Error: Unknown waveform type '{waveform}'", err=True)
-        raise typer.Exit(1)
+        print_error(f"Error: Unknown waveform type '{waveform}'")
+        raise ValueError("Invalid waveform type")
 
     # Resize if different from default
     if len(wave) != size:
@@ -113,63 +186,18 @@ def generate(
         indices = np.linspace(0, len(wave) - 1, size)
         wave = np.interp(indices, np.arange(len(wave)), wave)
 
-    # Apply EQ to base wavetable before bandlimiting if specified
-    if eq:
-        try:
-            eq_bands = parse_eq_string(eq)
-            typer.echo(f"Applying parametric EQ with {len(eq_bands)} bands to base wavetable...")
-            wave = apply_parametric_eq_fft(wave, eq_bands, preserve_rms=True, preserve_phase=True)
-        except ValueError as e:
-            typer.echo(f"Error parsing EQ settings: {e}", err=True)
-            raise typer.Exit(1)
-
-    # Apply high-frequency tilt EQ if specified
-    if high_tilt:
-        try:
-            parts = high_tilt.split(":")
-            if len(parts) != 2:
-                raise ValueError("High tilt must be in format 'start_ratio:gain_db'")
-            start_ratio = float(parts[0])
-            gain_db = float(parts[1])
-
-            if not 0.0 <= start_ratio <= 1.0:
-                raise ValueError("Start ratio must be between 0.0 and 1.0")
-
-            typer.echo(
-                f"Applying high-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
-            )
-            wave = apply_tilt_eq_fft(
-                wave, start_ratio, gain_db, "high", preserve_rms=True, preserve_phase=True
-            )
-        except ValueError as e:
-            typer.echo(f"Error parsing high tilt settings: {e}", err=True)
-            raise typer.Exit(1)
-
-    # Apply low-frequency tilt EQ if specified
-    if low_tilt:
-        try:
-            parts = low_tilt.split(":")
-            if len(parts) != 2:
-                raise ValueError("Low tilt must be in format 'start_ratio:gain_db'")
-            start_ratio = float(parts[0])
-            gain_db = float(parts[1])
-
-            if not 0.0 <= start_ratio <= 1.0:
-                raise ValueError("Start ratio must be between 0.0 and 1.0")
-
-            typer.echo(
-                f"Applying low-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
-            )
-            wave = apply_tilt_eq_fft(
-                wave, start_ratio, gain_db, "low", preserve_rms=True, preserve_phase=True
-            )
-        except ValueError as e:
-            typer.echo(f"Error parsing low tilt settings: {e}", err=True)
-            raise typer.Exit(1)
+    # Apply processing
+    processing = ProcessingParams(eq=eq, high_tilt=high_tilt, low_tilt=low_tilt)
+    wave = apply_processing(wave, processing)
 
     # Build mipmaps
-    typer.echo(f"Building mipmaps with {rolloff} rolloff...")
-    mipmaps = build_mipmap(wave, num_octaves=octaves, rolloff_method=rolloff, decimate=decimate)
+    console.print(f"Building mipmaps with [cyan bold]{rolloff}[/] rolloff...")
+    mipmaps = Mipmap(
+        base_wavetable=wave,
+        num_octaves=octaves,
+        rolloff_method=rolloff,
+        decimate=decimate,
+    ).generate()
 
     # Process each mipmap level
     processed_mipmaps = []
@@ -177,311 +205,191 @@ def generate(
         # Apply standard processing pipeline
         processed = align_to_zero_crossing(dc_remove(normalize(mip)))
         processed_mipmaps.append(processed)
-        typer.echo(f"Processed mipmap level {i}: RMS={np.sqrt(np.mean(processed**2)):.3f}")
+        console.print(f"Processed mipmap level {i}: RMS={np.sqrt(np.mean(processed**2)):.3f}")
 
-    # Export to .npz
-    typer.echo(f"Exporting to {output}...")
+    # Export
+    console.print(f"Exporting to {output}...")
 
-    # Prepare tables dict
     tables = {"base": processed_mipmaps}
+    meta = create_wavetable_metadata(
+        name=f"{waveform}_wavetable",
+        waveform=waveform,
+        octaves=octaves,
+        rolloff=rolloff,
+        size=size,
+        decimate=decimate,
+        sample_rate=export_params.wav_sample_rate,
+        frequency=frequency,
+        duty=duty,
+    )
 
-    # Prepare metadata in manifest format
-    meta = {
-        "version": 1,
-        "name": f"{waveform}_wavetable",
-        "author": "wtgen",
-        "sample_rate_hz": wav_sample_rate,
-        "cycle_length_samples": size,
-        "phase_convention": "zero_at_idx0",
-        "normalization": "rms_0.35",
-        "tuning": {"root_midi_note": 69, "cents_offset": 0},
-        "generation": {
-            "waveform": waveform,
-            "octaves": octaves,
-            "rolloff": rolloff.value,
-            "frequency": frequency,
-            "duty": duty,
-            "size": size,
-            "decimate": decimate,
-        },
-    }
-
-    if export_wav:
-        # Determine WAV output directory
-        if wav_dir is None:
-            wav_dir = output.parent / f"{output.stem}_wav"
-
-        typer.echo(f"Exporting WAV files to {wav_dir}...")
-        save_wavetable_with_wav_export(
-            output,
-            wav_dir,
-            tables,
-            meta,
-            compress=True,
-            sample_rate=wav_sample_rate,
-            bit_depth=wav_bit_depth,
-        )
-        typer.echo(
-            f" Exported {len(processed_mipmaps)} mipmap levels to {output} "
-            f"and WAV files to {wav_dir}"
-        )
-    else:
-        save_wavetable_npz(output, tables, meta, compress=True)
-
-        typer.echo(f"Exported {len(processed_mipmaps)} mipmap levels to {output}")
+    _, message = handle_wavetable_export(output, tables, meta, export_params)
+    console.print(message)
+    return 0
 
 
-@app.command()
+@app.command
 def harmonic(
-    output: Annotated[Path, typer.Option("--output", "-o", help="Output .npz file path")] = Path(
-        "harmonic_wavetable.npz"
-    ),
-    partials: Annotated[
-        str | None,
-        typer.Option("--partials", "-p", help="Harmonic partials as 'h1:a1:p1,h2:a2:p2,...'"),
-    ] = None,
-    octaves: Annotated[int, typer.Option("--octaves", "-n", help="Number of mipmap octaves")] = 8,
-    rolloff: Annotated[
-        RolloffMethod, typer.Option("--rolloff", "-r", help="Rolloff method for bandlimiting")
-    ] = RolloffMethod.raised_cosine,
-    size: Annotated[int, typer.Option("--size", "-s", help="Wavetable size (power of 2)")] = 2048,
-    decimate: Annotated[
-        bool, typer.Option("--decimate", help="Decimate each mipmap level (2048→1024→512...)")
-    ] = False,
-    export_wav: Annotated[
-        bool,
-        typer.Option("--export-wav", help="Also export mipmap levels as individual .wav files"),
-    ] = False,
-    wav_dir: Annotated[
-        Path | None,
-        typer.Option("--wav-dir", help="Directory for .wav files (default: <output_name>_wav)"),
-    ] = None,
-    wav_sample_rate: Annotated[
-        int, typer.Option("--wav-sample-rate", help="Sample rate for .wav files")
-    ] = 44100,
-    wav_bit_depth: Annotated[
-        int, typer.Option("--wav-bit-depth", help="Bit depth for .wav files (16, 24, or 32)")
-    ] = 16,
-    eq: Annotated[
-        str | None,
-        typer.Option(
-            "--eq",
-            help="EQ settings as 'freq:gain:q,freq:gain:q,...' (freq in Hz, gain in dB, q=factor)",
-        ),
-    ] = None,
-    high_tilt: Annotated[
-        str | None,
-        typer.Option(
-            "--high-tilt",
-            help="High-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
-        ),
-    ] = None,
-    low_tilt: Annotated[
-        str | None,
-        typer.Option(
-            "--low-tilt",
-            help="Low-frequency tilt as 'start_ratio:gain_db' (ratio 0.0-1.0, gain in dB)",
-        ),
-    ] = None,
-) -> None:
-    """Generate wavetable from harmonic partials."""
+    output: Path = Path("harmonic_wavetable.npz"),
+    partials: str | None = "1:1.0:0.0",
+    octaves: int = 8,
+    rolloff: RolloffMethod = "raised_cosine",
+    size: Annotated[int, Parameter(validator=power_of_two_integer)] = 2048,
+    decimate: bool = False,
+    export_wav: bool = False,
+    wav_dir: Path | None = None,
+    wav_sample_rate: int = 44100,
+    wav_bit_depth: int = 16,
+    eq: str | None = None,
+    high_tilt: str | None = None,
+    low_tilt: str | None = None,
+) -> int:
+    """
+    Generate wavetable from harmonic partials.
 
-    if size & (size - 1) != 0:
-        typer.echo("Error: Size must be a power of 2", err=True)
-        raise typer.Exit(1)
+    Parameters
+    ----------
+    output: Path
+        Output path for the .npz wavetable (default: harmonic_wavetable.npz)
+    partials: str | None
+        Harmonic partials as 'h1:a1:p1,h2:a2:p2...', where h is harmonic index, a is amplitude and p is phase
+    rolloff: RolloffMethod
+        Rolloff method for FIR bandlimiting
+    size: int
+        The length of the wavetable in samples. Must be a power of 2 (default: 2048)
+    decimate: bool
+        Whether to decimate the wavetable for each octave above base (default: False)
+    export_wav: bool
+        Whether to export the wavetable also in .wav format
+    wav_dir: Path | None
+        The output directory of the .wav wavetables (default: <output>.wav)
+    wav_sample_rate: int
+        The sample rate for .wav wavetables in Hz (default: 44100)
+    wav_bit_depth: BitDepth
+        The bit depths for .wav wavetables (default: 16)
+    eq: str | None
+        EQ settings in the format 'freq:gain:q,freq:gain:q' (freq in Hz, gain in dB, q=factor)
+    high_tilt: str | None
+        High frequency tilt spectral shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+    low_tilt: str | None
+        Low frequency spectral tilt shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+    """
+
+    export_params = ExportParams(
+        export_wav=export_wav,
+        wav_dir=wav_dir,
+        wav_sample_rate=wav_sample_rate,
+        wav_bit_depth=wav_bit_depth,
+    )
 
     # Parse partials
-    partial_list = []
     if partials:
-        try:
-            for partial_str in partials.split(","):
-                parts = partial_str.split(":")
-                if len(parts) != 3:
-                    raise ValueError(f"Invalid partial format: {partial_str}")
-                harmonic = int(parts[0])
-                amplitude = float(parts[1])
-                phase = float(parts[2])
-                partial_list.append((harmonic, amplitude, phase))
-        except ValueError as e:
-            typer.echo(f"Error parsing partials: {e}", err=True)
-            raise typer.Exit(1) from None
+        partial_list = parse_partials_string(partials)
+        harmonic_partials = [(p.harmonic, p.amplitude, p.phase) for p in partial_list]
     else:
         # Default: sawtooth-like harmonics
-        partial_list = [(i, 1.0 / i, 0.0) for i in range(1, 17)]
+        harmonic_partials = [(i, 1.0 / i, 0.0) for i in range(1, 17)]
 
-    typer.echo(f"Generating wavetable from {len(partial_list)} harmonics...")
+    console.print(f"Generating wavetable from {len(harmonic_partials)} harmonics...")
 
     # Generate base waveform from harmonics
-    wave = harmonics_to_table(partial_list, size)
+    wave = harmonics_to_table(harmonic_partials, size)
 
-    # Apply EQ to base wavetable before bandlimiting if specified
-    if eq:
-        try:
-            eq_bands = parse_eq_string(eq)
-            typer.echo(f"Applying parametric EQ with {len(eq_bands)} bands to base wavetable...")
-            from wtgen.dsp.eq import apply_parametric_eq_fft
-
-            wave = apply_parametric_eq_fft(wave, eq_bands, preserve_rms=True, preserve_phase=True)
-        except ValueError as e:
-            typer.echo(f"Error parsing EQ settings: {e}", err=True)
-            raise typer.Exit(1)
-
-    # Apply high-frequency tilt EQ if specified
-    if high_tilt:
-        try:
-            parts = high_tilt.split(":")
-            if len(parts) != 2:
-                raise ValueError("High tilt must be in format 'start_ratio:gain_db'")
-            start_ratio = float(parts[0])
-            gain_db = float(parts[1])
-
-            if not 0.0 <= start_ratio <= 1.0:
-                raise ValueError("Start ratio must be between 0.0 and 1.0")
-
-            typer.echo(
-                f"Applying high-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
-            )
-            wave = apply_tilt_eq_fft(
-                wave, start_ratio, gain_db, "high", preserve_rms=True, preserve_phase=True
-            )
-        except ValueError as e:
-            typer.echo(f"Error parsing high tilt settings: {e}", err=True)
-            raise typer.Exit(1)
-
-    # Apply low-frequency tilt EQ if specified
-    if low_tilt:
-        try:
-            parts = low_tilt.split(":")
-            if len(parts) != 2:
-                raise ValueError("Low tilt must be in format 'start_ratio:gain_db'")
-            start_ratio = float(parts[0])
-            gain_db = float(parts[1])
-
-            if not 0.0 <= start_ratio <= 1.0:
-                raise ValueError("Start ratio must be between 0.0 and 1.0")
-
-            typer.echo(
-                f"Applying low-frequency tilt: start={start_ratio:.2f}, gain={gain_db:+.1f}dB"
-            )
-            wave = apply_tilt_eq_fft(
-                wave, start_ratio, gain_db, "low", preserve_rms=True, preserve_phase=True
-            )
-        except ValueError as e:
-            typer.echo(f"Error parsing low tilt settings: {e}", err=True)
-            raise typer.Exit(1)
+    # Apply processing
+    processing = ProcessingParams(eq=eq, high_tilt=high_tilt, low_tilt=low_tilt)
+    wave = apply_processing(wave, processing)
 
     # Build mipmaps
-    typer.echo(f"Building mipmaps with {rolloff} rolloff...")
-    mipmaps = build_mipmap(wave, num_octaves=octaves, rolloff_method=rolloff, decimate=decimate)
+    console.print(f"Building mipmaps with {rolloff} rolloff...")
+    mipmaps = Mipmap(
+        base_wavetable=wave,
+        num_octaves=octaves,
+        rolloff_method=rolloff,
+        decimate=decimate,
+    ).generate()
 
     # Process each mipmap level
     processed_mipmaps = []
     for i, mip in enumerate(mipmaps):
         processed = align_to_zero_crossing(dc_remove(normalize(mip)))
         processed_mipmaps.append(processed)
-        typer.echo(f"Processed mipmap level {i}: RMS={np.sqrt(np.mean(processed**2)):.3f}")
+        console.print(f"Processed mipmap level {i}: RMS={np.sqrt(np.mean(processed**2)):.3f}")
 
-    # Export to .npz
-    typer.echo(f"Exporting to {output}...")
+    # Export
+    console.print(f"Exporting to {output}...")
 
-    # Prepare tables dict
     tables = {"base": processed_mipmaps}
+    meta = create_wavetable_metadata(
+        name="harmonic_wavetable",
+        waveform="harmonic",
+        octaves=octaves,
+        rolloff=rolloff,
+        size=size,
+        decimate=decimate,
+        sample_rate=export_params.wav_sample_rate,
+        partials=harmonic_partials,
+    )
 
-    # Prepare metadata in manifest format
-    meta = {
-        "version": 1,
-        "name": "harmonic_wavetable",
-        "author": "wtgen",
-        "sample_rate_hz": wav_sample_rate,
-        "cycle_length_samples": size,
-        "phase_convention": "zero_at_idx0",
-        "normalization": "rms_0.35",
-        "tuning": {"root_midi_note": 69, "cents_offset": 0},
-        "generation": {
-            "waveform": "harmonic",
-            "octaves": octaves,
-            "rolloff": rolloff.value,
-            "size": size,
-            "num_partials": len(partial_list),
-            "partials": partial_list,
-            "decimate": decimate,
-        },
-    }
-
-    if export_wav:
-        # Determine WAV output directory
-        if wav_dir is None:
-            wav_dir = output.parent / f"{output.stem}_wav"
-
-        typer.echo(f"Exporting WAV files to {wav_dir}...")
-        save_wavetable_with_wav_export(
-            output,
-            wav_dir,
-            tables,
-            meta,
-            compress=True,
-            sample_rate=wav_sample_rate,
-            bit_depth=wav_bit_depth,
-        )
-        typer.echo(
-            f" Exported {len(processed_mipmaps)} mipmap levels to {output} "
-            f"and WAV files to {wav_dir}"
-        )
-    else:
-        save_wavetable_npz(output, tables, meta, compress=True)
-        typer.echo(f" Exported {len(processed_mipmaps)} mipmap levels to {output}")
+    _, message = handle_wavetable_export(output, tables, meta, export_params)
+    console.print(message)
+    return 0
 
 
-@app.command()
-def info(file: Annotated[Path, typer.Argument(help="Input .npz wavetable file")]) -> None:
-    """Display information about a wavetable file."""
+@app.command
+def info(file: Path) -> int:
+    """
+    Display information about a wavetable file.
+
+    Parameters
+    ----------
+    file: Path
+        The path to the .npz wavetable
+
+    """
 
     if not file.exists():
-        typer.echo(f"Error: File {file} does not exist", err=True)
-        raise typer.Exit(1)
+        print_error(f"Error: File {file} does not exist")
+        raise ValueError("File does not exist")
 
-    try:
-        # Try new manifest format first
-        wt_data = load_wavetable_npz(file)
-        manifest = wt_data["manifest"]
-        tables = wt_data["tables"]
+    # Try new manifest format first
+    wt_data = load_wavetable_npz(file)
+    manifest = wt_data["manifest"]
+    tables = wt_data["tables"]
 
-        typer.echo(f"Wavetable: {file}")
-        typer.echo(f"  Name: {manifest.get('name', 'unknown')}")
-        typer.echo(f"  Version: {manifest.get('version', 'unknown')}")
-        typer.echo(f"  Author: {manifest.get('author', 'unknown')}")
-        typer.echo(f"  Sample rate: {manifest.get('sample_rate_hz', 'unknown')} Hz")
-        typer.echo(f"  Base cycle length: {manifest.get('cycle_length_samples', 'unknown')}")
+    console.print(f"Wavetable: {file}")
+    console.print(f"  Name: {manifest.get('name', 'unknown')}")
+    console.print(f"  Version: {manifest.get('version', 'unknown')}")
+    console.print(f"  Author: {manifest.get('author', 'unknown')}")
+    console.print(f"  Sample rate: {manifest.get('sample_rate_hz', 'unknown')} Hz")
+    console.print(f"  Base cycle length: {manifest.get('cycle_length_samples', 'unknown')}")
 
-        if "generation" in manifest:
-            gen = manifest["generation"]
-            typer.echo(f"  Waveform: {gen.get('waveform', 'unknown')}")
-            typer.echo(f"  Rolloff: {gen.get('rolloff', 'unknown')}")
-            if gen.get("decimate"):
-                typer.echo("  Decimated: Yes")
+    if "generation" in manifest:
+        gen = manifest["generation"]
+        console.print(f"  Waveform: {gen.get('waveform', 'unknown')}")
+        console.print(f"  Rolloff: {gen.get('rolloff', 'unknown')}")
+        if gen.get("decimate"):
+            console.print("  Decimated: Yes")
 
-        # Show table information
-        for table_info in manifest.get("tables", []):
-            table_id = table_info["id"]
-            mipmaps = tables.get(table_id, [])
-            typer.echo(f"  Table '{table_id}': {len(mipmaps)} mipmap levels")
+    # Show table information
+    for table_info in manifest.get("tables", []):
+        table_id = table_info["id"]
+        mipmaps = tables.get(table_id, [])
+        console.print(f"  Table '{table_id}': {len(mipmaps)} mipmap levels")
 
-            # Show mipmap sizes and RMS levels
-            typer.echo("    Mipmap levels:")
-            for i, mip in enumerate(mipmaps):
-                rms = np.sqrt(np.mean(mip**2))
-                typer.echo(f"      Level {i}: size={len(mip)}, RMS={rms:.3f}")
+        # Show mipmap sizes and RMS levels
+        console.print("    Mipmap levels:")
+        for i, mip in enumerate(mipmaps):
+            rms = np.sqrt(np.mean(mip**2))
+            console.print(f"      Level {i}: size={len(mip)}, RMS={rms:.3f}")
 
-        # Show statistics
-        if "stats" in manifest:
-            stats = manifest["stats"]
-            typer.echo(f"  DC offset: {stats.get('dc_offset_mean', 'unknown'):.6f}")
-            typer.echo(f"  Peak: {stats.get('peak', 'unknown'):.6f}")
+    # Show statistics
+    if "stats" in manifest:
+        stats = manifest["stats"]
+        console.print(f"  DC offset: {stats.get('dc_offset_mean', 'unknown'):.6f}")
+        console.print(f"  Peak: {stats.get('peak', 'unknown'):.6f}")
 
-    except Exception as e:
-        typer.echo(f"Error reading file: {e}", err=True)
-        raise typer.Exit(1)
+    return 0
 
 
 if __name__ == "__main__":
-    app()
+    sys.exit(app())

@@ -5,14 +5,15 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.io import wavfile
+
+from wtgen.types import ExportParams, WavetableMetadata, WavetableTables
 
 
 def save_wavetable_npz(
     out_path: Path | str,
-    tables: dict[str, list[NDArray[np.float32]]],
-    meta: dict[str, Any],
+    tables: WavetableTables,
+    meta: WavetableMetadata,
     compress: bool = True,
 ) -> None:
     """
@@ -21,7 +22,6 @@ def save_wavetable_npz(
     Args:
         out_path: Output file path
         tables: Dict mapping table IDs to lists of mipmap arrays
-            e.g. {"base": [np.array(2048), np.array(1024), ...]}
         meta: Metadata dict (excluding "tables" field which is auto-generated)
         compress: Whether to compress the ZIP file
     """
@@ -39,15 +39,15 @@ def save_wavetable_npz(
             }
 
             for lvl, arr in enumerate(mip_list):
-                arr = np.asarray(arr, dtype="<f4", order="C")
-                name = f"{table_id}/mip_{lvl:02d}_len{arr.shape[0]}.npy"
+                arr_data = np.asarray(arr, dtype="<f4", order="C")
+                name = f"{table_id}/mip_{lvl:02d}_len{arr_data.shape[0]}.npy"
 
                 # Serialize NPY into memory so we can write into the zip
                 buf = io.BytesIO()
-                np.save(buf, arr, allow_pickle=False)
+                np.save(buf, arr_data, allow_pickle=False)
                 z.writestr(name, buf.getvalue())
 
-                entry["mipmaps"].append({"npz_path": name, "length": int(arr.shape[0])})
+                entry["mipmaps"].append({"npz_path": name, "length": int(arr_data.shape[0])})
 
             manifest["tables"].append(entry)
 
@@ -97,7 +97,7 @@ def load_wavetable_npz(file_path: Path | str) -> dict[str, Any]:
 
 def save_mipmaps_as_wav(
     output_dir: Path | str,
-    tables: dict[str, list[NDArray[np.float32]]],
+    tables: WavetableTables,
     sample_rate: int = 44100,
     bit_depth: int = 16,
 ) -> None:
@@ -143,14 +143,16 @@ def save_mipmaps_as_wav(
             filepath = table_dir / filename
 
             # Save as .wav file
-            wavfile.write(str(filepath), sample_rate, mip_scaled)
+            # Ensure array is 1D for wavfile.write
+            mip_1d = np.asarray(mip_scaled).flatten()
+            wavfile.write(str(filepath), sample_rate, mip_1d)
 
 
 def save_wavetable_with_wav_export(
     npz_path: Path | str,
     wav_dir: Path | str,
-    tables: dict[str, list[NDArray[np.float32]]],
-    meta: dict[str, Any],
+    tables: WavetableTables,
+    meta: WavetableMetadata,
     compress: bool = True,
     sample_rate: int = 44100,
     bit_depth: int = 16,
@@ -172,3 +174,87 @@ def save_wavetable_with_wav_export(
 
     # Save WAV files
     save_mipmaps_as_wav(wav_dir, tables, sample_rate, bit_depth)
+
+
+def create_wavetable_metadata(
+    name: str,
+    waveform: str,
+    octaves: int,
+    rolloff: str,
+    size: int,
+    decimate: bool,
+    sample_rate: int,
+    frequency: float | None = None,
+    duty: float | None = None,
+    partials: list[tuple[int, float, float]] | None = None,
+) -> WavetableMetadata:
+    """Create standardized wavetable metadata."""
+    meta: WavetableMetadata = {
+        "version": 1,
+        "name": name,
+        "author": "wtgen",
+        "sample_rate_hz": sample_rate,
+        "cycle_length_samples": size,
+        "phase_convention": "zero_at_idx0",
+        "normalization": "rms_0.35",
+        "tuning": {"root_midi_note": 69, "cents_offset": 0},
+        "generation": {
+            "waveform": waveform,
+            "octaves": octaves,
+            "rolloff": rolloff,
+            "size": size,
+            "decimate": decimate,
+        },
+    }
+
+    if frequency is not None:
+        meta["generation"]["frequency"] = frequency
+
+    if duty is not None:
+        meta["generation"]["duty"] = duty
+
+    if partials is not None:
+        meta["generation"]["num_partials"] = len(partials)
+        meta["generation"]["partials"] = partials
+
+    return meta
+
+
+def handle_wavetable_export(
+    output_path: Path,
+    tables: WavetableTables,
+    meta: WavetableMetadata,
+    params: ExportParams,
+) -> tuple[Path | None, str]:
+    """Handle wavetable export based on parameters.
+
+    Returns:
+        Tuple of (wav_directory, success_message)
+    """
+    wav_dir = None
+    if params.export_wav:
+        if params.wav_dir is None:
+            wav_dir = output_path.parent / f"{output_path.stem}_wav"
+        else:
+            wav_dir = params.wav_dir
+
+        save_wavetable_with_wav_export(
+            output_path,
+            wav_dir,
+            tables,
+            meta,
+            compress=True,
+            sample_rate=params.wav_sample_rate,
+            bit_depth=params.wav_bit_depth,
+        )
+
+        num_mipmaps = len(next(iter(tables.values())))
+        message = (
+            f"Exported {num_mipmaps} mipmap levels to {output_path} and WAV files to {wav_dir}"
+        )
+    else:
+        save_wavetable_npz(output_path, tables, meta, compress=True)
+        num_mipmaps = len(next(iter(tables.values())))
+        message = f"Exported {num_mipmaps} mipmap levels to {output_path}"
+
+    return wav_dir, message

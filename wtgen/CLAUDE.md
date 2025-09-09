@@ -22,8 +22,8 @@ uv tool run basedpyright src/
 
 **Code Formatting**:
 ```bash
-uv tool run black .
-uv tool run ruff check --fix .
+uv run ruff format
+uv run ruff check --fix .
 ```
 
 ## Testing Framework

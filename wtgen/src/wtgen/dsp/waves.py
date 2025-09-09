@@ -23,15 +23,6 @@ class WaveformType(str, Enum):
     polyblep_saw = "polyblep_saw"
 
 
-class RolloffMethod(str, Enum):
-    brick_wall = "brick_wall"
-    tukey = "tukey"
-    blackman = "blackman"
-    raised_cosine = "raised_cosine"
-    hann = "hann"
-    none = "none"
-
-
 def generate_sine_wavetable(
     frequency: float = 1 / (2 * pi),
 ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
