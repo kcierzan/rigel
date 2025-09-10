@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-wtgen = "wtgen.cli:app"
+wtgen = "wtgen.cli.commands:app"
 
 [tool.ruff]
 line-length = 100
