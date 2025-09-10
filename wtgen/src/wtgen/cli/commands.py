@@ -126,29 +126,29 @@ def generate(
     Parameters
     ----------
     waveform: WaveformType
-        The base wave shape for the wavetable (default: sawtooth)
+        The base wave shape for the wavetable
     output: Path
-        The output destination for the .npz file (default: wavetable.npz)
+        The output destination for the .npz file
     octaves: int
-        The number of mipmap octaves (default: 8)
+        The number of mipmap octaves
     rolloff_method: RolloffMethod
-        The rolloff method for FIR bandlimiting (default: raised_cosine)
+        The rolloff method for FIR bandlimiting
     frequency: float
-        The base frequency of the wavetable (default: 1.0)
+        The base frequency of the wavetable
     duty: float
-        The duty cycle for square/pulse waveforms (default: 0.5)
+        The duty cycle for square/pulse waveforms
     size: int
-        The length of the wavetable in samples. Must be a power of 2 (default: 2048)
+        The length of the wavetable in samples. Must be a power of 2.
     decimate: bool
-        Whether to decimate the wavetable for each octave above base (default: False)
+        Whether to decimate the wavetable for each octave above base
     export_wav: bool
         Whether to export the wavetable also in .wav format
     wav_dir: Path | None
-        The output directory of the .wav wavetables (default: <output>.wav)
+        The output directory of the .wav wavetables
     wav_sample_rate: int
-        The sample rate for .wav wavetables in Hz (default: 44100)
+        The sample rate for .wav wavetables in Hz
     wav_bit_depth: BitDepth
-        The bit depths for .wav wavetables (default: 16)
+        The bit depths for .wav wavetables
     eq: str | None
         EQ settings in the format 'freq:gain:q,freq:gain:q' (freq in Hz, gain in dB, q=factor)
     high_tilt: str | None
