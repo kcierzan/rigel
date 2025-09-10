@@ -22,6 +22,7 @@ def validate_eq_string(type_, eq_string: str | None) -> None:
         if len(parts) < 2 or len(parts) > 3:
             raise ValueError(f"Invalid EQ band format: {band_str}")
 
+
 def validate_power_of_two_integer(type_, size: int) -> None:
     """Validate that size is a power of 2."""
     if size & (size - 1) != 0:

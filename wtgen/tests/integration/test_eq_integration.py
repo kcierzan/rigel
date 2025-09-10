@@ -15,7 +15,7 @@ from wtgen.dsp.eq import apply_parametric_eq_fft, create_eq_band
 from wtgen.dsp.mipmap import Mipmap
 from wtgen.dsp.fir import RolloffMethod
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
-from wtgen.dsp.waves import generate_sawtooth_wavetable, harmonics_to_table
+from wtgen.dsp.waves import WaveGenerator
 from wtgen.export import load_wavetable_npz, save_wavetable_npz
 
 
@@ -25,7 +25,7 @@ class TestEQWithMipmapPipeline:
     def test_eq_before_bandlimiting_preserves_characteristics(self):
         """Test that EQ before bandlimiting maintains important characteristics."""
         # Generate base waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
 
         # Version 1: EQ after mipmap generation (wrong way)
         mipmaps_first = Mipmap(base_wave, num_octaves=3, decimate=False).generate()
@@ -49,7 +49,7 @@ class TestEQWithMipmapPipeline:
     def test_eq_preserves_mipmap_generation_quality(self):
         """Test that EQ doesn't break the mipmap generation process."""
         # Generate base waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
 
         # Build mipmaps without EQ
         mipmaps_no_eq = Mipmap(base_wave, num_octaves=4, decimate=False).generate()
@@ -75,7 +75,7 @@ class TestEQWithMipmapPipeline:
     def test_eq_preserves_zero_crossing_alignment_through_pipeline(self):
         """Test that EQ preserves zero-crossing alignment through full pipeline."""
         # Generate aligned base waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
         base_wave = align_to_zero_crossing(base_wave)
 
         # Apply EQ
@@ -97,7 +97,7 @@ class TestEQWithMipmapPipeline:
 
     def test_eq_with_different_rolloff_methods(self):
         """Test EQ interaction with different bandlimiting rolloff methods."""
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
         eq_bands = [create_eq_band(3000.0, 5.0, 1.0)]
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
@@ -116,7 +116,7 @@ class TestEQWithMipmapPipeline:
 
     def test_eq_with_decimation(self):
         """Test EQ works correctly with mipmap decimation."""
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
         eq_bands = [create_eq_band(1000.0, 4.0)]
         eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
 
@@ -141,7 +141,7 @@ class TestEQWithMipmapPipeline:
     def test_eq_pipeline_hypothesis(self, eq_freq_hz, eq_gain, eq_q, num_octaves):
         """Property test for EQ in the complete pipeline."""
         # Generate base waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
 
         # Apply EQ
         eq_bands = [create_eq_band(eq_freq_hz, eq_gain, eq_q)]
@@ -173,7 +173,7 @@ class TestEQWithHarmonics:
         """Test EQ applied to harmonically generated wavetables."""
         # Create harmonic content
         partials = [(1, 1.0, 0.0), (2, 0.5, 0.0), (3, 0.33, 0.0), (4, 0.25, 0.0)]
-        base_wave = harmonics_to_table(partials, 512)
+        base_wave = WaveGenerator().harmonics_to_table(partials, 512)
 
         # Apply EQ to emphasize 2nd harmonic
         eq_bands = [create_eq_band(200.0, 6.0, 2.0)]  # Around 2nd harmonic
@@ -192,7 +192,7 @@ class TestEQWithHarmonics:
         """Test multiple EQ bands with harmonic content."""
         # Rich harmonic content
         partials = [(i, 1.0 / i, 0.0) for i in range(1, 9)]
-        base_wave = harmonics_to_table(partials, 1024)
+        base_wave = WaveGenerator().harmonics_to_table(partials, 1024)
 
         # Apply complex EQ curve
         eq_bands = [
@@ -226,7 +226,7 @@ class TestEQExportCompatibility:
             output_path = Path(temp_dir) / "eq_test.npz"
 
             # Generate EQ'd wavetable
-            _, base_wave = generate_sawtooth_wavetable(1.0)
+            _, base_wave = WaveGenerator().sawtooth(1.0)
             eq_bands = [create_eq_band(2000.0, 3.0)]
             eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
             mipmaps = Mipmap(eq_wave, num_octaves=2, decimate=False).generate()
@@ -262,7 +262,7 @@ class TestEQExportCompatibility:
         """Test that EQ processing preserves export metadata."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Generate and process wavetable with EQ
-            _, base_wave = generate_sawtooth_wavetable(1.0)
+            _, base_wave = WaveGenerator().sawtooth(1.0)
             eq_bands = [create_eq_band(1500.0, -2.0, 1.5)]
             eq_wave = apply_parametric_eq_fft(base_wave, eq_bands)
             mipmaps = Mipmap(eq_wave, num_octaves=1, decimate=False).generate()
