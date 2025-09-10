@@ -1,8 +1,10 @@
-from typing import Literal, NoReturn, TypeAlias
+from typing import Literal, TypeAlias
 
 import numpy as np
 from numpy import cos, pi
 from numpy.typing import NDArray
+
+from wtgen.utils import assert_exhaustiveness
 
 RolloffMethod: TypeAlias = Literal["raised_cosine", "tukey", "hann", "blackman", "brick_wall"]
 
@@ -183,8 +185,3 @@ class FIRFilter:
             if k > self._cutoff_harmonic:
                 self._spectrum[k] = 0
                 self._spectrum[self._N - k] = 0
-
-
-def assert_exhaustiveness(x: NoReturn) -> NoReturn:
-    """Provide an assertion at type-check time that this function is never called."""
-    raise AssertionError(f"Invalid value: {x!r}")

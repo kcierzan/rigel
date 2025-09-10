@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, TypeAlias
 
@@ -11,6 +12,15 @@ WavetableTables: TypeAlias = dict[str, MipmapList]
 WavetableMetadata: TypeAlias = dict[str, Any]
 
 BitDepth = Literal[16, 24, 32]
+
+
+class WaveformType(str, Enum):
+    sawtooth = "sawtooth"
+    square = "square"
+    pulse = "pulse"
+    triangle = "triangle"
+    sine = "sine"
+    polyblep_saw = "polyblep_saw"
 
 
 @dataclass
