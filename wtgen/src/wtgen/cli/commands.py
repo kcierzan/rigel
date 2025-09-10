@@ -14,15 +14,7 @@ from wtgen.cli.validators import (
     validate_eq_string,
     validate_power_of_two_integer,
 )
-from wtgen.dsp.waves import (
-    WaveformType,
-    generate_polyblep_sawtooth_wavetable,
-    generate_pulse_wavetable,
-    generate_sawtooth_wavetable,
-    generate_square_wavetable,
-    generate_triangle_wavetable,
-    harmonics_to_table,
-)
+from wtgen.dsp.waves import WaveGenerator
 from wtgen.export import (
     create_wavetable_metadata,
     handle_wavetable_export,
@@ -33,6 +25,7 @@ from wtgen.types import (
     ExportParams,
     HarmonicPartial,
     ProcessingParams,
+    WaveformType,
 )
 
 app = App(name="wtgen", help="A utility for generating and analyzing wavetables")
@@ -154,20 +147,13 @@ def generate(
 
     console.print(f"Generating {waveform} wavetable with {octaves} octaves...")
 
-    # Generate base waveform
-    if waveform == "sawtooth":
-        _, wave = generate_sawtooth_wavetable(frequency)
-    elif waveform == "square":
-        _, wave = generate_square_wavetable(frequency, duty)
-    elif waveform == "pulse":
-        _, wave = generate_pulse_wavetable(frequency, duty)
-    elif waveform == "triangle":
-        _, wave = generate_triangle_wavetable(frequency)
-    elif waveform == "polyblep_saw":
-        _, wave = generate_polyblep_sawtooth_wavetable(frequency)
-    else:
-        print_error(f"Error: Unknown waveform type '{waveform}'")
-        raise ValueError("Invalid waveform type")
+    wave_generator = WaveGenerator()
+
+    _, wave = wave_generator.generate(
+        waveform=waveform,
+        frequency=frequency,
+        duty=duty,
+    )
 
     # Resize if different from default
     if len(wave) != size:
@@ -282,7 +268,8 @@ def harmonic(
     console.print(f"Generating wavetable from {len(harmonic_partials)} harmonics...")
 
     # Generate base waveform from harmonics
-    wave = harmonics_to_table(harmonic_partials, size)
+    wave_generator = WaveGenerator()
+    wave = wave_generator.harmonics_to_table(harmonic_partials, size)
 
     # Apply processing
     processing = ProcessingParams(eq=eq, high_tilt=high_tilt, low_tilt=low_tilt)

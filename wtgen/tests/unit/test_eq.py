@@ -22,7 +22,7 @@ from wtgen.dsp.eq import (
 )
 from wtgen.dsp.mipmap import Mipmap
 from wtgen.dsp.process import align_to_zero_crossing
-from wtgen.dsp.waves import generate_sawtooth_wavetable
+from wtgen.dsp.waves import WaveGenerator
 
 
 class TestCreateEQBand:
@@ -316,7 +316,7 @@ class TestEQIntegration:
     def test_eq_with_mipmap_generation(self):
         """Test EQ integration with mipmap generation."""
         # Generate base waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
 
         # Apply EQ first
         eq_bands = [create_eq_band(2000.0, 4.0, 1.5)]
@@ -334,7 +334,7 @@ class TestEQIntegration:
     def test_eq_preserves_zero_crossing_alignment(self):
         """Test that EQ works well with zero-crossing alignment."""
         # Create aligned waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
         aligned_wave = align_to_zero_crossing(base_wave)
 
         # Apply EQ with phase preservation
@@ -619,7 +619,7 @@ class TestTiltEQIntegration:
     def test_tilt_eq_with_mipmap_generation(self):
         """Test tilt EQ integration with mipmap generation."""
         # Generate base waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
 
         # Apply tilt EQ first
         eq_wave = apply_tilt_eq_fft(base_wave, 0.4, 4.0, "high")
@@ -636,7 +636,7 @@ class TestTiltEQIntegration:
     def test_tilt_eq_preserves_zero_crossing_alignment(self):
         """Test that tilt EQ works well with zero-crossing alignment."""
         # Create aligned waveform
-        _, base_wave = generate_sawtooth_wavetable(1.0)
+        _, base_wave = WaveGenerator().sawtooth(1.0)
         aligned_wave = align_to_zero_crossing(base_wave)
 
         # Apply tilt EQ with phase preservation
