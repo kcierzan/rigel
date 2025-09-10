@@ -9,6 +9,11 @@ from rich.console import Console
 from wtgen.dsp.eq import apply_parametric_eq_fft, apply_tilt_eq_fft, parse_eq_string
 from wtgen.dsp.mipmap import Mipmap, RolloffMethod
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
+from wtgen.cli.validators import (
+    validate_tilt_string,
+    validate_eq_string,
+    validate_power_of_two_integer,
+)
 from wtgen.dsp.waves import (
     WaveformType,
     generate_polyblep_sawtooth_wavetable,
@@ -38,12 +43,6 @@ def print_error(message) -> None:
     console.print(message, style="bold red")
 
 
-def power_of_two_integer(type_, size: int) -> None:
-    """Validate that size is a power of 2."""
-    if size & (size - 1) != 0:
-        raise ValueError("Size must be a power of 2")
-
-
 def parse_partials_string(partials: str) -> list[HarmonicPartial]:
     """Parse partials string into HarmonicPartial objects."""
     partial_list = []
@@ -67,13 +66,8 @@ def apply_processing(wave: np.ndarray, processing: ProcessingParams) -> np.ndarr
 
     if processing.high_tilt:
         parts = processing.high_tilt.split(":")
-        if len(parts) != 2:
-            raise ValueError("High tilt must be in format 'start_ratio:gain_db'")
         start_ratio = float(parts[0])
         gain_db = float(parts[1])
-
-        if not 0.0 <= start_ratio <= 1.0:
-            raise ValueError("Start ratio must be between 0.0 and 1.0")
 
         console.print(
             f"Applying [yellow]high-frequency[/] tilt: [yellow]start={start_ratio:.2f}, gain={gain_db:+.1f}dB[/]"
@@ -84,13 +78,8 @@ def apply_processing(wave: np.ndarray, processing: ProcessingParams) -> np.ndarr
 
     if processing.low_tilt:
         parts = processing.low_tilt.split(":")
-        if len(parts) != 2:
-            raise ValueError("Low tilt must be in format 'start_ratio:gain_db'")
         start_ratio = float(parts[0])
         gain_db = float(parts[1])
-
-        if not 0.0 <= start_ratio <= 1.0:
-            raise ValueError("Start ratio must be between 0.0 and 1.0")
 
         console.print(
             f"Applying [magenta]low-frequency[/] tilt: [magenta]start={start_ratio:.2f}, gain={gain_db:+.1f}dB[/]"
@@ -110,15 +99,15 @@ def generate(
     rolloff: RolloffMethod = "raised_cosine",
     frequency: float = 1.0,
     duty: float = 0.5,
-    size: Annotated[int, Parameter(validator=power_of_two_integer)] = 2048,
+    size: Annotated[int, Parameter(validator=validate_power_of_two_integer)] = 2048,
     decimate: bool = False,
     export_wav: bool = False,
     wav_dir: Path | None = None,
     wav_sample_rate: int = 44100,
     wav_bit_depth: BitDepth = 16,
-    eq: str | None = None,
-    high_tilt: str | None = None,
-    low_tilt: str | None = None,
+    eq: Annotated[str | None, Parameter(validator=validate_eq_string)] = None,
+    high_tilt: Annotated[str | None, Parameter(validator=validate_tilt_string)] = None,
+    low_tilt: Annotated[str | None, Parameter(validator=validate_tilt_string)] = None,
 ) -> int:
     """
     Generate wavetable mipmaps and export to .npz or .wav format.
@@ -234,7 +223,7 @@ def harmonic(
     partials: str | None = "1:1.0:0.0",
     octaves: int = 8,
     rolloff: RolloffMethod = "raised_cosine",
-    size: Annotated[int, Parameter(validator=power_of_two_integer)] = 2048,
+    size: Annotated[int, Parameter(validator=validate_power_of_two_integer)] = 2048,
     decimate: bool = False,
     export_wav: bool = False,
     wav_dir: Path | None = None,

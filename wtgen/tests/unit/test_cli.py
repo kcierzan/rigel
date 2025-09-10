@@ -9,7 +9,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from wtgen.cli import WaveformType, app
+from wtgen.cli.commands import app
+from wtgen.dsp.waves import WaveformType
 from wtgen.export import load_wavetable_npz
 from zipfile import BadZipFile
 
