@@ -4,13 +4,13 @@ import numpy as np
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from wtgen.utils import EPSILON
 from wtgen.dsp.process import (
-    estimate_inter_sample_peak,
     align_to_zero_crossing,
     dc_remove,
+    estimate_inter_sample_peak,
     normalize,
 )
+from wtgen.utils import EPSILON
 
 
 class TestDCRemove:
