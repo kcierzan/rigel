@@ -7,6 +7,7 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from wtgen.dsp.mipmap import MipmapChain, MipmapLevel, Mipmap
+from wtgen.utils import EPSILON
 
 
 class TestBuildMipmap:
@@ -44,7 +45,7 @@ class TestBuildMipmap:
             assert max_abs_value <= 1.0 + 1e-6, f"Level {i}: Peak {max_abs_value} exceeds 1.0"
 
             # Check that RMS is reasonable (may be lower than target if scaled for clipping prevention)
-            if np.any(np.abs(level) > 1e-12):  # Non-zero waveform
+            if np.any(np.abs(level) > EPSILON):  # Non-zero waveform
                 rms = np.sqrt(np.mean(level**2))
                 assert rms > 0.1, f"Level {i}: RMS {rms} too low, indicates over-scaling"
                 assert rms <= 0.35 + 1e-6, (
@@ -287,7 +288,7 @@ class TestBuildMipmap:
             assert max_abs_value <= 1.0 + 1e-6, f"Level {i}: Peak {max_abs_value} exceeds 1.0"
 
             # RMS should be reasonable (may be lower than target due to clipping prevention)
-            if np.any(np.abs(level) > 1e-12):  # Non-zero waveform
+            if np.any(np.abs(level) > EPSILON):  # Non-zero waveform
                 rms = np.sqrt(np.mean(level**2))
                 assert rms > 0.1, f"Level {i}: RMS {rms} too low"
                 # RMS may be lower than target if scaling was applied to prevent clipping
@@ -323,7 +324,7 @@ class TestBuildMipmap:
             assert max_abs_value <= 1.0 + 1e-6, f"Level {i}: Peak {max_abs_value} exceeds 1.0"
 
             # Should have reasonable RMS (may be lower than target due to clipping prevention)
-            if np.any(np.abs(level) > 1e-12):
+            if np.any(np.abs(level) > EPSILON):
                 rms = np.sqrt(np.mean(level**2))
                 assert rms > 0.1, f"Level {i}: RMS {rms} too low"
 

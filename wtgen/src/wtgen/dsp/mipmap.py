@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 
 from wtgen.dsp import process
 from wtgen.dsp.fir import FIRFilter, RolloffMethod
+from wtgen.utils import EPSILON
 
 # Type alias for mipmap levels
 MipmapLevel: TypeAlias = NDArray[np.float32]
@@ -149,7 +150,7 @@ class Mipmap:
         # Target RMS level for consistent synthesizer behavior
         # Improved RMS normalization with clipping prevention
         current_rms = np.sqrt(np.mean(input_signal**2))
-        if current_rms > 1e-12:
+        if current_rms > EPSILON:
             # First, find the maximum possible scale factor without clipping
             current_peak = np.max(np.abs(input_signal))
             max_scale_for_no_clipping = (
@@ -239,7 +240,7 @@ class Mipmap:
 
             # Ratio of std to mean indicates oscillatory behavior
             # High ratio suggests Gibbs phenomenon artifacts
-            oscillation_ratio = derivative_std / (derivative_mean + 1e-12)
+            oscillation_ratio = derivative_std / (derivative_mean + EPSILON)
 
             results["gibbs_artifacts"].append(
                 {

@@ -4,6 +4,7 @@ import numpy as np
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
+from wtgen.utils import EPSILON
 from wtgen.dsp.process import (
     estimate_inter_sample_peak,
     align_to_zero_crossing,
@@ -43,7 +44,7 @@ class TestDCRemove:
 
         # Result should have zero mean
         assert (
-            abs(np.mean(result)) < 1e-12
+            abs(np.mean(result)) < EPSILON
         )  # Tightened from 1e-10, balancing precision with robustness
         # Should preserve shape
         assert result.shape == wavetable.shape
@@ -74,7 +75,7 @@ class TestNormalize:
         """Test normalization of zero signal."""
         wavetable = np.zeros(4)
         result = normalize(wavetable)
-        np.testing.assert_allclose(result, np.zeros(4), atol=1e-12)
+        np.testing.assert_allclose(result, np.zeros(4), atol=EPSILON)
 
     @given(st.lists(st.floats(-1000, 1000), min_size=1, max_size=2048))
     def test_normalize_hypothesis(self, values):
@@ -88,7 +89,7 @@ class TestNormalize:
         # Should preserve shape
         assert result.shape == wavetable.shape
 
-        if max_val > 1e-12:  # Non-zero signal
+        if max_val > EPSILON:  # Non-zero signal
             # The true peak (including inter-sample peaks) should not exceed the target
             true_peak = estimate_inter_sample_peak(result)
             assert true_peak <= 0.999 + 1e-10  # Allow small numerical tolerance
@@ -110,7 +111,7 @@ class TestNormalizeToRange:
 
         # Should have zero mean
         assert (
-            abs(np.mean(result)) < 1e-12
+            abs(np.mean(result)) < EPSILON
         )  # Tightened from 1e-10, balancing precision with robustness
         # Should use target range
         range_used = np.max(result) - np.min(result)
@@ -124,7 +125,7 @@ class TestNormalizeToRange:
 
         # Should have zero mean
         assert (
-            abs(np.mean(result)) < 1e-12
+            abs(np.mean(result)) < EPSILON
         )  # Tightened from 1e-10, balancing precision with robustness
         # Should use the target range
         range_used = np.max(result) - np.min(result)
@@ -141,14 +142,14 @@ class TestNormalizeToRange:
     def test_normalize_to_range_hypothesis(self, values):
         """Hypothesis test for normalize_to_range."""
         assume(all(np.isfinite(v) for v in values))
-        assume(max(values) - min(values) > 1e-12)  # Non-constant signal
+        assume(max(values) - min(values) > EPSILON)  # Non-constant signal
 
         wavetable = np.array(values)
         result = normalize_to_range(wavetable)
 
         # Should have zero mean
         assert (
-            abs(np.mean(result)) < 1e-12
+            abs(np.mean(result)) < EPSILON
         )  # Tightened from 1e-10, balancing precision with robustness
         # Should use target range
         range_used = np.max(result) - np.min(result)
@@ -222,4 +223,4 @@ class TestIntegrationProperties:
         assert abs(np.mean(step1)) < 1e-15
 
         true_peak = estimate_inter_sample_peak(step2)
-        assert true_peak <= 0.999 + 1e-12
+        assert true_peak <= 0.999 + EPSILON
