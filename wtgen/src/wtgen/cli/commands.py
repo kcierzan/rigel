@@ -6,14 +6,14 @@ import numpy as np
 from cyclopts import App, Parameter
 from rich.console import Console
 
-from wtgen.dsp.eq import apply_parametric_eq_fft, apply_tilt_eq_fft, parse_eq_string
-from wtgen.dsp.mipmap import Mipmap, RolloffMethod
-from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.cli.validators import (
-    validate_tilt_string,
     validate_eq_string,
     validate_power_of_two_integer,
+    validate_tilt_string,
 )
+from wtgen.dsp.eq import Equalizer
+from wtgen.dsp.mipmap import Mipmap, RolloffMethod
+from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import WaveGenerator
 from wtgen.export import (
     create_wavetable_metadata,
@@ -24,7 +24,6 @@ from wtgen.types import (
     BitDepth,
     ExportParams,
     HarmonicPartial,
-    ProcessingParams,
     WaveformType,
 )
 
@@ -48,40 +47,6 @@ def parse_partials_string(partials: str) -> list[HarmonicPartial]:
         phase = float(parts[2])
         partial_list.append(HarmonicPartial(harmonic, amplitude, phase))
     return partial_list
-
-
-def apply_processing(wave: np.ndarray, processing: ProcessingParams) -> np.ndarray:
-    """Apply EQ and tilt processing to a waveform."""
-    if processing.eq:
-        eq_bands = parse_eq_string(processing.eq)
-        console.print(f"Applying parametric EQ with {len(eq_bands)} bands to base wavetable...")
-        wave = apply_parametric_eq_fft(wave, eq_bands, preserve_rms=True, preserve_phase=True)
-
-    if processing.high_tilt:
-        parts = processing.high_tilt.split(":")
-        start_ratio = float(parts[0])
-        gain_db = float(parts[1])
-
-        console.print(
-            f"Applying [yellow]high-frequency[/] tilt: [yellow]start={start_ratio:.2f}, gain={gain_db:+.1f}dB[/]"
-        )
-        wave = apply_tilt_eq_fft(
-            wave, start_ratio, gain_db, "high", preserve_rms=True, preserve_phase=True
-        )
-
-    if processing.low_tilt:
-        parts = processing.low_tilt.split(":")
-        start_ratio = float(parts[0])
-        gain_db = float(parts[1])
-
-        console.print(
-            f"Applying [magenta]low-frequency[/] tilt: [magenta]start={start_ratio:.2f}, gain={gain_db:+.1f}dB[/]"
-        )
-        wave = apply_tilt_eq_fft(
-            wave, start_ratio, gain_db, "low", preserve_rms=True, preserve_phase=True
-        )
-
-    return wave
 
 
 @app.command
@@ -162,8 +127,13 @@ def generate(
         wave = np.interp(indices, np.arange(len(wave)), wave)
 
     # Apply processing
-    processing = ProcessingParams(eq=eq, high_tilt=high_tilt, low_tilt=low_tilt)
-    wave = apply_processing(wave, processing)
+    equalizer = Equalizer(
+        eq_settings=eq,
+        high_tilt_settings=high_tilt,
+        low_tilt_settings=low_tilt,
+        sample_rate=44100.0,
+    )
+    wave = equalizer.apply(wave)
 
     # Build mipmaps
     console.print(f"Building mipmaps with [cyan bold]{rolloff}[/] rolloff...")
@@ -272,8 +242,13 @@ def harmonic(
     wave = wave_generator.harmonics_to_table(harmonic_partials, size)
 
     # Apply processing
-    processing = ProcessingParams(eq=eq, high_tilt=high_tilt, low_tilt=low_tilt)
-    wave = apply_processing(wave, processing)
+    equalizer = Equalizer(
+        eq_settings=eq,
+        high_tilt_settings=high_tilt,
+        low_tilt_settings=low_tilt,
+        sample_rate=44100.0,
+    )
+    wave = equalizer.apply(wave)
 
     # Build mipmaps
     console.print(f"Building mipmaps with {rolloff} rolloff...")
@@ -320,7 +295,6 @@ def info(file: Path) -> int:
     ----------
     file: Path
         The path to the .npz wavetable
-
     """
 
     if not file.exists():

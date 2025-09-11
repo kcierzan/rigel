@@ -3,6 +3,7 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+from zipfile import BadZipFile
 
 import numpy as np
 import pytest
@@ -12,7 +13,6 @@ from hypothesis import strategies as st
 from wtgen.cli.commands import app
 from wtgen.dsp.waves import WaveformType
 from wtgen.export import load_wavetable_npz
-from zipfile import BadZipFile
 
 
 class TestCliGenerate:
