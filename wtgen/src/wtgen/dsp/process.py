@@ -2,6 +2,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import signal
 
+from wtgen.utils import EPSILON
+
 
 def dc_remove(base_wavetable: NDArray[np.floating]) -> NDArray[np.floating]:
     """Remove DC component from a wavetable by subtracting the mean value.
@@ -60,7 +62,7 @@ def normalize(base_wavetable: NDArray[np.floating], peak: float = 0.999) -> NDAr
         return base_wavetable
 
     true_peak = estimate_inter_sample_peak(base_wavetable)
-    if true_peak <= 1e-12:  # Handle near-zero signals (inclusive of boundary)
+    if true_peak <= EPSILON:  # Handle near-zero signals (inclusive of boundary)
         return np.zeros_like(base_wavetable)
     return (base_wavetable / true_peak) * peak
 
@@ -88,7 +90,7 @@ def normalize_to_range(
     current_max = np.max(wavetable)
     current_range = current_max - current_min
 
-    if current_range < 1e-12:
+    if current_range < EPSILON:
         # Constant signal - return zeros
         return np.zeros_like(wavetable)
 
@@ -104,7 +106,7 @@ def normalize_to_range(
     new_max = np.max(normalized)
     new_range = new_max - new_min
 
-    if new_range > 1e-12:
+    if new_range > EPSILON:
         # Scale to use the target range while maintaining zero mean
         normalized = (normalized / new_range) * target_range
 
