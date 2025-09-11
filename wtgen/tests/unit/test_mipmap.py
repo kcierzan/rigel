@@ -6,7 +6,7 @@ import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from wtgen.dsp.mipmap import MipmapChain, MipmapLevel, Mipmap
+from wtgen.dsp.mipmap import Mipmap, MipmapChain, MipmapLevel
 from wtgen.utils import EPSILON
 
 
