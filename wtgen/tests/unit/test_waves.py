@@ -5,6 +5,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from wtgen.dsp.waves import Partial, PartialList, WaveGenerator
+from wtgen.utils import EPSILON
 
 
 class TestHarmonicsToTable:
@@ -14,7 +15,7 @@ class TestHarmonicsToTable:
         """Test conversion with empty partials list."""
         result = WaveGenerator().harmonics_to_table([], 64)
         expected = np.zeros(64)
-        np.testing.assert_allclose(result, expected, atol=1e-12)
+        np.testing.assert_allclose(result, expected, atol=EPSILON)
 
     def test_single_fundamental(self):
         """Test conversion with single fundamental frequency."""
@@ -145,7 +146,7 @@ class TestHarmonicsToTable:
         if not valid_partials:
             # Empty case
             result = WaveGenerator().harmonics_to_table([], 64)
-            np.testing.assert_allclose(result, np.zeros(64), atol=1e-12)
+            np.testing.assert_allclose(result, np.zeros(64), atol=EPSILON)
             return
 
         partials: PartialList = valid_partials

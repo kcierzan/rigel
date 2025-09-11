@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 from scipy import signal
 
 from wtgen.types import WaveformType
+from wtgen.utils import EPSILON
 
 WAVETABLE_SIZE = 2048
 
@@ -204,7 +205,7 @@ class WaveGenerator:
 
         # Basic normalization to prevent extreme values before further processing
         max_val = np.max(np.abs(x))
-        if max_val > 1e-12:
+        if max_val > EPSILON:
             x = x / max_val
 
         # Check if peaks would exceed ±1.0 and scale down if necessary

@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from wtgen.dsp.process import align_to_zero_crossing
+from wtgen.utils import EPSILON
 
 # Type aliases
 EQBand: TypeAlias = dict[str, float]
@@ -156,9 +157,9 @@ def apply_parametric_eq_fft(
     eq_wavetable = np.fft.ifft(spectrum).real.astype(wavetable.dtype)
 
     # Preserve RMS level if requested
-    if preserve_rms and original_rms > 1e-12:
+    if preserve_rms and original_rms > EPSILON:
         current_rms = np.sqrt(np.mean(eq_wavetable**2))
-        if current_rms > 1e-12:
+        if current_rms > EPSILON:
             rms_scale = original_rms / current_rms
             eq_wavetable *= rms_scale
 
@@ -403,7 +404,7 @@ def apply_tilt_eq_fft(
     tilted_wavetable = np.fft.ifft(spectrum).real.astype(wavetable.dtype)
 
     # Preserve RMS level if requested
-    if preserve_rms and original_rms > 1e-12:
+    if preserve_rms and original_rms > EPSILON:
         current_rms = np.sqrt(np.mean(tilted_wavetable**2))
         if current_rms > 1e-12:
             rms_scale = original_rms / current_rms

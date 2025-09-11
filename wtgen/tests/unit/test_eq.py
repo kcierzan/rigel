@@ -23,6 +23,7 @@ from wtgen.dsp.eq import (
 from wtgen.dsp.mipmap import Mipmap
 from wtgen.dsp.process import align_to_zero_crossing
 from wtgen.dsp.waves import WaveGenerator
+from wtgen.utils import EPSILON
 
 
 class TestCreateEQBand:
@@ -246,7 +247,7 @@ class TestApplyParametricEQFFT:
         # RMS should be preserved (default behavior)
         original_rms = np.sqrt(np.mean(wavetable**2))
         result_rms = np.sqrt(np.mean(result**2))
-        if original_rms > 1e-12:
+        if original_rms > EPSILON:
             assert abs(result_rms - original_rms) < 0.01
 
 
@@ -557,7 +558,7 @@ class TestApplyTiltEQFFT:
         # RMS should be preserved (default behavior)
         original_rms = np.sqrt(np.mean(wavetable**2))
         result_rms = np.sqrt(np.mean(result**2))
-        if original_rms > 1e-12:
+        if original_rms > EPSILON:
             assert abs(result_rms - original_rms) < 0.01
 
 
