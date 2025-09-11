@@ -1,7 +1,7 @@
 """Unit tests for wtgen.dsp.process module."""
 
 import numpy as np
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from wtgen.utils import EPSILON
@@ -10,7 +10,6 @@ from wtgen.dsp.process import (
     align_to_zero_crossing,
     dc_remove,
     normalize,
-    normalize_to_range,
 )
 
 
@@ -77,6 +76,7 @@ class TestNormalize:
         result = normalize(wavetable)
         np.testing.assert_allclose(result, np.zeros(4), atol=EPSILON)
 
+    @settings(max_examples=1000)
     @given(st.lists(st.floats(-1000, 1000), min_size=1, max_size=2048))
     def test_normalize_hypothesis(self, values):
         """Hypothesis test for normalize."""
@@ -99,64 +99,6 @@ class TestNormalize:
             assert sample_peak <= 0.999 + 1e-10
         else:  # Near-zero signal should become exactly zero
             assert np.all(np.abs(result) < 1e-10)  # Near-zero signal should become very small
-
-
-class TestNormalizeToRange:
-    """Test range normalization functionality."""
-
-    def test_normalize_to_range_basic(self):
-        """Test basic range normalization (maintains zero mean)."""
-        wavetable = np.array([1.0, 3.0, 2.0])
-        result = normalize_to_range(wavetable)
-
-        # Should have zero mean
-        assert (
-            abs(np.mean(result)) < EPSILON
-        )  # Tightened from 1e-10, balancing precision with robustness
-        # Should use target range
-        range_used = np.max(result) - np.min(result)
-        target_range = 0.999 - (-0.999)
-        assert abs(range_used - target_range) < 1e-15
-
-    def test_normalize_to_range_custom(self):
-        """Test range normalization with custom range (maintains zero mean)."""
-        wavetable = np.array([1.0, 5.0, 3.0])
-        result = normalize_to_range(wavetable, target_min=-0.5, target_max=0.8)
-
-        # Should have zero mean
-        assert (
-            abs(np.mean(result)) < EPSILON
-        )  # Tightened from 1e-10, balancing precision with robustness
-        # Should use the target range
-        range_used = np.max(result) - np.min(result)
-        target_range = 0.8 - (-0.5)
-        assert abs(range_used - target_range) < 1e-15
-
-    def test_normalize_to_range_constant(self):
-        """Test range normalization on constant signal."""
-        wavetable = np.array([2.0, 2.0, 2.0])
-        result = normalize_to_range(wavetable)
-        np.testing.assert_allclose(result, np.zeros(3), atol=1e-15)
-
-    @given(st.lists(st.floats(-100, 100), min_size=2, max_size=1024))
-    def test_normalize_to_range_hypothesis(self, values):
-        """Hypothesis test for normalize_to_range."""
-        assume(all(np.isfinite(v) for v in values))
-        assume(max(values) - min(values) > EPSILON)  # Non-constant signal
-
-        wavetable = np.array(values)
-        result = normalize_to_range(wavetable)
-
-        # Should have zero mean
-        assert (
-            abs(np.mean(result)) < EPSILON
-        )  # Tightened from 1e-10, balancing precision with robustness
-        # Should use target range
-        range_used = np.max(result) - np.min(result)
-        target_range = 0.999 - (-0.999)
-        assert abs(range_used - target_range) < 1e-15
-        # Should preserve shape
-        assert result.shape == wavetable.shape
 
 
 class TestAlignToZeroCrossing:
@@ -195,7 +137,8 @@ class TestAlignToZeroCrossing:
         result = align_to_zero_crossing(wavetable)
         np.testing.assert_array_equal(result, wavetable)
 
-    @given(st.lists(st.floats(-10, 10), min_size=4, max_size=512))
+    @settings(max_examples=1000)
+    @given(st.lists(st.floats(-10, 10), min_size=4, max_size=2048))
     def test_align_to_zero_crossing_hypothesis(self, values):
         """Hypothesis test for align_to_zero_crossing."""
         assume(all(np.isfinite(v) for v in values))
