@@ -123,6 +123,7 @@ class TestBuildMipmap:
 
         for i, level in enumerate(mipmap_chain):
             start_value = abs(level[0])
+            end_value = abs(level[-1])
             phase_values.append(start_value)
 
             # Each level should start closer to zero than the original
@@ -131,9 +132,11 @@ class TestBuildMipmap:
             )
 
             # Should be very close to zero crossing (much stricter than before)
-            assert start_value < 0.1, (
+            assert start_value < 0.001, (
                 f"Level {i} start value {start_value:.6f} not at zero crossing"
             )
+
+            assert end_value < 0.02, f"Level {i} end value {end_value:.6f} not near zero crossing"
 
         # Test that phase alignment is consistent - no abrupt jumps
         max_phase_jump = 0.0
