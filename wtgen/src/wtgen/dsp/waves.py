@@ -16,6 +16,7 @@ Partial = tuple[int, float, float]
 PartialList = list[Partial]
 PhaseMode = Literal["minimum", "linear"]
 
+
 @njit
 def build_spectrum_core(
     harmonic_indices: np.ndarray, amplitudes: np.ndarray, phases: np.ndarray, size: int
@@ -50,6 +51,7 @@ def build_spectrum_core(
     # Combine real and imaginary parts
     spec = spec_real + 1j * spec_imag
     return spec
+
 
 class WaveGenerator:
     def generate(

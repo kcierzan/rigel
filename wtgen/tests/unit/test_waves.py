@@ -65,7 +65,9 @@ class TestHarmonicsToTable:
             (1, 1.0, 0.0),  # Fundamental
             (100, 0.5, 0.0),  # Very high harmonic (should be filtered for small tables)
         ]
-        result = WaveGenerator().harmonics_to_table(partials, 64, phase="linear")  # Small table size
+        result = WaveGenerator().harmonics_to_table(
+            partials, 64, phase="linear"
+        )  # Small table size
 
         # Should still be finite and reasonable
         assert np.all(np.isfinite(result))

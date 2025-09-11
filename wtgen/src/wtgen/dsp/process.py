@@ -61,56 +61,11 @@ def normalize(base_wavetable: NDArray[np.floating], peak: float = 0.999) -> NDAr
     if len(base_wavetable) == 0:
         return base_wavetable
 
-    true_peak = estimate_inter_sample_peak(base_wavetable)
+    true_peak = np.max(np.abs(base_wavetable))
+    inter_sample_peak = estimate_inter_sample_peak(base_wavetable)
     if true_peak <= EPSILON:  # Handle near-zero signals (inclusive of boundary)
         return np.zeros_like(base_wavetable)
-    return (base_wavetable / true_peak) * peak
-
-
-def normalize_to_range(
-    wavetable: NDArray[np.floating], target_min: float = -0.999, target_max: float = 0.999
-) -> NDArray[np.floating]:
-    """Normalize wavetable to use the full specified range.
-
-    This ensures the waveform uses the complete dynamic range available,
-    with the minimum value scaled to target_min and maximum to target_max.
-
-    Args:
-        wavetable: Input wavetable to normalize
-        target_min: Target minimum value (default: -0.999)
-        target_max: Target maximum value (default: 0.999)
-
-    Returns:
-        Range-normalized wavetable
-    """
-    if len(wavetable) == 0:
-        return wavetable
-
-    current_min = np.min(wavetable)
-    current_max = np.max(wavetable)
-    current_range = current_max - current_min
-
-    if current_range < EPSILON:
-        # Constant signal - return zeros
-        return np.zeros_like(wavetable)
-
-    # Scale and shift to target range
-    target_range = target_max - target_min
-    normalized = (wavetable - current_min) / current_range * target_range + target_min
-
-    # Remove any DC offset introduced by the range normalization
-    normalized = normalized - np.mean(normalized)
-
-    # Re-scale to maintain the target range after DC removal
-    new_min = np.min(normalized)
-    new_max = np.max(normalized)
-    new_range = new_max - new_min
-
-    if new_range > EPSILON:
-        # Scale to use the target range while maintaining zero mean
-        normalized = (normalized / new_range) * target_range
-
-    return normalized
+    return (base_wavetable / inter_sample_peak) * peak
 
 
 def align_to_zero_crossing(wavetable: NDArray[np.floating]) -> NDArray[np.floating]:
