@@ -107,9 +107,8 @@ in
           "dev"
         ];
 
-        # In case someone flips the switch above, default to the frozen lock
-        # file and install both the default + dev dependency groups.  The same
-        # command string is exposed as a script for day-to-day use.
+        # Default to the frozen lock file and installing both the default + dev
+        # dependency groups.
         arguments = [
           "--frozen"
         ];
