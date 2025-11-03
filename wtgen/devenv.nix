@@ -152,8 +152,10 @@ in
       uv venv
     fi
 
-    # Install the project in editable mode for pytest runs
-    uv pip install --quiet -e .
+    # Install the project in editable mode for pytest runs if missing
+    if ! uv pip show wtgen >/dev/null 2>&1; then
+      uv pip install --quiet -e .
+    fi
 
     # Make sure native nixpkgs tooling (like ruff) takes precedence over wheel
     # binaries inside .venv to avoid dynamic loader issues on NixOS.
