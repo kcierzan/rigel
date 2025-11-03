@@ -89,7 +89,9 @@ in
     # Allow uv to reuse manylinux wheels instead of forcing source builds on
     # Nix.  This keeps dependency installation fast and identical to other
     # platforms while still letting us override libraries above when required.
-    manylinux.enable = true;
+    # Do not enable this on macOS because the derivation depends on Linux-only
+    # glibc toolchains which are unavailable on Darwin hosts.
+    manylinux.enable = isLinux;
 
     uv = {
       enable = true;
