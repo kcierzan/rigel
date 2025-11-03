@@ -1,12 +1,13 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 wtgen is a Python library for wavetable generation and processing, specializing in harmonic wavetable synthesis and bandlimited mipmap generation for alias-free audio playback. The codebase focuses on high-quality DSP processing with extensive testing coverage.
 
 ## Development Setup
+
+***CURRENTLY BROKEN ON NIXOS PENDING [devenv](https://devenv.sh/) SETUP!***
+
+Once devenv is configured, these same tools should be usable through
+dedicated devenv entrypoints.
 
 **Dependencies**: Uses `uv` for dependency management. Install with:
 ```bash
@@ -80,9 +81,10 @@ HYPOTHESIS_MAX_EXAMPLES=10000 uv run pytest tests/unit/test_waves.py::TestHarmon
 
 ## Type Checking Configuration
 
-- **mypy**: Configured for strict typing with specific DSP module exemptions in `mypy.ini`
 - **basedpyright**: Configured to suppress warnings from scientific libraries while catching real type errors
+- **mypy**: Configured for strict typing with specific DSP module exemptions in `mypy.ini`
 - Both tools support the scientific computing stack (numpy, scipy, numba)
+- Planned: eventually this project is likely to migrate to [ty](https://docs.astral.sh/ty/)
 
 ## Key Testing Patterns
 
@@ -93,6 +95,6 @@ The codebase uses extensive property-based testing with Hypothesis to validate:
 - Range normalization with zero-mean constraint
 
 When running tests, higher `HYPOTHESIS_MAX_EXAMPLES` values provide more thorough validation but take longer to execute.
-- Always run pytest, mypy, basedpyright, ruff, and black before considering any changes complete
-- Always add tests for any new code and run them before considering the task compelte
+- ALWAYS run pytest, mypy, basedpyright, and ruff before considering any changes complete
+- ALWAYS add tests for any new code and run them before considering the task complete
 - When you encounter typechecking issues in python code, fix them
