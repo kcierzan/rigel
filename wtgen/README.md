@@ -11,6 +11,51 @@ A Python library for wavetable generation and processing
 - Configurable rolloff methods for antialiasing
 - Wavetable inspection and analysis tools
 
+## Development Environment
+
+wtgen ships with a [devenv](https://devenv.sh/) + flakes workflow so contributors on both NixOS and nix-darwin can get a fully reproducible toolchain.
+
+### Prerequisites
+
+- Install [Nix](https://zero-to-nix.com/start) with flakes enabled.
+- Optional: install the standalone `devenv` CLI via `nix profile install github:cachix/devenv/latest` for `devenv shell` / `devenv shell -- …`.
+
+### Quick start
+
+Install [devenv](https://devenv.sh/getting-started/)
+
+Then launch the devenv shell:
+```bash
+devenv shell
+```
+
+On first entry the shell will:
+- create `.venv/` if missing,
+- run `uv sync --frozen --group dev`,
+- install wtgen in editable mode (`uv pip install -e .`),
+- activate the virtual environment automatically.
+
+Subsequent entries reuse the same `.venv` unless you remove it.
+
+### Common tasks
+
+All of these commands can be launched from inside the shell, or via `devenv shell -- …` if you prefer not to activate it manually.
+
+- `devenv shell -- uv:sync` – rebuild `.venv` from `uv.lock` (re-runs sync + editable install).
+- `devenv shell -- lint` – Ruff lint.
+- `devenv shell -- format` – Ruff formatter.
+- `devenv shell -- typecheck` – mypy followed by basedpyright (use `typecheck:mypy` or `typecheck:pyright` individually as needed).
+- `devenv shell -- test:full` – full pytest suite with xdist auto-sharding.
+- `devenv shell -- test:fast` – single-process pytest with `-x --tb=short`.
+
+If you are not using Nix, you can mimic the same environment locally:
+
+```bash
+uv sync --frozen --group dev
+uv pip install -e .
+source .venv/bin/activate
+```
+
 ## CLI Usage
 
 wtgen provides a command-line interface for generating and analyzing wavetables. The CLI supports three main commands:
