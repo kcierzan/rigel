@@ -1,0 +1,11 @@
+# Ignore local Python environment created by uv
+.venv/
+
+# devenv state directory (created when running `devenv up`)
+.devenv/
+.devenv.flake.nix
+
+# Common Python build artefacts
+__pycache__/
+*.py[cod]
+
