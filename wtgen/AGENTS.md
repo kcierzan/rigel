@@ -1,75 +1,92 @@
 ## Project Overview
 
-wtgen is a Python library for wavetable generation and processing, specializing in harmonic wavetable synthesis and bandlimited mipmap generation for alias-free audio playback. The codebase focuses on high-quality DSP processing with extensive testing coverage.
+wtgen is a Python library for wavetable generation and processing, specializing in harmonic
+wavetable synthesis and bandlimited mipmap generation for alias-free audio playback. The codebase
+focuses on high-quality DSP processing with extensive testing coverage.
 
 ## Development Setup
 
-***CURRENTLY BROKEN ON NIXOS PENDING [devenv](https://devenv.sh/) SETUP!***
+Use of devenv shell is ABSOLUTELY ESSENTIAL to running common development tasks for the project.
+Simply entering the shell for the first time should install dependencies automatically with `uv`:
 
-Once devenv is configured, these same tools should be usable through
-dedicated devenv entrypoints.
-
-**Dependencies**: Uses `uv` for dependency management. Install with:
-```bash
-uv sync --extra dev
-uv pip install -e .
+```sh
+devenv shell
 ```
 
-**Type Checking**: Project supports both mypy and basedpyright:
-```bash
-uv tool run mypy src/
-uv tool run basedpyright src/
+will in effect run:
+
+```sh
+uv sync --frozen --group dev
+uv pip install --quiet -e .
 ```
 
-**Code Formatting**:
-```bash
-uv run ruff format
-uv run ruff check --fix .
+This also modifies the shell path to use nix binaries for `ruff` and `basedpyright` to avoid
+dynamic linking issues on NixOS.
+
+## Running commands
+
+All important Python repository commands are run via `devenv shell`.
+
+### Installation
+
+```sh
+devenv shell -- uv:sync
 ```
 
-## Testing Framework
+### Linting
 
-**Basic Test Execution**:
-```bash
-# Run all tests
-uv run python -m pytest
-
-# Run with parallel execution (faster)
-uv run python -m pytest -n auto
-
-# Run specific test module
-uv run python -m pytest tests/unit/test_process.py
-
-# Stop on first failure with short traceback
-uv run python - pytest -x --tb=short
+```sh
+devenv shell -- lint
 ```
 
-**Property-Based Testing**: Uses Hypothesis extensively. Control fuzz testing iterations:
-```bash
-# Increase hypothesis examples for more thorough testing
-HYPOTHESIS_MAX_EXAMPLES=5000 uv run pytest tests/ -x -n auto --tb=short
+### Formatting
 
-# For specific hypothesis tests with higher iteration counts
-HYPOTHESIS_MAX_EXAMPLES=10000 uv run pytest tests/unit/test_waves.py::TestHarmonicsToTable::test_harmonics_to_table_hypothesis -x -n auto --tb=short
+```sh
+devenv shell -- format
 ```
 
-**Test Categories**:
-- `tests/unit/test_process.py` - DSP processing functions (30 tests)
-- `tests/unit/test_waves.py` - Harmonic synthesis (22 tests)
-- `tests/unit/test_mipmap.py` - Mipmap generation (21 tests)
-- `tests/integration/` - End-to-end pipeline validation
+### Typechecking
+
+```sh
+devenv shell -- typecheck
+```
+
+### Testing
+
+For full parallel testing with xdist auto-sharding:
+
+```sh
+devenv shell -- test:full
+```
+
+For single-threaded testing with short tracebacks:
+
+```sh
+devenv shell -- test:fast
+```
+
+For running a single test:
+
+```sh
+devenv shell -- uv run python -m pytest -x --tb=short <path_to_test_file>
+```
+
+**Property-Based Testing**: Uses Hypothesis extensively. Control fuzz testing iterations: ```bash #
+Increase hypothesis examples for more thorough testing HYPOTHESIS_MAX_EXAMPLES=5000 uv run pytest
+tests/ -x -n auto --tb=short
+
+# For specific hypothesis tests with higher iteration counts HYPOTHESIS_MAX_EXAMPLES=10000 uv run
+pytest tests/unit/test_waves.py::TestHarmonicsToTable::test_harmonics_to_table_hypothesis -x -n auto
+--tb=short ```
 
 ## Architecture
 
 **Core DSP Modules** (`src/wtgen/dsp/`):
 - `waves.py` - Harmonic wavetable synthesis from partial lists
 - `mipmap.py` - Bandlimited mipmap generation with multiple rolloff methods
-- `process.py` - Signal processing utilities (zero-crossing alignment, DC removal, RMS normalization)
+- `process.py` - Signal processing utilities (zero-crossing alignment, DC removal, RMS
+  normalization)
 - `fir.py` - FIR filter implementations
-
-**Key Constants**:
-- `WAVETABLE_SIZE = 2048` - Standard wavetable length
-- `TARGET_RMS = 0.35` - Standard RMS level for generated wavetables
 
 **Critical DSP Properties Tested**:
 - Zero-crossing alignment across all mipmap levels
@@ -81,7 +98,8 @@ HYPOTHESIS_MAX_EXAMPLES=10000 uv run pytest tests/unit/test_waves.py::TestHarmon
 
 ## Type Checking Configuration
 
-- **basedpyright**: Configured to suppress warnings from scientific libraries while catching real type errors
+- **basedpyright**: Configured to suppress warnings from scientific libraries while catching real
+  type errors
 - **mypy**: Configured for strict typing with specific DSP module exemptions in `mypy.ini`
 - Both tools support the scientific computing stack (numpy, scipy, numba)
 - Planned: eventually this project is likely to migrate to [ty](https://docs.astral.sh/ty/)
@@ -94,7 +112,8 @@ The codebase uses extensive property-based testing with Hypothesis to validate:
 - Energy balancing without DC introduction
 - Range normalization with zero-mean constraint
 
-When running tests, higher `HYPOTHESIS_MAX_EXAMPLES` values provide more thorough validation but take longer to execute.
+When running tests, higher `HYPOTHESIS_MAX_EXAMPLES` values provide more thorough validation but
+take longer to execute.
 - ALWAYS run pytest, mypy, basedpyright, and ruff before considering any changes complete
 - ALWAYS add tests for any new code and run them before considering the task complete
 - When you encounter typechecking issues in python code, fix them
