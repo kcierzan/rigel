@@ -103,13 +103,15 @@ in
       sync = {
         enable = true;
 
+        groups = [
+          "dev"
+        ];
+
         # In case someone flips the switch above, default to the frozen lock
         # file and install both the default + dev dependency groups.  The same
         # command string is exposed as a script for day-to-day use.
         arguments = [
           "--frozen"
-          "--group"
-          "dev"
         ];
       };
     };
@@ -146,11 +148,13 @@ in
   enterShell = ''
     set -euo pipefail
 
+    # If there is not a uv venv already, create one
     if [ ! -d ".venv" ]; then
-      printf '\n==> Bootstrapping Python environment with uv (one-time)...\n\n'
-      uv sync --frozen --group dev
-      uv pip install --quiet -e .
+      uv venv
     fi
+
+    # Install the project in editable mode for pytest runs
+    uv pip install --quiet -e .
 
     # Make sure native nixpkgs tooling (like ruff) takes precedence over wheel
     # binaries inside .venv to avoid dynamic loader issues on NixOS.
