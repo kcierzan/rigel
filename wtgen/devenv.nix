@@ -150,10 +150,6 @@ in
       uv pip install --quiet -e .
     fi
 
-    # Activate the freshly created virtual environment.  This mirrors what most
-    # editors expect and lets developers run python commands without `uv run`.
-    # source .venv/bin/activate
-
     # Make sure native nixpkgs tooling (like ruff) takes precedence over wheel
     # binaries inside .venv to avoid dynamic loader issues on NixOS.
     export PATH="${pkgs.ruff}/bin:${pkgs.basedpyright}/bin:$PATH"
@@ -229,6 +225,14 @@ in
     # Simple example: keep pytest running in watch mode.  Disable by default so
     # non-fans are not surprised, but it is handy to document here.
     "pytest-watch".exec = "uv run python -m pytest --maxfail=1 -f";
+  };
+
+  tasks."wtgen:uv-state-dir" = {
+    description = "Ensure uv state directory exists";
+    exec = ''
+      mkdir -p "$DEVENV_STATE/venv"
+    '';
+    before = [ "devenv:python:uv" ];
   };
 
   # ---------------------------------------------------------------------------
