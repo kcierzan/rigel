@@ -88,6 +88,7 @@ wheels/
 
 # Virtual environments
 .venv
+.devenv/
 
 # testing
 .hypothesis
