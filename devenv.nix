@@ -163,6 +163,7 @@ in
       zip
       unzip
       just
+      xwin
     ]
     ++ lib.optionals isLinux [
       alsa-lib
@@ -190,7 +191,6 @@ in
       libiconv
       linuxCrossCc
       linuxCrossBinutils
-      xwin
     ];
 
   scripts = {
