@@ -40,6 +40,8 @@ immediately.
   (`note`, `chord`, etc.).
 - Document public items with Rustdoc when adding APIs that surface outside the
   crate.
+- When making edits to any nix files, pay close attention to nix string interpolation
+  causing conflicts with shell and always escape correctly
 
 ## Testing Guidelines
 - Primary suite runs via `cargo:test`; target crate-level coverage for DSP math
@@ -51,6 +53,8 @@ immediately.
 - Python experiments in `wtgen/tests/` should mirror Rust expectations; check
   in generated assets only when deterministic. Any large binary assets should
   be checked in using git-lfs.
+- When testing any nix/devenv changes, tail the output as nix errors tend to
+  be very long with only the last 100 or so lines mattering much.
 
 ## Commit & Pull Request Guidelines
 - Recent commits use short, imperative subjects (`Fix devenv comment`, `Make
