@@ -15,7 +15,6 @@ let
   # need additional SDK/tooling shims so we keep the list centralised here.
   rustTargets = [
     "aarch64-apple-darwin"
-    "x86_64-apple-darwin"
     "x86_64-pc-windows-msvc"
     "x86_64-unknown-linux-gnu"
   ];
@@ -27,6 +26,8 @@ let
   # compiling GUI crates that want pkg-config discovery (iced, baseview, ...).
   linuxPkgs = inputs.nixpkgs.legacyPackages."x86_64-linux";
   linuxXorg = if linuxPkgs ? xorg then linuxPkgs.xorg else { };
+  # Teach macOS pkg-config how to find Linux GUI deps by enumerating every
+  # optional pkg-config directory we might need from the x86_64 nixpkgs set.
   linuxPkgConfigPaths = lib.concatLists [
     (lib.optionals (linuxPkgs ? libGL) [
       "${linuxPkgs.libGL.dev}/lib/pkgconfig"
@@ -142,6 +143,7 @@ in
   languages.rust = {
     enable = true;
     channel = "stable";
+    # Use latest for now to ensure continuous compatibility but pin before release
     version = "latest";
     components = [
       "rustfmt"
@@ -163,6 +165,8 @@ in
       zip
       unzip
       just
+      # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
+      # without requiring a Windows VM.
       xwin
     ]
     ++ lib.optionals isLinux [
@@ -184,8 +188,6 @@ in
     ++ lib.optionals isDarwin [
       # macOS host prerequisites: Xcode headers, OpenMP runtime for SIMD code,
       # libiconv for CLI/build tooling, plus cross-compilers for the Linux target.
-      # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
-      # without requiring a Windows VM.
       appleSdk
       llvmPackages.openmp
       libiconv
