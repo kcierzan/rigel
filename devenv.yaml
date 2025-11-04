@@ -1,3 +1,52 @@
+clean:
+  enabled: true
+  keep:
+    - HOME
+    - USER
+    - LOGNAME
+    - TMPDIR
+    - TERM
+    - COLORTERM
+    - LANG
+    - LC_ALL
+    - LC_CTYPE
+    - LC_COLLATE
+    - LC_MESSAGES
+    - LC_NUMERIC
+    - LC_TIME
+    - LC_MONETARY
+    - EDITOR
+    - VISUAL
+    - PAGER
+    - MANPAGER
+    - GIT_EDITOR
+    - SSH_AUTH_SOCK
+    - SSH_AGENT_PID
+    - GPG_TTY
+    - XDG_RUNTIME_DIR
+    - XDG_CACHE_HOME
+    - XDG_CONFIG_HOME
+    - XDG_DATA_HOME
+    - XDG_STATE_HOME
+    - DISPLAY
+    - WAYLAND_DISPLAY
+    - XPC_SERVICE_NAME
+    - XPC_FLAGS
+    - TERM_PROGRAM
+    - TERM_PROGRAM_VERSION
+    - SSL_CERT_FILE
+    - SSL_CERT_DIR
+    - Apple_PubSub_Socket_Render
+    - DEVENV_PROFILE
+    - DEVENV_ROOT
+    - DEVENV_DOTFILE
+    - DEVENV_STATE
+    - DEVENV_RUNTIME
+    - DEVENV_TASK_FILE
+    - DEVENV_TASKS
+    - DEVENV_DIRENVRC_VERSION
+    - DEVENV_DIRENVRC_ROLLING_UPGRADE
+    - DEVENV_NIX
 inputs:
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
