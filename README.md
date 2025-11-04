@@ -102,12 +102,14 @@ The plugin is built as a headless instrument plugin that can be loaded into any 
 
 #### Building the plugin library
 
+From the devenv shell
 ```bash
 # Build the plugin for your current platform
-cargo build --release -p rigel-plugin
+build:native
+```
 
 # For aarch64 Mac (Apple Silicon) specifically:
-cargo build --release -p rigel-plugin --target aarch64-apple-darwin
+build:macos
 ```
 
 The build will create:
@@ -241,26 +243,6 @@ The DSP core is optimized for real-time audio processing:
 Typical performance on modern hardware:
 - Single voice: ~0.1% CPU usage at 44.1kHz
 - Target: <1% CPU for full polyphonic operation
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes following the code guidelines
-4. Add tests for new functionality
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-## Roadmap
-
-- [ ] **v0.1**: Basic monophonic synthesis with CLI ✅
-- [ ] **v0.2**: Wavetable synthesis with morphing
-- [ ] **v0.3**: Audio filters and effects
-- [ ] **v0.4**: Polyphonic voice management
-- [ ] **v0.5**: NIH-plug integration and basic GUI
-- [ ] **v0.6**: Advanced modulation system
-- [ ] **v1.0**: Full-featured wavetable synthesizer
 
 ## License
 
