@@ -11,16 +11,26 @@
 - `wtgen/`: Python research workspace (nix devenv managed) for generating
   wavetable assets used during development.
 
-## Build, Test, and Development Commands
-- `cargo build --workspace` builds every crate; add `--release` when profiling
-  performance.
-- `cargo run --bin rigel -- note --note 60 --duration 2 --output middle_c.wav`
-  renders quick regression audio.
-- `cargo xtask bundle rigel-plugin --release` emits VST3/CLAP bundles under
-  `target/`.
-- `cargo fmt` and `cargo clippy --all-targets --all-features` must pass before
-  reviews.
-  pytest`.
+## Essential commands
+
+All commands must ALWAYS be executed in the devenv shell environment. Thanks to the
+direnv setup, you will likely be running in the devenv shell environment so all
+of these commands can be run as-is. If for some reason the devenv shell is
+broken, invoke them like: `devenv shell -- <command>`, fixing the devenv env
+immediately.
+
+### Building
+
+- Build for the host platform: `build:native`
+- Build for macOS: `build:macos`
+- Build for x86_64 Linux: `build:linux`
+- Build for x86_64 Windows: `build:win`
+
+### Testing, Linting, and Formatting
+
+- Test: `cago:test`
+- Format: `cargo:fmt`
+- Lint: `cargo:lint`
 
 ## Coding Style & Naming Conventions
 - Follow Rust 2021 defaults: 4-space indentation, snake_case modules,
@@ -32,14 +42,15 @@
   crate.
 
 ## Testing Guidelines
-- Primary suite runs via `cargo test`; target crate-level coverage for DSP math
+- Primary suite runs via `cargo:test`; target crate-level coverage for DSP math
   and CLI parsing.
 - Add focused tests under `crates/dsp` or module-specific files; name tests
   `mod_name_behavior`.
 - For audio changes, regenerate short WAV fixtures via the CLI and listen or
   diff waveforms before merging.
 - Python experiments in `wtgen/tests/` should mirror Rust expectations; check
-  in generated assets only when deterministic.
+  in generated assets only when deterministic. Any large binary assets should
+  be checked in using git-lfs.
 
 ## Commit & Pull Request Guidelines
 - Recent commits use short, imperative subjects (`Fix devenv comment`, `Make
