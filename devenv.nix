@@ -366,7 +366,7 @@ in
         export PATH="$sanitized_path"
 
         # Regenerate simple wrappers that temporarily restore the impure PATH for whitelisted tools.
-        host_tools_default="nvim fd rg eza yazi fzf delta go-preview lazygit codex starship starship-jj"
+        host_tools_default="nvim fd rg eza yazi fzf delta go-preview lazygit nix gh codex starship starship-jj"
         host_tools="''${DEVENV_HOST_SHIMS:-$host_tools_default}"
         find "$shim_dir" -mindepth 1 -maxdepth 1 -type f -delete || true
         generate_shim() {
