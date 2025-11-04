@@ -199,6 +199,7 @@ in
     "cargo:fmt".exec = "cargo fmt";
     "cargo:lint".exec = "cargo clippy --all-targets --all-features";
     "cargo:test".exec = "cargo test";
+    "build:cli".exec = "cargo build --release --bin rigel";
     "build:native".exec = "cargo xtask bundle rigel-plugin --release";
     "build:linux".exec = "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu";
     "build:macos".exec = "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin";
