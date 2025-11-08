@@ -73,6 +73,8 @@ class WaveGenerator:
                 return self.triangle(frequency)
             case "polyblep_saw":
                 return self.polyblep_sawtooth(frequency)
+            case _:
+                raise ValueError(f"Unsupported waveform: {waveform}")
 
     def sine(
         self,
@@ -315,3 +317,19 @@ class WaveGenerator:
             output[i] = naive_saw - correction
 
         return (t, output)
+
+
+def generate_sawtooth_wavetable(
+    frequency: float = 1.0,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Convenience helper for generating standard sawtooth wavetables."""
+    generator = WaveGenerator()
+    return generator.sawtooth(frequency)
+
+
+def generate_polyblep_sawtooth_wavetable(
+    frequency: float = 1.0,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """Convenience helper for generating band-limited PolyBLEP sawtooth tables."""
+    generator = WaveGenerator()
+    return generator.polyblep_sawtooth(frequency)

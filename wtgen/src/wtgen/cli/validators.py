@@ -1,4 +1,4 @@
-def validate_tilt_string(type_, eq_string: str | None) -> None:
+def validate_tilt_string(type_: object, eq_string: str | None) -> None:
     if not eq_string:
         return
 
@@ -12,7 +12,7 @@ def validate_tilt_string(type_, eq_string: str | None) -> None:
         raise ValueError("Start ration must be between 0.0 and 1.0")
 
 
-def validate_eq_string(type_, eq_string: str | None) -> None:
+def validate_eq_string(type_: object, eq_string: str | None) -> None:
     if not eq_string:
         return
 
@@ -23,7 +23,7 @@ def validate_eq_string(type_, eq_string: str | None) -> None:
             raise ValueError(f"Invalid EQ band format: {band_str}")
 
 
-def validate_power_of_two_integer(type_, size: int) -> None:
+def validate_power_of_two_integer(type_: object, size: int) -> None:
     """Validate that size is a power of 2."""
     if size & (size - 1) != 0:
         raise ValueError("Size must be a power of 2")
