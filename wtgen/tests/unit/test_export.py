@@ -254,7 +254,7 @@ class TestLoadWavetableNpz:
             loaded_waves = result["tables"]["multi_mip"]
 
             assert len(loaded_waves) == 4
-            for i, (original, loaded) in enumerate(zip(waves, loaded_waves, strict=False)):
+            for original, loaded in zip(waves, loaded_waves, strict=False):
                 np.testing.assert_array_almost_equal(loaded, original, decimal=5)
                 assert loaded.dtype == np.float32
 

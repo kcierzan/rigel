@@ -110,6 +110,32 @@ uv run wtgen generate square \
 uv run wtgen generate polyblep_saw --output polyblep.npz
 ```
 
+## Plotting API
+
+The `wtgen.plotting` module provides data-first helpers that work well in notebooks,
+tests, or LLM-powered tooling. Each helper returns a `PlotFigure` dataclass that can
+either be rendered to matplotlib or inspected as structured data:
+
+```python
+from wtgen.plotting import tables_plot_figure, render_figure
+from wtgen.export import load_wavetable_npz
+
+data = load_wavetable_npz("sawtooth.npz")
+figure = tables_plot_figure(data["tables"], table_id="base")
+
+# Text summary for quick inspection or logging
+print(figure.summary(max_points=4))
+
+# Render when you actually need the image output
+render_figure(figure, show=True)
+```
+
+The summary/`to_dict` helpers expose key RMS/peak statistics so automated
+verification (including tests and LLM agents) can reason about the plots without
+opening a GUI. Extending the plotting system only requires creating new
+`PlotPanel`/`PlotFigure` instances, so CLI features automatically gain visualization
+support by reusing the same interface.
+
 ### Generate Harmonic Wavetables
 
 Create wavetables from custom harmonic content:
