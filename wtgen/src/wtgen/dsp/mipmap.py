@@ -1,4 +1,4 @@
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -43,7 +43,8 @@ class Mipmap:
 
     def generate(self) -> MipmapChain:
         """
-        Build a mipmap chain from a base wavetable with smooth bandlimiting to avoid Gibbs phenomenon.
+        Build a mipmap chain from a base wavetable with smooth bandlimiting
+        to avoid Gibbs phenomenon.
 
         Args:
             base_wavetable: Base wavetable for one cycle (full bandwidth)
@@ -251,3 +252,21 @@ class Mipmap:
             )
 
         return results
+
+
+def build_mipmap(
+    base_wavetable: NDArray[np.floating],
+    num_octaves: int = 8,
+    sample_rate: float = 44100.0,
+    rolloff_method: RolloffMethod | str = "raised_cosine",
+    decimate: bool = False,
+) -> MipmapChain:
+    """Convenience helper for constructing mipmap chains without instantiating Mipmap."""
+    resolved_method = cast(RolloffMethod, rolloff_method)
+    return Mipmap(
+        base_wavetable=base_wavetable,
+        num_octaves=num_octaves,
+        sample_rate=sample_rate,
+        rolloff_method=resolved_method,
+        decimate=decimate,
+    ).generate()
