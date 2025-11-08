@@ -199,11 +199,12 @@ rigel/
 
 ### Development Environment
 
-- `direnv` drops you into the Nix shell automatically; without it run `nix develop` (macOS/Linux) or `devenv shell`.
-- The flake exports the same module to both commands, so every dependency lives in `devenv.nix`. Day-to-day work just uses the default (impure) shell for convenience.
-- When you need a fully isolated build, invoke `nix develop --pure` or `devenv shell --pure` to hide host PATH entries without any custom shims.
-- Common editors and TUI helpers (`neovim`, `ripgrep`, `fd`, `fzf`, `eza`, `yazi`, `lazygit`, `delta`, `starship`, etc.) now come from the dev shell, keeping tooling consistent across macOS and Linux.
-- Cross-compilation helpers remain available through the `build:*` scripts described in `devenv.nix`, so `build:linux`, `build:macos`, and `build:win` continue to work unchanged inside `nix develop`.
+- `direnv` automatically enters the dev shell for this repo; without it, run `nix develop` (macOS/Linux) or `devenv shell`.
+- `flake.nix` exports the same module for both commands, so every package and language configured in `devenv.nix` is available no matter which entry point you use.
+- The shell PATH always prioritizes tools provided by Nix, and then falls back to your host PATH for anything not declared yet.
+- Use `nix develop --pure` or `devenv shell --pure` if you want to hide the host PATH entirely for maximum reproducibility.
+- Common editors and TUI helpers (`neovim`, `ripgrep`, `fd`, `fzf`, `eza`, `yazi`, `lazygit`, `delta`, `starship`, etc.) are included directly in the dev shell so contributors share the same versions on macOS and Linux.
+- Cross-compilation helpers remain available through the `build:*` scripts defined in `devenv.nix`, so `build:linux`, `build:macos`, and `build:win` keep working inside any of the shells mentioned above.
 
 ### Maintaining the Nix Environment
 
