@@ -140,31 +140,36 @@ in
     if envPwd != "" then envPwd else fallback
   );
 
-  env = {
-    RUST_BACKTRACE = lib.mkDefault "1";
-    MACOSX_DEPLOYMENT_TARGET = "11.0";
-    PKG_CONFIG_ALLOW_CROSS = lib.mkDefault "1";
-    # Scrub host linker/compiler hints so only devenv/Nix values leak into builds.
-    LIBRARY_PATH = lib.mkForce "";
-    LDFLAGS = lib.mkForce "";
-    CPPFLAGS = lib.mkForce "";
-  }
-  // lib.optionalAttrs (isDarwin && hasLinuxPkgConfig) {
-    PKG_CONFIG_PATH = linuxPkgConfigPath;
-    PKG_CONFIG_PATH_x86_64_unknown_linux_gnu = linuxPkgConfigPath;
-  }
-  // lib.optionalAttrs (isDarwin && hasLinuxLibraryPaths) {
-    NIX_LDFLAGS = linuxLdFlags;
-    NIX_LDFLAGS_x86_64_unknown_linux_gnu = linuxLdFlags;
-  }
-  // lib.optionalAttrs isDarwin {
-    CC_x86_64_unknown_linux_gnu = "${linuxCrossCc}/bin/${linuxTargetPrefix}cc";
-    CXX_x86_64_unknown_linux_gnu = "${linuxCrossCc}/bin/${linuxTargetPrefix}c++";
-    AR_x86_64_unknown_linux_gnu = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ar";
-    RANLIB_x86_64_unknown_linux_gnu = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ranlib";
-    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${linuxCrossCc}/bin/${linuxTargetPrefix}cc";
-    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_AR = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ar";
-  };
+  env =
+    let
+      hostPath = builtins.getEnv "PATH";
+    in
+    {
+      RUST_BACKTRACE = lib.mkDefault "1";
+      MACOSX_DEPLOYMENT_TARGET = "11.0";
+      PKG_CONFIG_ALLOW_CROSS = lib.mkDefault "1";
+      DEVENV_HOST_PATH = hostPath;
+      # Scrub host linker/compiler hints so only devenv/Nix values leak into builds.
+      LIBRARY_PATH = lib.mkForce "";
+      LDFLAGS = lib.mkForce "";
+      CPPFLAGS = lib.mkForce "";
+    }
+    // lib.optionalAttrs (isDarwin && hasLinuxPkgConfig) {
+      PKG_CONFIG_PATH = linuxPkgConfigPath;
+      PKG_CONFIG_PATH_x86_64_unknown_linux_gnu = linuxPkgConfigPath;
+    }
+    // lib.optionalAttrs (isDarwin && hasLinuxLibraryPaths) {
+      NIX_LDFLAGS = linuxLdFlags;
+      NIX_LDFLAGS_x86_64_unknown_linux_gnu = linuxLdFlags;
+    }
+    // lib.optionalAttrs isDarwin {
+      CC_x86_64_unknown_linux_gnu = "${linuxCrossCc}/bin/${linuxTargetPrefix}cc";
+      CXX_x86_64_unknown_linux_gnu = "${linuxCrossCc}/bin/${linuxTargetPrefix}c++";
+      AR_x86_64_unknown_linux_gnu = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ar";
+      RANLIB_x86_64_unknown_linux_gnu = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ranlib";
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${linuxCrossCc}/bin/${linuxTargetPrefix}cc";
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_AR = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ar";
+    };
 
   languages.rust = {
     enable = true;
@@ -184,6 +189,7 @@ in
   packages =
     with pkgs;
     [
+      basedpyright
       git
       pkg-config
       cmake
@@ -307,33 +313,38 @@ in
   };
 
   enterShell = ''
-        set -euo pipefail
+    set -euo pipefail
 
-        # Stage per-project cargo/rustup state so builds stay project-local.
-        state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
-        export DEVENV_STATE="$state_dir"
-        export CARGO_HOME="$state_dir/cargo"
-        export RUSTUP_HOME="$state_dir/rustup"
-        mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+    # Stage per-project cargo/rustup state so builds stay project-local.
+    state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+    export DEVENV_STATE="$state_dir"
+    export CARGO_HOME="$state_dir/cargo"
+    export RUSTUP_HOME="$state_dir/rustup"
+    mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
 
-        toolchain_bin=""
-        if command -v rustup >/dev/null 2>&1; then
-          rustup show active-toolchain >/dev/null 2>&1 || rustup show >/dev/null
-          active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
-          if [ -n "$active_toolchain" ]; then
-            toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
-            export CLIPPY_DRIVER_PATH="$toolchain_bin/clippy-driver"
-            export RUSTC="$toolchain_bin/rustc"
-          fi
-        fi
+    toolchain_bin=""
+    if command -v rustup >/dev/null 2>&1; then
+      rustup show active-toolchain >/dev/null 2>&1 || rustup show >/dev/null
+      active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
+      if [ -n "$active_toolchain" ]; then
+        toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
+        export CLIPPY_DRIVER_PATH="$toolchain_bin/clippy-driver"
+        export RUSTC="$toolchain_bin/rustc"
+      fi
+    fi
 
-        if [ -n "$toolchain_bin" ]; then
-          export PATH="$toolchain_bin:$PATH"
-        fi
-        export PATH="$CARGO_HOME/bin:$PATH"
+    if [ -n "$toolchain_bin" ]; then
+      export PATH="$toolchain_bin:$PATH"
+    fi
+    export PATH="$CARGO_HOME/bin:$PATH"
 
-        echo "Rust toolchain: $(rustc --version)"
-        echo "Cargo version: $(cargo --version)"
+    host_path="''${DEVENV_HOST_PATH:-}"
+    if [ -n "$host_path" ]; then
+      export PATH="$PATH:$host_path"
+    fi
+
+    echo "Rust toolchain: $(rustc --version)"
+    echo "Cargo version: $(cargo --version)"
   '';
 
   enterTest = ''
