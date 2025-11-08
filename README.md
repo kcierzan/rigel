@@ -197,6 +197,14 @@ rigel/
 └── .gitignore
 ```
 
+### Development Environment
+
+- `direnv` drops you into the Nix shell automatically; without it run `nix develop` (macOS/Linux) or `devenv shell`.
+- The flake exports the same module to both commands, so every dependency lives in `devenv.nix`. Day-to-day work just uses the default (impure) shell for convenience.
+- When you need a fully isolated build, invoke `nix develop --pure` or `devenv shell --pure` to hide host PATH entries without any custom shims.
+- Common editors and TUI helpers (`neovim`, `ripgrep`, `fd`, `fzf`, `eza`, `yazi`, `lazygit`, `delta`, `starship`, etc.) now come from the dev shell, keeping tooling consistent across macOS and Linux.
+- Cross-compilation helpers remain available through the `build:*` scripts described in `devenv.nix`, so `build:linux`, `build:macos`, and `build:win` continue to work unchanged inside `nix develop`.
+
 ### Maintaining the Nix Environment
 
 Rigel's `flake.nix` simply re-exports the shell described in `devenv.nix`, so keeping either up to date keeps both `nix develop` and `devenv shell` aligned. When touching either file, stay inside the devenv shell (direnv drops you into it automatically in this repo).
