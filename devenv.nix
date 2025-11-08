@@ -191,6 +191,15 @@ in
       zip
       unzip
       just
+      fd
+      ripgrep
+      neovim
+      lazygit
+      fzf
+      delta
+      eza
+      yazi
+      starship
       # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
       # without requiring a Windows VM.
       xwin
@@ -300,41 +309,16 @@ in
   enterShell = ''
         set -euo pipefail
 
-        # Stage per-project cargo/rustup state so host shims never win.
+        # Stage per-project cargo/rustup state so builds stay project-local.
         state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
         export DEVENV_STATE="$state_dir"
         export CARGO_HOME="$state_dir/cargo"
         export RUSTUP_HOME="$state_dir/rustup"
         mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
 
-        # Remember the incoming (impure) PATH exactly once so we can opt specific tools back in.
-        if [ -z "''${DEVENV_IMPURE_PATH:-}" ]; then
-          export DEVENV_IMPURE_PATH="$PATH"
-        fi
-        export IMPURE_PATH="$DEVENV_IMPURE_PATH"
-
-        shim_dir="$state_dir/host-shims"
-        mkdir -p "$shim_dir"
-        export DEVENV_HOST_SHIM_DIR="$shim_dir"
-
-        # Build a clean PATH that prefers devenv packages plus project tool installs.
-        sanitized_path=""
-        append_path() {
-          local dir="$1"
-          [ -n "$dir" ] || return 0
-          case ":$sanitized_path:" in
-            *":$dir:"*) return 0 ;;
-          esac
-          if [ -z "$sanitized_path" ]; then
-            sanitized_path="$dir"
-          else
-            sanitized_path="$sanitized_path:$dir"
-          fi
-        }
-
-        active_toolchain=""
         toolchain_bin=""
         if command -v rustup >/dev/null 2>&1; then
+          rustup show active-toolchain >/dev/null 2>&1 || rustup show >/dev/null
           active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
           if [ -n "$active_toolchain" ]; then
             toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
@@ -343,64 +327,10 @@ in
           fi
         fi
 
-        append_path "$shim_dir"
-        append_path "$toolchain_bin"
-        append_path "$DEVENV_PROFILE/bin"
-        append_path "$state_dir/cargo-install/bin"
-        append_path "$CARGO_HOME/bin"
-
-        IFS=: read -r -a original_entries <<<"$IMPURE_PATH"
-        for entry in "''${original_entries[@]}"; do
-          case "$entry" in
-            /nix/store/*)
-              append_path "$entry"
-              ;;
-          esac
-        done
-
-        append_path "/usr/bin"
-        append_path "/bin"
-        append_path "/usr/sbin"
-        append_path "/sbin"
-
-        export PATH="$sanitized_path"
-
-        # Regenerate simple wrappers that temporarily restore the impure PATH for whitelisted tools.
-        host_tools_default="nvim fd rg eza yazi fzf delta go-preview lazygit nix gh codex starship starship-jj"
-        host_tools="''${DEVENV_HOST_SHIMS:-$host_tools_default}"
-        find "$shim_dir" -mindepth 1 -maxdepth 1 -type f -delete || true
-        generate_shim() {
-          local tool="$1"
-          [ -n "$tool" ] || return 0
-          local shim="$shim_dir/$tool"
-          cat <<EOF >"$shim"
-    #!/usr/bin/env bash
-    if [ -z "\$IMPURE_PATH" ]; then
-      echo "error: IMPURE_PATH not set; cannot run $tool" >&2
-      exit 1
-    fi
-    export PATH="\$IMPURE_PATH"
-    if ! command -v "$tool" >/dev/null 2>&1; then
-      echo "error: $tool not available on IMPURE_PATH" >&2
-      exit 127
-    fi
-    exec "$tool" "\$@"
-    EOF
-          chmod +x "$shim"
-        }
-        for tool in $host_tools; do
-          generate_shim "$tool"
-        done
-
-        # Purge Homebrew/mise variables that sneak host libs or headers into builds.
-        unset RUBY_CONFIGURE_OPTS NODE_EXTRA_CA_CERTS HOMEBREW_PREFIX HOMEBREW_BUNDLE_NO_LOCK \
-          HOMEBREW_NO_SANDBOX HOMEBREW_CELLAR HOMEBREW_REPOSITORY HOMEBREW_ROOT __MISE_ORIG_PATH \
-          INFOPATH
-
-        # Ensure the requested toolchain is prepped before emitting diagnostics.
-        if command -v rustup >/dev/null 2>&1; then
-          rustup show active-toolchain >/dev/null
+        if [ -n "$toolchain_bin" ]; then
+          export PATH="$toolchain_bin:$PATH"
         fi
+        export PATH="$CARGO_HOME/bin:$PATH"
 
         echo "Rust toolchain: $(rustc --version)"
         echo "Cargo version: $(cargo --version)"
