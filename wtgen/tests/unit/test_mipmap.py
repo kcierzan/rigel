@@ -44,7 +44,8 @@ class TestBuildMipmap:
             max_abs_value = np.max(np.abs(level))
             assert max_abs_value <= 1.0 + 1e-6, f"Level {i}: Peak {max_abs_value} exceeds 1.0"
 
-            # Check that RMS is reasonable (may be lower than target if scaled for clipping prevention)
+            # Check that RMS is reasonable (may be lower when scaled to avoid
+            # clipping).
             if np.any(np.abs(level) > EPSILON):  # Non-zero waveform
                 rms = np.sqrt(np.mean(level**2))
                 assert rms > 0.1, f"Level {i}: RMS {rms} too low, indicates over-scaling"
@@ -128,7 +129,8 @@ class TestBuildMipmap:
 
             # Each level should start closer to zero than the original
             assert start_value <= original_start + 1e-6, (
-                f"Level {i} start value {start_value:.6f} not better than original {original_start:.6f}"
+                f"Level {i} start value {start_value:.6f} "
+                f"not better than original {original_start:.6f}"
             )
 
             # Should be very close to zero crossing (much stricter than before)
@@ -304,11 +306,8 @@ class TestBuildMipmap:
             np.sum(spectra[i - 1][: len(spectra[i - 1]) // 8])
             np.sum(spectra[i][: len(spectra[i]) // 8])
 
-            # The relative concentration of energy in low frequencies should increase
-            # (this is a loose check since exact ratios depend on the filtering)
-
-            # The relative concentration of energy in low frequencies should increase
-            # (this is a loose check since exact ratios depend on the filtering)  # Tightened from 0.002
+            # The relative concentration of low-frequency energy should increase.
+            # (This is a loose check since exact ratios depend on the filtering.)
 
     def test_Mipmap_no_clipping(self):
         """Test that mipmap generation prevents clipping with RMS normalization."""
@@ -601,8 +600,8 @@ class TestMipmapAntialiasing:
                 safety_ratio = actual_cutoff_freq / nyquist
 
                 assert safety_ratio <= safety_margin + 0.01, (
-                    f"Level {octave_level}: Safety ratio {safety_ratio:.3f} "
-                    f"exceeds margin {safety_margin:.3f} (theoretical: {theoretical_max_harmonics:.3f})"
+                    f"Level {octave_level}: Safety ratio {safety_ratio:.3f} exceeds margin "
+                    f"{safety_margin:.3f} (theoretical: {theoretical_max_harmonics:.3f})"
                 )
             else:
                 # When forced to use 1 harmonic, just ensure no aliasing
@@ -700,10 +699,7 @@ class TestMipmapAntialiasing:
 
             # Find peak frequencies in the spectrum
             peak_threshold = 0.1 * np.max(spectrum[1 : N // 2])
-            peaks = []
-            for i in range(1, N // 2):
-                if spectrum[i] > peak_threshold:
-                    peaks.append(i)
+            peaks = [i for i in range(1, N // 2) if spectrum[i] > peak_threshold]
 
             # Calculate expected maximum harmonic for this level
             max_harmonics, _, _ = self._calculate_mipmap_parameters(
