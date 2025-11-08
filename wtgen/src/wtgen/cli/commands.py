@@ -12,7 +12,8 @@ from wtgen.cli.validators import (
     validate_tilt_string,
 )
 from wtgen.dsp.eq import Equalizer
-from wtgen.dsp.mipmap import Mipmap, RolloffMethod
+from wtgen.dsp.fir import RolloffMethod
+from wtgen.dsp.mipmap import Mipmap
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import WaveGenerator
 from wtgen.export import (
@@ -31,7 +32,7 @@ app = App(name="wtgen", help="A utility for generating and analyzing wavetables"
 console = Console()
 
 
-def print_error(message) -> None:
+def print_error(message: str) -> None:
     console.print(message, style="bold red")
 
 
@@ -97,11 +98,14 @@ def generate(
     wav_bit_depth: BitDepth
         The bit depths for .wav wavetables
     eq: str | None
-        EQ settings in the format 'freq:gain:q,freq:gain:q' (freq in Hz, gain in dB, q=factor)
+        EQ settings in the format 'freq:gain:q,freq:gain:q'
+        (freq in Hz, gain in dB, q=factor)
     high_tilt: str | None
-        High frequency tilt spectral shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+        High-frequency tilt spectral shaper in the format 'start_ratio:gain'
+        (ratio of Nyquist 0.0-1.0, gain in dB)
     low_tilt: str | None
-        Low frequency spectral tilt shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+        Low-frequency spectral tilt shaper in the format 'start_ratio:gain'
+        (ratio of Nyquist 0.0-1.0, gain in dB)
     """
     export_params = ExportParams(
         export_wav=export_wav,
@@ -197,7 +201,8 @@ def harmonic(
     output: Path
         Output path for the .npz wavetable (default: harmonic_wavetable.npz)
     partials: str | None
-        Harmonic partials as 'h1:a1:p1,h2:a2:p2...', where h is harmonic index, a is amplitude and p is phase
+        Harmonic partials as 'h1:a1:p1,h2:a2:p2...'
+        where h is harmonic index, a is amplitude and p is phase
     rolloff: RolloffMethod
         Rolloff method for FIR bandlimiting
     size: int
@@ -213,11 +218,14 @@ def harmonic(
     wav_bit_depth: BitDepth
         The bit depths for .wav wavetables (default: 16)
     eq: str | None
-        EQ settings in the format 'freq:gain:q,freq:gain:q' (freq in Hz, gain in dB, q=factor)
+        EQ settings in the format 'freq:gain:q,freq:gain:q'
+        (freq in Hz, gain in dB, q=factor)
     high_tilt: str | None
-        High frequency tilt spectral shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+        High-frequency tilt spectral shaper in the format 'start_ratio:gain'
+        (ratio of Nyquist 0.0-1.0, gain in dB)
     low_tilt: str | None
-        Low frequency spectral tilt shaper in the format 'start_ratio:gain' (ratio of Nyquist 0.0-1.0, gain in dB)
+        Low-frequency spectral tilt shaper in the format 'start_ratio:gain'
+        (ratio of Nyquist 0.0-1.0, gain in dB)
     """
 
     export_params = ExportParams(
