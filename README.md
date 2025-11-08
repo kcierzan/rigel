@@ -197,6 +197,46 @@ rigel/
 └── .gitignore
 ```
 
+### Development Environment
+
+- `direnv` automatically enters the dev shell for this repo; without it, run `nix develop` (macOS/Linux) or `devenv shell`.
+- `flake.nix` exports the same module for both commands, so every package and language configured in `devenv.nix` is available no matter which entry point you use.
+- The shell PATH always prioritizes tools provided by Nix, and then falls back to your host PATH for anything not declared yet.
+- Use `nix develop --pure` or `devenv shell --pure` if you want to hide the host PATH entirely for maximum reproducibility.
+- Common editors and TUI helpers (`neovim`, `ripgrep`, `fd`, `fzf`, `eza`, `yazi`, `lazygit`, `delta`, `starship`, etc.) are included directly in the dev shell so contributors share the same versions on macOS and Linux.
+- Cross-compilation helpers remain available through the `build:*` scripts defined in `devenv.nix`, so `build:linux`, `build:macos`, and `build:win` keep working inside any of the shells mentioned above.
+
+### Maintaining the Nix Environment
+
+Rigel's `flake.nix` simply re-exports the shell described in `devenv.nix`, so keeping either up to date keeps both `nix develop` and `devenv shell` aligned. When touching either file, stay inside the devenv shell (direnv drops you into it automatically in this repo).
+
+**Update workflow**
+
+1. Start from a clean working tree (`git status` should show only intentional edits).
+2. Refresh the flake inputs (nixpkgs + devenv) so both `nix develop` and `devenv` agree:
+   ```bash
+   nix flake update        # rewrites flake.lock with the latest rolling inputs
+   devenv update           # refreshes devenv.lock (rust-overlay, git-hooks, etc.)
+   ```
+3. Re-enter the shell (`direnv reload` or `devenv shell`) so the new inputs are evaluated.
+4. Sanity-check the toolchain before committing:
+   ```bash
+   cargo fmt -- --check
+   cargo clippy --all-targets --all-features -- -D warnings
+   cargo test
+   ```
+   (This matches the `ci:check` task defined in `devenv.nix`.)
+
+**Rollback instructions**
+
+- If a new input breaks the shell or builds, restore the previous locks and reload the shell:
+  ```bash
+  git checkout -- flake.lock devenv.lock
+  direnv reload   # or restart `devenv shell`
+  ```
+- For partial rollbacks, you can selectively keep either lock file (e.g., keep `flake.lock` but revert `devenv.lock`) with the same command.
+- Once things look good again, rerun the sanity-check commands above and commit both the locks and any related changes to `devenv.nix`/`flake.nix`.
+
 ### Building for Different Targets
 
 The `no_std` DSP core can be built for various targets:
