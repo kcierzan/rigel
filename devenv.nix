@@ -149,6 +149,8 @@ in
       MACOSX_DEPLOYMENT_TARGET = "11.0";
       PKG_CONFIG_ALLOW_CROSS = lib.mkDefault "1";
       DEVENV_HOST_PATH = hostPath;
+      RIGEL_SYNTH_ROOT = lib.mkDefault (toString ./projects/rigel-synth);
+      RIGEL_WTGEN_ROOT = lib.mkDefault (toString ./projects/wtgen);
       # Scrub host linker/compiler hints so only devenv/Nix values leak into builds.
       LIBRARY_PATH = lib.mkForce "";
       LDFLAGS = lib.mkForce "";

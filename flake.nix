@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------------
 # Top-level flake configuration for the Rigel repository developer environment.
 # -----------------------------------------------------------------------------
-# Mirrors the pattern used in wtgen/ so that both `nix develop` and `devenv`
+# Mirrors the pattern used in projects/wtgen/ so that both `nix develop` and `devenv`
 # share the exact same shell configuration defined in devenv.nix.
 # -----------------------------------------------------------------------------
 {
