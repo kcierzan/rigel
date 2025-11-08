@@ -135,6 +135,8 @@ in
     # Hypothesis occasionally benefits from more examples; expose a friendly
     # default developers can override per-command.
     HYPOTHESIS_PROFILE = "dev";
+    RIGEL_WTGEN_ROOT = lib.mkDefault (toString ./.);
+    RIGEL_SYNTH_ROOT = lib.mkDefault (toString ../rigel-synth);
   };
 
   # ---------------------------------------------------------------------------
