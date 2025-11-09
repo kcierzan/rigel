@@ -191,21 +191,48 @@ HYPOTHESIS_MAX_EXAMPLES=5000 uv run pytest tests/ -x -n auto --tb=short
 
 ## CI/CD Pipeline
 
-GitHub Actions workflow (`.github/workflows/ci.yml`) runs:
+### Main CI Workflow (`.github/workflows/ci.yml`)
 
-1. **Container Builds**: Only when devenv config changes
-   - Rigel container (Rust environment)
-   - wtgen container (Python environment)
+Runs on all PRs and pushes:
 
-2. **Parallel Pipelines**:
+1. **Parallel Pipelines**:
    - `rigel-pipeline`: fmt, clippy, test
    - `wtgen-pipeline`: ruff lint, pytest
 
-3. **Plugin Builds**:
-   - Linux & Windows: Matrix build in container
+2. **Plugin Builds**:
+   - Linux & Windows: Matrix build on ubuntu-latest
    - macOS: Native build on macos-14 runner
 
-All CI commands run through containers for reproducibility.
+All CI commands run through devenv shell for reproducibility.
+
+### Release Workflows
+
+**Continuous Release** (`.github/workflows/continuous-release.yml`):
+- Triggers: Push to `main` branch
+- Builds plugins for Linux, Windows, macOS
+- Updates "latest" pre-release with binaries
+- Archive naming: `rigel-plugin-latest-{platform}.tar.gz`
+- Each archive contains both VST3 and CLAP bundles from `target/bundled/`
+
+**Tagged Release** (`.github/workflows/release.yml`):
+- Triggers: Push tags matching `v*` (e.g., `v0.2.0`)
+- Builds plugins for all platforms
+- Creates new GitHub release with auto-generated changelog
+- Archive naming: `rigel-plugin-{version}-{platform}.tar.gz`
+- Published as stable releases (not pre-release)
+
+**Creating a Release:**
+```bash
+# Ensure version in Cargo.toml matches desired version
+git tag v0.2.0
+git push origin v0.2.0
+# GitHub Actions will automatically build and create the release
+```
+
+**Notes:**
+- Bundles are created in `target/bundled/` by nih_plug_xtask
+- macOS binaries are currently unsigned
+- Future: Add code signing via GitHub secrets
 
 ## Cross-Platform Support
 

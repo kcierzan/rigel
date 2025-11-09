@@ -1,0 +1,151 @@
+name: Continuous Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux-windows:
+    name: Build ${{ matrix.target }} Bundle
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux
+            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
+          - target: windows
+            build_command: ./ci/scripts/build-win.sh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: kcierzan-rigel
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: devenv
+
+      - name: Install devenv
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Cache devenv
+        uses: actions/cache@v4
+        with:
+          path: .devenv
+          key: rigel-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
+          restore-keys: |
+            rigel-devenv-
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+          shared-key: ${{ matrix.target }}
+
+      - name: Build plugin (${{ matrix.target }})
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- ${{ matrix.build_command }}
+
+      - name: Create archive
+        run: |
+          cd target/bundled
+          tar -czf ../../rigel-plugin-latest-${{ matrix.target }}.tar.gz .
+          cd ../..
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest Development Build"
+          prerelease: true
+          files: rigel-plugin-latest-${{ matrix.target }}.tar.gz
+          body: |
+            Automated continuous release from the main branch.
+
+            **Commit:** ${{ github.sha }}
+            **Built:** ${{ github.event.head_commit.timestamp }}
+
+            These are unsigned development builds. For stable releases, see the [Releases page](https://github.com/${{ github.repository }}/releases).
+
+  build-macos:
+    name: Build macOS Bundle
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: kcierzan-rigel
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: devenv
+
+      - name: Install devenv
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Cache devenv
+        uses: actions/cache@v4
+        with:
+          path: .devenv
+          key: macos-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
+          restore-keys: |
+            macos-devenv-
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+          shared-key: macos
+
+      - name: Build plugin (macOS)
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- build:macos
+
+      - name: Create archive
+        run: |
+          cd target/bundled
+          tar -czf ../../rigel-plugin-latest-macos.tar.gz .
+          cd ../..
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest Development Build"
+          prerelease: true
+          files: rigel-plugin-latest-macos.tar.gz
+          body: |
+            Automated continuous release from the main branch.
+
+            **Commit:** ${{ github.sha }}
+            **Built:** ${{ github.event.head_commit.timestamp }}
+
+            These are unsigned development builds. For stable releases, see the [Releases page](https://github.com/${{ github.repository }}/releases).
