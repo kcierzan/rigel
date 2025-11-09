@@ -110,6 +110,7 @@ let
   linuxLdFlags = lib.concatStringsSep " " (map (path: "-L${path}") linuxLibraryPaths);
   cargoScript = command: ''
     set -euo pipefail
+    export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
     state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
     export DEVENV_STATE="$state_dir"
@@ -176,8 +177,8 @@ in
   languages.rust = {
     enable = true;
     channel = "stable";
-    # Use latest for now to ensure continuous compatibility but pin before release
-    version = "latest";
+    # Pin the toolchain so CI and local shells use the exact same Rust.
+    version = "1.91.0";
     components = [
       "rustfmt"
       "clippy"
@@ -191,6 +192,10 @@ in
   packages =
     with pkgs;
     [
+      rustc
+      cargo
+      rustfmt
+      clippy
       basedpyright
       git
       pkg-config
@@ -316,6 +321,7 @@ in
 
   enterShell = ''
     set -euo pipefail
+    export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
     # Stage per-project cargo/rustup state so builds stay project-local.
     state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
