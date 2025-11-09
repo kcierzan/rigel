@@ -37,6 +37,8 @@ jobs:
           cache-on-failure: true
 
       - name: Run Rust checks
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
           devenv shell -- bash -c '
             cargo fmt -- --check
@@ -74,6 +76,8 @@ jobs:
 
       - name: Sync wtgen environment
         working-directory: projects/wtgen
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
           devenv shell -- uv sync --frozen --group dev
           devenv shell -- uv pip install --quiet -e .
@@ -81,11 +85,14 @@ jobs:
 
       - name: Ruff lint
         working-directory: projects/wtgen
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- ruff check .
 
       - name: Run wtgen tests
         working-directory: projects/wtgen
         env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
           LC_ALL: C.UTF-8
           LANG: C.UTF-8
         run: devenv shell -- uv run python -m pytest -n auto
@@ -121,6 +128,8 @@ jobs:
           shared-key: ${{ matrix.target }}
 
       - name: Build plugin (${{ matrix.target }})
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- ${{ matrix.build_command }}
 
       - name: Create archive
@@ -167,6 +176,8 @@ jobs:
           shared-key: macos
 
       - name: Build plugin (macOS)
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- build:macos
 
       - name: Create archive
