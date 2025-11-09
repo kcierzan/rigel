@@ -109,20 +109,6 @@ jobs:
         if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         uses: DeterminateSystems/nix-installer-action@v12
 
-      - name: Setup Cachix
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' && secrets.CACHIX_AUTH_TOKEN }}
-        uses: cachix/cachix-action@v14
-        with:
-          name: rigel
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Cache devenv CLI
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.nix-profile
-          key: nix-profile-${{ runner.os }}
-
       - name: Install devenv CLI
         if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -162,20 +148,6 @@ jobs:
       - name: Install Nix
         if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Setup Cachix
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' && secrets.CACHIX_AUTH_TOKEN }}
-        uses: cachix/cachix-action@v14
-        with:
-          name: rigel
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Cache devenv CLI
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.nix-profile
-          key: nix-profile-${{ runner.os }}
 
       - name: Install devenv CLI
         if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
@@ -381,19 +353,6 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Setup Cachix
-        if: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        uses: cachix/cachix-action@v14
-        with:
-          name: rigel
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
-      - name: Cache devenv CLI
-        uses: actions/cache@v4
-        with:
-          path: ~/.nix-profile
-          key: nix-profile-${{ runner.os }}
 
       - name: Cache devenv state
         uses: actions/cache@v4
