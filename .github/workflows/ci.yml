@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint-test:
-    name: Lint & Tests
+  rigel-pipeline:
+    name: Rigel Lint & Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +34,26 @@ jobs:
         run: |
           devenv shell -- bash -lc "set -euo pipefail; export PATH=\"\$DEVENV_PROFILE/bin:\$PATH\"; cargo fmt -- --check; cargo clippy --all-targets --all-features -- -D warnings; cargo test"
 
+  wtgen-pipeline:
+    name: wtgen Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Cache devenv state
+        uses: actions/cache@v4
+        with:
+          path: .devenv/state
+          key: ${{ runner.os }}-devenv-${{ hashFiles('devenv.lock', 'devenv.nix', 'flake.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-devenv-
+
+      - name: Install devenv CLI
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
       - name: Cache wtgen venv
         uses: actions/cache@v4
         with:
@@ -49,7 +69,7 @@ jobs:
 
   build-plugin:
     name: Build Plugin (${{ matrix.target }})
-    needs: lint-test
+    needs: rigel-pipeline
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
