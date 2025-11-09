@@ -255,9 +255,12 @@ in
     export LANG=C.UTF-8
   '';
 
-  containers.shell.version =
-    let
-      fromEnv = builtins.getEnv "DEVENV_CONTAINER_VERSION";
-    in
-    if fromEnv != "" then fromEnv else "latest";
+  containers.shell = {
+    name = "wtgen-shell";
+    version =
+      let
+        fromEnv = builtins.getEnv "DEVENV_CONTAINER_VERSION";
+      in
+      if fromEnv != "" then fromEnv else "latest";
+  };
 }

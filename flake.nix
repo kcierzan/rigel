@@ -19,6 +19,11 @@
 
     rust-overlay.url = "github:oxalica/rust-overlay";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
+
+    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
   };
 
   # Reuse the public binary cache provided by devenv and allow access to PWD so
@@ -31,7 +36,7 @@
     impure-env = "PWD";
   };
 
-  outputs = { self, nixpkgs, devenv, systems, rust-overlay, ... } @ inputs:
+  outputs = { self, nixpkgs, devenv, systems, rust-overlay, nix2container, mk-shell-bin, ... } @ inputs:
     let
       # Helper to instantiate attributes for each supported CPU/OS pair.
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
