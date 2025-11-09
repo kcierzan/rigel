@@ -26,6 +26,11 @@
     # with the `languages.python.version` option.
     nixpkgs-python.url = "github:cachix/nixpkgs-python";
     nixpkgs-python.inputs = { nixpkgs.follows = "nixpkgs"; };
+
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
+
+    mk-shell-bin.url = "github:rrbutani/nix-mk-shell-bin";
   };
 
   # Use the public binary cache provided by devenv so developers do not need to
@@ -38,7 +43,7 @@
     impure-env = "PWD";
   };
 
-  outputs = { self, nixpkgs, devenv, systems, ... } @ inputs:
+  outputs = { self, nixpkgs, devenv, systems, nix2container, mk-shell-bin, ... } @ inputs:
     let
       # Helper to instantiate attributes for each supported CPU/OS pair.
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
