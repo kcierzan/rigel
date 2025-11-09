@@ -25,11 +25,15 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v12
 
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
       - name: Setup Cachix
         uses: cachix/cachix-action@v15
         with:
           name: kcierzan-rigel
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: devenv
 
       - name: Install devenv
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -42,16 +46,11 @@ jobs:
           restore-keys: |
             rigel-devenv-
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: rigel-cargo-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            rigel-cargo-
+          workspaces: "."
+          cache-on-failure: true
 
       - name: cargo fmt
         run: devenv shell -- cargo fmt -- --check
@@ -73,11 +72,15 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v12
 
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
       - name: Setup Cachix
         uses: cachix/cachix-action@v15
         with:
           name: kcierzan-rigel
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: devenv
 
       - name: Install devenv
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -90,21 +93,18 @@ jobs:
           restore-keys: |
             wtgen-devenv-
 
-      - name: Cache uv
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          path: |
-            projects/wtgen/.venv
-            ~/.cache/uv
-          key: wtgen-uv-${{ hashFiles('projects/wtgen/uv.lock') }}
-          restore-keys: |
-            wtgen-uv-
+          enable-cache: true
+          cache-suffix: ${{ hashFiles('projects/wtgen/uv.lock') }}
 
       - name: Sync wtgen environment
         working-directory: projects/wtgen
         run: |
           devenv shell -- uv sync --frozen --group dev
           devenv shell -- uv pip install --quiet -e .
+          devenv shell -- uv cache prune --ci
 
       - name: Ruff lint
         working-directory: projects/wtgen
@@ -139,11 +139,15 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v12
 
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
       - name: Setup Cachix
         uses: cachix/cachix-action@v15
         with:
           name: kcierzan-rigel
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: devenv
 
       - name: Install devenv
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -156,16 +160,12 @@ jobs:
           restore-keys: |
             rigel-devenv-
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: rigel-${{ matrix.target }}-cargo-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            rigel-${{ matrix.target }}-cargo-
+          workspaces: "."
+          cache-on-failure: true
+          shared-key: ${{ matrix.target }}
 
       - name: Build plugin (${{ matrix.target }})
         run: devenv shell -- ${{ matrix.build_command }}
@@ -194,11 +194,15 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v12
 
+      - name: Enable Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
       - name: Setup Cachix
         uses: cachix/cachix-action@v15
         with:
           name: kcierzan-rigel
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          extraPullNames: devenv
 
       - name: Install devenv
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -210,6 +214,13 @@ jobs:
           key: macos-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
           restore-keys: |
             macos-devenv-
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+          shared-key: macos
 
       - name: Build plugin (macOS)
         run: devenv shell -- build:macos
