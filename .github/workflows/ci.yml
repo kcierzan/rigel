@@ -14,333 +14,161 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  compute-hashes:
-    name: Compute devenv hashes
-    runs-on: ubuntu-latest
-    outputs:
-      rigel: ${{ steps.hash.outputs.rigel }}
-      wtgen: ${{ steps.hash.outputs.wtgen }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - id: hash
-        run: |
-          set -euo pipefail
-          rigel_files=(
-            devenv.nix
-            devenv.lock
-            devenv.yaml
-            flake.nix
-            flake.lock
-          )
-          wtgen_files=(
-            projects/wtgen/devenv.nix
-            projects/wtgen/devenv.lock
-            projects/wtgen/devenv.yaml
-            projects/wtgen/flake.nix
-            projects/wtgen/flake.lock
-          )
-
-          rigel_hash=$(cat "${rigel_files[@]}" | sha256sum | cut -d' ' -f1)
-          wtgen_hash=$(cat "${wtgen_files[@]}" | sha256sum | cut -d' ' -f1)
-
-          echo "rigel=$rigel_hash" >> "$GITHUB_OUTPUT"
-          echo "wtgen=$wtgen_hash" >> "$GITHUB_OUTPUT"
-
-  detect-devenv-changes:
-    name: Detect devenv changes
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      rigel: ${{ steps.paths.outputs.rigel }}
-      wtgen: ${{ steps.paths.outputs.wtgen }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect devenv changes
-        id: paths
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            rigel:
-              - 'devenv.nix'
-              - 'devenv.lock'
-              - 'devenv.yaml'
-              - 'flake.nix'
-              - 'flake.lock'
-            wtgen:
-              - 'projects/wtgen/devenv.nix'
-              - 'projects/wtgen/devenv.lock'
-              - 'projects/wtgen/devenv.yaml'
-              - 'projects/wtgen/flake.nix'
-              - 'projects/wtgen/flake.lock'
-
-      - name: Report status
-        run: |
-          echo "rigel changed: ${{ steps.paths.outputs.rigel }}"
-          echo "wtgen changed: ${{ steps.paths.outputs.wtgen }}"
-
-  build-rigel-container:
-    name: Build rigel devenv container
-    runs-on: ubuntu-latest
-    needs:
-      - compute-hashes
-      - detect-devenv-changes
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Rigel container unchanged
-        if: ${{ needs.detect-devenv-changes.outputs.rigel != 'true' }}
-        run: echo "Rigel devenv inputs unchanged; skipping container build."
-
-      - uses: actions/checkout@v4
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
-        with:
-          fetch-depth: 0
-
-      - name: Install Nix
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
-        uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Setup Cachix
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
-        uses: cachix/cachix-action@v15
-        with:
-          name: kcierzan-rigel
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: Install devenv CLI
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
-        run: nix profile install --accept-flake-config github:cachix/devenv/latest
-
-      - name: Build rigel devenv container
-        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
-        env:
-          DEVENV_CONTAINER_VERSION: devenv-${{ needs.compute-hashes.outputs.rigel }}
-          OWNER: ${{ github.repository_owner }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          devenv --impure container build shell
-          devenv --impure container --registry "docker://ghcr.io/${owner}/" \
-            --copy-args="--dest-creds ${owner}:${GH_TOKEN}" \
-            copy shell
-
-  build-wtgen-container:
-    name: Build wtgen devenv container
-    runs-on: ubuntu-latest
-    needs:
-      - compute-hashes
-      - detect-devenv-changes
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: wtgen container unchanged
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen != 'true' }}
-        run: echo "wtgen devenv inputs unchanged; skipping container build."
-
-      - uses: actions/checkout@v4
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
-        with:
-          fetch-depth: 0
-
-      - name: Install Nix
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
-        uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Setup Cachix
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
-        uses: cachix/cachix-action@v15
-        with:
-          name: kcierzan-rigel
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: Install devenv CLI
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
-        run: nix profile install --accept-flake-config github:cachix/devenv/latest
-
-      - name: Build wtgen devenv container
-        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
-        working-directory: projects/wtgen
-        env:
-          DEVENV_CONTAINER_VERSION: devenv-${{ needs.compute-hashes.outputs.wtgen }}
-          OWNER: ${{ github.repository_owner }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          devenv --impure container build shell
-          devenv --impure container --registry "docker://ghcr.io/${owner}/" \
-            --copy-args="--dest-creds ${owner}:${GH_TOKEN}" \
-            copy shell
-
   rigel-pipeline:
     name: Rigel Lint & Tests
     runs-on: ubuntu-latest
-    needs:
-      - compute-hashes
-      - build-rigel-container
-    permissions:
-      contents: read
-      packages: read
-    container:
-      image: ghcr.io/${{ github.repository_owner }}/rigel-shell:devenv-${{ needs.compute-hashes.outputs.rigel }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure cargo directories
-        run: |
-          state_dir="$GITHUB_WORKSPACE/.devenv/state"
-          echo "DEVENV_STATE=$state_dir" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$state_dir/cargo" >> "$GITHUB_ENV"
-          echo "RUSTUP_HOME=$state_dir/rustup" >> "$GITHUB_ENV"
-          mkdir -p "$state_dir/cargo/bin" "$state_dir/rustup"
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
 
-      - name: Cache cargo registry
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: kcierzan-rigel
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Install devenv
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Cache devenv
+        uses: actions/cache@v4
+        with:
+          path: .devenv
+          key: rigel-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
+          restore-keys: |
+            rigel-devenv-
+
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
-            .devenv/state/cargo
-            .devenv/state/rustup
-          key: rigel-cargo-${{ needs.compute-hashes.outputs.rigel }}-${{ hashFiles('Cargo.lock') }}
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rigel-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
-            rigel-cargo-${{ needs.compute-hashes.outputs.rigel }}-
-
-      - name: Cache cargo target
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: rigel-target-${{ needs.compute-hashes.outputs.rigel }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            rigel-target-${{ needs.compute-hashes.outputs.rigel }}-
+            rigel-cargo-
 
       - name: cargo fmt
-        run: cargo fmt -- --check
+        run: devenv shell -- cargo fmt -- --check
 
       - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: devenv shell -- cargo clippy --all-targets --all-features -- -D warnings
 
       - name: cargo test
-        run: cargo test
+        run: devenv shell -- cargo test
 
   wtgen-pipeline:
     name: wtgen Lint & Tests
     runs-on: ubuntu-latest
-    needs:
-      - compute-hashes
-      - build-wtgen-container
-    permissions:
-      contents: read
-      packages: read
-    container:
-      image: ghcr.io/${{ github.repository_owner }}/wtgen-shell:devenv-${{ needs.compute-hashes.outputs.wtgen }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure uv cache
-        run: |
-          cache_dir="$GITHUB_WORKSPACE/.uv-cache"
-          mkdir -p "$cache_dir"
-          echo "UV_CACHE_DIR=$cache_dir" >> "$GITHUB_ENV"
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
 
-      - name: Cache uv artifacts
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: kcierzan-rigel
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Install devenv
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Cache devenv
+        uses: actions/cache@v4
+        with:
+          path: projects/wtgen/.devenv
+          key: wtgen-devenv-${{ hashFiles('projects/wtgen/devenv.nix', 'projects/wtgen/devenv.lock', 'projects/wtgen/flake.lock') }}
+          restore-keys: |
+            wtgen-devenv-
+
+      - name: Cache uv
         uses: actions/cache@v4
         with:
           path: |
             projects/wtgen/.venv
-            .uv-cache
-          key: wtgen-venv-${{ needs.compute-hashes.outputs.wtgen }}-${{ hashFiles('projects/wtgen/uv.lock') }}
+            ~/.cache/uv
+          key: wtgen-uv-${{ hashFiles('projects/wtgen/uv.lock') }}
           restore-keys: |
-            wtgen-venv-${{ needs.compute-hashes.outputs.wtgen }}-
+            wtgen-uv-
 
       - name: Sync wtgen environment
         working-directory: projects/wtgen
         run: |
-          uv sync --frozen --group dev
-          uv pip install --quiet -e .
+          devenv shell -- uv sync --frozen --group dev
+          devenv shell -- uv pip install --quiet -e .
 
       - name: Ruff lint
         working-directory: projects/wtgen
-        run: ruff check .
+        run: devenv shell -- ruff check .
 
       - name: Run wtgen tests
         working-directory: projects/wtgen
         env:
           LC_ALL: C.UTF-8
           LANG: C.UTF-8
-        run: uv run python -m pytest -n auto
+        run: devenv shell -- uv run python -m pytest -n auto
 
   build-plugin-linux:
     name: Build Plugin (Linux & Windows)
     runs-on: ubuntu-latest
-    needs:
-      - compute-hashes
-      - rigel-pipeline
-    permissions:
-      contents: read
-      packages: read
-    container:
-      image: ghcr.io/${{ github.repository_owner }}/rigel-shell:devenv-${{ needs.compute-hashes.outputs.rigel }}
+    needs: rigel-pipeline
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: linux
             build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
-            bundle_dir: target/linux/x86_64-unknown-linux-gnu/release/bundles
+            bundle_dir: target/x86_64-unknown-linux-gnu/release/bundles
           - target: windows
             build_command: ./ci/scripts/build-win.sh
-            bundle_dir: target/windows/x86_64-pc-windows-msvc/release/bundles
+            bundle_dir: target/x86_64-pc-windows-msvc/release/bundles
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure cargo directories
-        run: |
-          state_dir="$GITHUB_WORKSPACE/.devenv/state"
-          echo "DEVENV_STATE=$state_dir" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$state_dir/cargo" >> "$GITHUB_ENV"
-          echo "RUSTUP_HOME=$state_dir/rustup" >> "$GITHUB_ENV"
-          mkdir -p "$state_dir/cargo/bin" "$state_dir/rustup"
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
 
-      - name: Configure cargo target dir
-        run: |
-          target_dir="$GITHUB_WORKSPACE/target/${{ matrix.target }}"
-          mkdir -p "$target_dir"
-          echo "CARGO_TARGET_DIR=$target_dir" >> "$GITHUB_ENV"
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: kcierzan-rigel
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Cache cargo registry
+      - name: Install devenv
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Cache devenv
+        uses: actions/cache@v4
+        with:
+          path: .devenv
+          key: rigel-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
+          restore-keys: |
+            rigel-devenv-
+
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
-            .devenv/state/cargo
-            .devenv/state/rustup
-          key: rigel-cargo-${{ needs.compute-hashes.outputs.rigel }}-${{ hashFiles('Cargo.lock') }}
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rigel-${{ matrix.target }}-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
-            rigel-cargo-${{ needs.compute-hashes.outputs.rigel }}-
-
-      - name: Cache cargo target
-        uses: actions/cache@v4
-        with:
-          path: target/${{ matrix.target }}
-          key: rigel-${{ matrix.target }}-target-${{ needs.compute-hashes.outputs.rigel }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            rigel-${{ matrix.target }}-target-${{ needs.compute-hashes.outputs.rigel }}-
+            rigel-${{ matrix.target }}-cargo-
 
       - name: Build plugin (${{ matrix.target }})
-        run: ${{ matrix.build_command }}
+        run: devenv shell -- ${{ matrix.build_command }}
 
       - name: Archive bundles
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -356,9 +184,7 @@ jobs:
 
   build-plugin-macos:
     name: Build Plugin (macOS)
-    needs:
-      - compute-hashes
-      - rigel-pipeline
+    needs: rigel-pipeline
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -374,16 +200,16 @@ jobs:
           name: kcierzan-rigel
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Cache devenv state
+      - name: Install devenv
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Cache devenv
         uses: actions/cache@v4
         with:
-          path: .devenv/state
-          key: macos-devenv-${{ needs.compute-hashes.outputs.rigel }}
+          path: .devenv
+          key: macos-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
           restore-keys: |
             macos-devenv-
-
-      - name: Install devenv CLI
-        run: nix profile install --accept-flake-config github:cachix/devenv/latest
 
       - name: Build plugin (macOS)
         run: devenv shell -- build:macos
@@ -391,7 +217,7 @@ jobs:
       - name: Archive bundles
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          devenv shell -- bash -lc "tar -C target/aarch64-apple-darwin/release/bundles -czf rigel-plugin-macos.tar.gz ."
+          tar -C target/aarch64-apple-darwin/release/bundles -czf rigel-plugin-macos.tar.gz .
 
       - name: Upload artifacts
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
