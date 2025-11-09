@@ -18,6 +18,7 @@ let
     "x86_64-pc-windows-msvc"
     "x86_64-unknown-linux-gnu"
   ];
+  rustTargetList = lib.concatStringsSep " " rustTargets;
   linuxCross = pkgs.pkgsCross.gnu64;
   linuxCrossCc = linuxCross.stdenv.cc;
   linuxCrossBinutils = linuxCross.buildPackages.binutils;
@@ -120,6 +121,11 @@ let
 
     toolchain_bin=""
     if command -v rustup >/dev/null 2>&1; then
+      for target in ${rustTargetList}; do
+        if ! rustup target list --installed | grep -q "$target"; then
+          rustup target add "$target"
+        fi
+      done
       active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
       if [ -n "$active_toolchain" ]; then
         toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
@@ -196,6 +202,7 @@ in
       cargo
       rustfmt
       clippy
+      rustup
       python3
       basedpyright
       git
@@ -334,6 +341,11 @@ in
     toolchain_bin=""
     if command -v rustup >/dev/null 2>&1; then
       rustup show active-toolchain >/dev/null 2>&1 || rustup show >/dev/null
+      for target in ${rustTargetList}; do
+        if ! rustup target list --installed | grep -q "$target"; then
+          rustup target add "$target"
+        fi
+      done
       active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
       if [ -n "$active_toolchain" ]; then
         toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
