@@ -143,6 +143,11 @@ in
     if envPwd != "" then envPwd else fallback
   );
 
+  # Enable Cachix binary cache for faster Nix builds
+  cachix.enable = true;
+  cachix.pull = "kcierzan-rigel";
+  cachix.push = "kcierzan-rigel";
+
   env =
     let
       hostPath = builtins.getEnv "PATH";
