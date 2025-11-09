@@ -70,9 +70,9 @@ fn test_midi_configuration() {
         MidiConfig::Basic,
         "Plugin should accept MIDI input"
     );
-    assert_eq!(
-        RigelPlugin::SAMPLE_ACCURATE_AUTOMATION,
-        true,
+    let supports_sample_accurate_automation = RigelPlugin::SAMPLE_ACCURATE_AUTOMATION;
+    assert!(
+        supports_sample_accurate_automation,
         "Plugin should support sample-accurate automation"
     );
 }
@@ -156,7 +156,6 @@ fn test_parameter_serialization() {
     // Test that we can deserialize the state (basic smoke test)
     params.deserialize_fields(&state);
     // If we get here without panicking, deserialization worked
-    assert!(true, "Plugin state deserialization completed");
 }
 
 #[test]
