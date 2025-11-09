@@ -75,3 +75,66 @@ immediately.
   `rigel-dsp`.
 - Avoid blocking I/O or file access from real-time audio callbacks; stage work
   on auxiliary threads.
+
+## Release Process
+
+The project uses automated GitHub Actions workflows to build and distribute plugin binaries.
+
+### Continuous Releases (Latest)
+
+Every push to `main` triggers `.github/workflows/continuous-release.yml`:
+- Builds VST3/CLAP plugins for Linux, Windows, and macOS
+- Updates the "latest" GitHub release with new binaries
+- Archives named: `rigel-plugin-latest-{linux|windows|macos}.tar.gz`
+- Marked as pre-release for development builds
+
+### Version Releases
+
+Creating and pushing a version tag triggers `.github/workflows/release.yml`:
+
+```bash
+# Update version in Cargo.toml if needed
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+This will:
+- Build plugins for all three platforms
+- Create a new GitHub release with the tag name
+- Auto-generate changelog from commits since last release
+- Upload binaries as: `rigel-plugin-v0.2.0-{platform}.tar.gz`
+
+### Archive Contents
+
+Each platform archive contains:
+- `rigel-plugin.clap` - CLAP format plugin (single file on Linux/Windows, bundle on macOS)
+- `rigel-plugin.vst3/` - VST3 format plugin bundle
+
+### Installation for Users
+
+**macOS:**
+```bash
+tar -xzf rigel-plugin-latest-macos.tar.gz
+cp -r rigel-plugin.vst3 ~/Library/Audio/Plug-Ins/VST3/
+cp -r rigel-plugin.clap ~/Library/Audio/Plug-Ins/CLAP/
+```
+
+**Linux:**
+```bash
+tar -xzf rigel-plugin-latest-linux.tar.gz
+mkdir -p ~/.vst3 ~/.clap
+cp -r rigel-plugin.vst3 ~/.vst3/
+cp rigel-plugin.clap ~/.clap/
+```
+
+**Windows (PowerShell):**
+```powershell
+tar -xzf rigel-plugin-latest-windows.tar.gz
+Copy-Item -Recurse rigel-plugin.vst3 "$env:COMMONPROGRAMFILES\VST3\"
+Copy-Item rigel-plugin.clap "$env:COMMONPROGRAMFILES\CLAP\"
+```
+
+### Notes
+
+- macOS binaries are currently unsigned; users will need to bypass Gatekeeper
+- Code signing can be added later by configuring Apple Developer certificates in GitHub secrets
