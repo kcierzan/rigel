@@ -52,20 +52,15 @@ jobs:
           workspaces: "."
           cache-on-failure: true
 
-      - name: cargo fmt
+      - name: Run Rust checks
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- cargo fmt -- --check
-
-      - name: cargo clippy
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: cargo test
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- cargo test
+        run: |
+          devenv shell -- bash -c '
+            cargo fmt -- --check
+            cargo clippy --all-targets --all-features -- -D warnings
+            cargo test
+          '
 
   wtgen-pipeline:
     name: wtgen Lint & Tests
@@ -101,9 +96,16 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
         with:
-          enable-cache: true
-          cache-suffix: ${{ hashFiles('projects/wtgen/uv.lock') }}
+          path: |
+            ~/.cache/uv
+            projects/wtgen/.venv
+          key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
 
       - name: Sync wtgen environment
         working-directory: projects/wtgen
@@ -138,10 +140,8 @@ jobs:
         include:
           - target: linux
             build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
-            bundle_dir: target/x86_64-unknown-linux-gnu/release/bundles
           - target: windows
             build_command: ./ci/scripts/build-win.sh
-            bundle_dir: target/x86_64-pc-windows-msvc/release/bundles
     steps:
       - uses: actions/checkout@v4
         with:
@@ -178,26 +178,22 @@ jobs:
           cache-on-failure: true
           shared-key: ${{ matrix.target }}
 
+      - name: Cache xwin SDK
+        if: matrix.target == 'windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/xwin-cache
+            target/xwin
+          key: xwin-sdk-${{ runner.os }}-v1
+
       - name: Build plugin (${{ matrix.target }})
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- ${{ matrix.build_command }}
 
-      - name: Archive bundles
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          tar -C ${{ matrix.bundle_dir }} -czf rigel-plugin-${{ matrix.target }}.tar.gz .
-
-      - name: Upload artifacts
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rigel-plugin-${{ matrix.target }}
-          path: rigel-plugin-${{ matrix.target }}.tar.gz
-
   build-plugin-macos:
     name: Build Plugin (macOS)
-    needs: rigel-pipeline
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
@@ -239,15 +235,3 @@ jobs:
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- build:macos
-
-      - name: Archive bundles
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          tar -C target/aarch64-apple-darwin/release/bundles -czf rigel-plugin-macos.tar.gz .
-
-      - name: Upload artifacts
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rigel-plugin-macos
-          path: rigel-plugin-macos.tar.gz
