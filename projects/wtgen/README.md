@@ -1,5 +1,7 @@
 # wtgen
 
+_Location:_ `projects/wtgen` inside the Rigel monorepo.
+
 A Python library for wavetable generation and processing
 
 ## Features

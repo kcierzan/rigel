@@ -1,15 +1,18 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `crates/dsp`: `no_std` DSP core; keep all real-time code allocation-free.
-- `crates/cli`: CLI entry point (`rigel`) for rendering audio and exercising
-  DSP paths.
-- `crates/plugin`: NIH-plug wrapper for building VST3/CLAP binaries; interacts
-  with DAWs.
-- `crates/xtask`: helper tasks including `cargo xtask bundle` for plugin
-  packaging.
-- `wtgen/`: Python research workspace (nix devenv managed) for generating
-  wavetable assets used during development.
+- `projects/rigel-synth/crates/dsp`: `no_std` DSP core; keep all real-time code
+  allocation-free.
+- `projects/rigel-synth/crates/cli`: CLI entry point (`rigel`) for rendering
+  audio and exercising DSP paths.
+- `projects/rigel-synth/crates/plugin`: NIH-plug wrapper for building VST3/CLAP
+  binaries; interacts with DAWs.
+- `projects/rigel-synth/crates/xtask`: helper tasks including `cargo xtask
+  bundle` for plugin packaging.
+- `projects/wtgen/`: Python research workspace (nix devenv managed) for
+  generating wavetable assets used during development.
+- `projects/rigel-site` & `projects/rigel-backend`: placeholders for the public
+  site + future backend service; use them for planning docs and tracking TODOs.
 
 ## Essential commands
 
@@ -46,11 +49,12 @@ immediately.
 ## Testing Guidelines
 - Primary suite runs via `cargo:test`; target crate-level coverage for DSP math
   and CLI parsing.
-- Add focused tests under `crates/dsp` or module-specific files; name tests
+- Add focused tests under `projects/rigel-synth/crates/dsp` or module-specific
+  files; name tests
   `mod_name_behavior`.
 - For audio changes, regenerate short WAV fixtures via the CLI and listen or
   diff waveforms before merging.
-- Python experiments in `wtgen/tests/` should mirror Rust expectations; check
+- Python experiments in `projects/wtgen/tests/` should mirror Rust expectations; check
   in generated assets only when deterministic. Any large binary assets should
   be checked in using git-lfs.
 - When testing any nix/devenv changes, tail the output as nix errors tend to
