@@ -56,8 +56,6 @@ in
   packages =
     with pkgs;
     [
-      # nodejs_20 is required for GitHub Actions runner in containers
-      nodejs_20
       uv
       git
       pkg-config
