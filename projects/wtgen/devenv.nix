@@ -25,6 +25,7 @@ let
   isDarwin = pkgs.stdenv.isDarwin;
 in
 {
+  name = "wtgen";
   # Tell devenv where the project root lives when used through flakes.
   # Prefer the calling shell's $PWD (requires configurable-impure-env) so the
   # root resolves to the actual checkout instead of the Nix store copy.
@@ -253,4 +254,10 @@ in
     export LC_ALL=C.UTF-8
     export LANG=C.UTF-8
   '';
+
+  containers.shell.version =
+    let
+      fromEnv = builtins.getEnv "DEVENV_CONTAINER_VERSION";
+    in
+    if fromEnv != "" then fromEnv else "latest";
 }
