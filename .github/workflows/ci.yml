@@ -92,22 +92,29 @@ jobs:
     needs:
       - compute-hashes
       - detect-devenv-changes
-    if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
     permissions:
       contents: read
       packages: write
     steps:
+      - name: Rigel container unchanged
+        if: ${{ needs.detect-devenv-changes.outputs.rigel != 'true' }}
+        run: echo "Rigel devenv inputs unchanged; skipping container build."
+
       - uses: actions/checkout@v4
+        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         with:
           fetch-depth: 0
 
       - name: Install Nix
+        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         uses: DeterminateSystems/nix-installer-action@v12
 
       - name: Install devenv CLI
+        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
 
       - name: Build rigel devenv container
+        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         env:
           DEVENV_CONTAINER_VERSION: devenv-${{ needs.compute-hashes.outputs.rigel }}
           OWNER: ${{ github.repository_owner }}
@@ -125,22 +132,29 @@ jobs:
     needs:
       - compute-hashes
       - detect-devenv-changes
-    if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
     permissions:
       contents: read
       packages: write
     steps:
+      - name: wtgen container unchanged
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen != 'true' }}
+        run: echo "wtgen devenv inputs unchanged; skipping container build."
+
       - uses: actions/checkout@v4
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         with:
           fetch-depth: 0
 
       - name: Install Nix
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         uses: DeterminateSystems/nix-installer-action@v12
 
       - name: Install devenv CLI
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
 
       - name: Build wtgen devenv container
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         working-directory: projects/wtgen
         env:
           DEVENV_CONTAINER_VERSION: devenv-${{ needs.compute-hashes.outputs.wtgen }}
@@ -153,40 +167,12 @@ jobs:
             --copy-args="--dest-creds ${owner}:${GH_TOKEN}" \
             copy shell
 
-  containers-ready:
-    name: Containers ready
-    runs-on: ubuntu-latest
-    needs:
-      - detect-devenv-changes
-      - build-rigel-container
-      - build-wtgen-container
-    if: ${{ always() }}
-    steps:
-      - name: Verify container builds
-        run: |
-          rigel_changed="${{ needs.detect-devenv-changes.outputs.rigel }}"
-          rigel_result="${{ needs.build-rigel-container.result }}"
-          wtgen_changed="${{ needs.detect-devenv-changes.outputs.wtgen }}"
-          wtgen_result="${{ needs.build-wtgen-container.result }}"
-
-          if [ "$rigel_changed" = "true" ] && [ "$rigel_result" != "success" ]; then
-            echo "Rigel container build failed (result: $rigel_result)"
-            exit 1
-          fi
-
-          if [ "$wtgen_changed" = "true" ] && [ "$wtgen_result" != "success" ]; then
-            echo "wtgen container build failed (result: $wtgen_result)"
-            exit 1
-          fi
-
-          echo "Containers ready"
-
   rigel-pipeline:
     name: Rigel Lint & Tests
     runs-on: ubuntu-latest
     needs:
       - compute-hashes
-      - containers-ready
+      - build-rigel-container
     permissions:
       contents: read
       packages: read
@@ -237,7 +223,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - compute-hashes
-      - containers-ready
+      - build-wtgen-container
     permissions:
       contents: read
       packages: read
