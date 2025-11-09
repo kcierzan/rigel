@@ -33,7 +33,7 @@
       "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=";
     extra-substituters = "https://devenv.cachix.org";
     extra-experimental-features = "configurable-impure-env";
-    impure-env = "PWD";
+    impure-env = "PWD DEVENV_CONTAINER_VERSION";
   };
 
   outputs = { self, nixpkgs, devenv, systems, rust-overlay, nix2container, mk-shell-bin, ... } @ inputs:
