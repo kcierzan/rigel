@@ -21,6 +21,8 @@ let
   ];
   rustTargetList = lib.concatStringsSep " " rustTargets;
   rustComponents = [
+    "rustc"
+    "cargo"
     "rustfmt"
     "clippy"
     "rust-src"
@@ -128,33 +130,6 @@ let
     export RUSTUP_HOME="$state_dir/rustup"
     mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
 
-    toolchain_bin=""
-    if command -v rustup >/dev/null 2>&1; then
-      desired_toolchain="${rustToolchainSpecifier}"
-      ensure_toolchain() {
-        local toolchain="$1"
-        if ! rustup toolchain list | grep -q "^$toolchain"; then
-          rustup toolchain install "$toolchain" >/dev/null 2>&1
-        fi
-        rustup default "$toolchain" >/dev/null 2>&1 || true
-        for component in ${rustComponentList}; do
-          rustup component add --toolchain "$toolchain" "$component" >/dev/null 2>&1 || true
-        done
-        for target in ${rustTargetList}; do
-          rustup target add --toolchain "$toolchain" "$target" >/dev/null 2>&1 || true
-        done
-      }
-      ensure_toolchain "$desired_toolchain"
-
-      active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
-      if [ -n "$active_toolchain" ]; then
-        toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
-        export PATH="$toolchain_bin:$PATH"
-        export CLIPPY_DRIVER_PATH="$toolchain_bin/clippy-driver"
-        export RUSTC="$toolchain_bin/rustc"
-      fi
-    fi
-
     exec ${command}
   '';
 in
@@ -212,11 +187,6 @@ in
   packages =
     with pkgs;
     [
-      rustc
-      cargo
-      rustfmt
-      clippy
-      rustup
       python3
       basedpyright
       git
