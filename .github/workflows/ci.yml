@@ -109,6 +109,20 @@ jobs:
         if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         uses: DeterminateSystems/nix-installer-action@v12
 
+      - name: Setup Cachix
+        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
+        uses: cachix/cachix-action@v14
+        with:
+          name: rigel
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Cache devenv CLI
+        if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.nix-profile
+          key: nix-profile-${{ runner.os }}
+
       - name: Install devenv CLI
         if: ${{ needs.detect-devenv-changes.outputs.rigel == 'true' }}
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -121,8 +135,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          devenv container build shell
-          devenv container --registry "docker://ghcr.io/${owner}/" \
+          devenv --impure container build shell
+          devenv --impure container --registry "docker://ghcr.io/${owner}/" \
             --copy-args="--dest-creds ${owner}:${GH_TOKEN}" \
             copy shell
 
@@ -149,6 +163,20 @@ jobs:
         if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         uses: DeterminateSystems/nix-installer-action@v12
 
+      - name: Setup Cachix
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
+        uses: cachix/cachix-action@v14
+        with:
+          name: rigel
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Cache devenv CLI
+        if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.nix-profile
+          key: nix-profile-${{ runner.os }}
+
       - name: Install devenv CLI
         if: ${{ needs.detect-devenv-changes.outputs.wtgen == 'true' }}
         run: nix profile install --accept-flake-config github:cachix/devenv/latest
@@ -162,8 +190,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          devenv container build shell
-          devenv container --registry "docker://ghcr.io/${owner}/" \
+          devenv --impure container build shell
+          devenv --impure container --registry "docker://ghcr.io/${owner}/" \
             --copy-args="--dest-creds ${owner}:${GH_TOKEN}" \
             copy shell
 
@@ -353,6 +381,18 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: rigel
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+
+      - name: Cache devenv CLI
+        uses: actions/cache@v4
+        with:
+          path: ~/.nix-profile
+          key: nix-profile-${{ runner.os }}
 
       - name: Cache devenv state
         uses: actions/cache@v4
