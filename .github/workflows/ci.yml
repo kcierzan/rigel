@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint-test:
+    name: Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Cache devenv state
+        uses: actions/cache@v4
+        with:
+          path: .devenv/state
+          key: ${{ runner.os }}-devenv-${{ hashFiles('devenv.lock', 'devenv.nix', 'flake.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-devenv-
+
+      - name: Install devenv CLI
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Rust fmt/clippy/tests
+        run: |
+          devenv shell -- bash -lc "set -euo pipefail; cargo fmt -- --check; cargo clippy --all-targets --all-features -- -D warnings; cargo test"
+
+      - name: Cache wtgen venv
+        uses: actions/cache@v4
+        with:
+          path: projects/wtgen/.venv
+          key: ${{ runner.os }}-wtgen-venv-${{ hashFiles('projects/wtgen/uv.lock', 'projects/wtgen/devenv.nix') }}
+          restore-keys: |
+            ${{ runner.os }}-wtgen-venv-
+
+      - name: wtgen tests
+        working-directory: projects/wtgen
+        run: |
+          devenv shell -- test:full
+
+  build-plugin:
+    name: Build Plugin (${{ matrix.target }})
+    needs: lint-test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos
+            os: macos-14
+            build_script: build:macos
+            bundle_dir: target/aarch64-apple-darwin/release/bundles
+          - target: linux
+            os: ubuntu-latest
+            build_script: build:linux
+            bundle_dir: target/x86_64-unknown-linux-gnu/release/bundles
+          - target: windows
+            os: ubuntu-latest
+            build_script: build:win
+            bundle_dir: target/x86_64-pc-windows-msvc/release/bundles
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Cache devenv state
+        uses: actions/cache@v4
+        with:
+          path: .devenv/state
+          key: ${{ runner.os }}-devenv-${{ matrix.target }}-${{ hashFiles('devenv.lock', 'devenv.nix', 'flake.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-devenv-${{ matrix.target }}-
+
+      - name: Install devenv CLI
+        run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+      - name: Build plugin bundles
+        run: |
+          devenv shell -- ${{ matrix.build_script }}
+
+      - name: Archive bundles
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          devenv shell -- bash -lc "tar -C ${{ matrix.bundle_dir }} -czf rigel-plugin-${{ matrix.target }}.tar.gz ."
+
+      - name: Upload artifacts
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigel-plugin-${{ matrix.target }}
+          path: rigel-plugin-${{ matrix.target }}.tar.gz
