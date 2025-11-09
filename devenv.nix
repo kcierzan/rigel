@@ -10,6 +10,7 @@ let
   isLinux = pkgs.stdenv.isLinux;
   isDarwin = pkgs.stdenv.isDarwin;
   appleSdk = if isDarwin then pkgs.apple-sdk_15 else null;
+  rustToolchainSpecifier = "1.91.0";
 
   # Rust triples we support from the primary macOS dev host. Windows/Linux builds
   # need additional SDK/tooling shims so we keep the list centralised here.
@@ -19,6 +20,14 @@ let
     "x86_64-unknown-linux-gnu"
   ];
   rustTargetList = lib.concatStringsSep " " rustTargets;
+  rustComponents = [
+    "rustfmt"
+    "clippy"
+    "rust-src"
+    "rust-analyzer"
+    "llvm-tools-preview"
+  ];
+  rustComponentList = lib.concatStringsSep " " rustComponents;
   linuxCross = pkgs.pkgsCross.gnu64;
   linuxCrossCc = linuxCross.stdenv.cc;
   linuxCrossBinutils = linuxCross.buildPackages.binutils;
@@ -121,11 +130,22 @@ let
 
     toolchain_bin=""
     if command -v rustup >/dev/null 2>&1; then
-      for target in ${rustTargetList}; do
-        if ! rustup target list --installed | grep -q "$target"; then
-          rustup target add "$target"
+      desired_toolchain="${rustToolchainSpecifier}"
+      ensure_toolchain() {
+        local toolchain="$1"
+        if ! rustup toolchain list | grep -q "^$toolchain"; then
+          rustup toolchain install "$toolchain" >/dev/null 2>&1
         fi
-      done
+        rustup default "$toolchain" >/dev/null 2>&1 || true
+        for component in ${rustComponentList}; do
+          rustup component add --toolchain "$toolchain" "$component" >/dev/null 2>&1 || true
+        done
+        for target in ${rustTargetList}; do
+          rustup target add --toolchain "$toolchain" "$target" >/dev/null 2>&1 || true
+        done
+      }
+      ensure_toolchain "$desired_toolchain"
+
       active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
       if [ -n "$active_toolchain" ]; then
         toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
@@ -184,14 +204,8 @@ in
     enable = true;
     channel = "stable";
     # Pin the toolchain so CI and local shells use the exact same Rust.
-    version = "1.91.0";
-    components = [
-      "rustfmt"
-      "clippy"
-      "rust-src"
-      "rust-analyzer"
-      "llvm-tools-preview"
-    ];
+    version = rustToolchainSpecifier;
+    components = rustComponents;
     targets = rustTargets;
   };
 
@@ -340,12 +354,21 @@ in
 
     toolchain_bin=""
     if command -v rustup >/dev/null 2>&1; then
-      rustup show active-toolchain >/dev/null 2>&1 || rustup show >/dev/null
-      for target in ${rustTargetList}; do
-        if ! rustup target list --installed | grep -q "$target"; then
-          rustup target add "$target"
+      desired_toolchain="${rustToolchainSpecifier}"
+      ensure_toolchain() {
+        local toolchain="$1"
+        if ! rustup toolchain list | grep -q "^$toolchain"; then
+          rustup toolchain install "$toolchain" >/dev/null 2>&1
         fi
-      done
+        rustup default "$toolchain" >/dev/null 2>&1 || true
+        for component in ${rustComponentList}; do
+          rustup component add --toolchain "$toolchain" "$component" >/dev/null 2>&1 || true
+        done
+        for target in ${rustTargetList}; do
+          rustup target add --toolchain "$toolchain" "$target" >/dev/null 2>&1 || true
+        done
+      }
+      ensure_toolchain "$desired_toolchain"
       active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
       if [ -n "$active_toolchain" ]; then
         toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
