@@ -196,6 +196,7 @@ in
       cargo
       rustfmt
       clippy
+      python3
       basedpyright
       git
       pkg-config
