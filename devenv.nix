@@ -202,15 +202,6 @@ in
       zip
       unzip
       just
-      fd
-      ripgrep
-      neovim
-      lazygit
-      fzf
-      delta
-      eza
-      yazi
-      starship
       # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
       # without requiring a Windows VM.
       xwin
@@ -324,7 +315,7 @@ in
       cargo clippy --all-targets --all-features -- -D warnings
       cargo test
     '';
-    };
+  };
 
   containers.shell = {
     name = "rigel-shell";
