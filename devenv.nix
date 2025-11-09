@@ -10,6 +10,7 @@ let
   isLinux = pkgs.stdenv.isLinux;
   isDarwin = pkgs.stdenv.isDarwin;
   appleSdk = if isDarwin then pkgs.apple-sdk_15 else null;
+  rustToolchainSpecifier = "1.91.0";
 
   # Rust triples we support from the primary macOS dev host. Windows/Linux builds
   # need additional SDK/tooling shims so we keep the list centralised here.
@@ -18,6 +19,17 @@ let
     "x86_64-pc-windows-msvc"
     "x86_64-unknown-linux-gnu"
   ];
+  rustTargetList = lib.concatStringsSep " " rustTargets;
+  rustComponents = [
+    "rustc"
+    "cargo"
+    "rustfmt"
+    "clippy"
+    "rust-src"
+    "rust-analyzer"
+    "llvm-tools-preview"
+  ];
+  rustComponentList = lib.concatStringsSep " " rustComponents;
   linuxCross = pkgs.pkgsCross.gnu64;
   linuxCrossCc = linuxCross.stdenv.cc;
   linuxCrossBinutils = linuxCross.buildPackages.binutils;
@@ -110,6 +122,7 @@ let
   linuxLdFlags = lib.concatStringsSep " " (map (path: "-L${path}") linuxLibraryPaths);
   cargoScript = command: ''
     set -euo pipefail
+    export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
     state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
     export DEVENV_STATE="$state_dir"
@@ -117,21 +130,11 @@ let
     export RUSTUP_HOME="$state_dir/rustup"
     mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
 
-    toolchain_bin=""
-    if command -v rustup >/dev/null 2>&1; then
-      active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
-      if [ -n "$active_toolchain" ]; then
-        toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
-        export PATH="$toolchain_bin:$PATH"
-        export CLIPPY_DRIVER_PATH="$toolchain_bin/clippy-driver"
-        export RUSTC="$toolchain_bin/rustc"
-      fi
-    fi
-
     exec ${command}
   '';
 in
 {
+  name = "rigel";
   devenv.root = lib.mkDefault (
     let
       envPwd = builtins.getEnv "PWD";
@@ -139,6 +142,11 @@ in
     in
     if envPwd != "" then envPwd else fallback
   );
+
+  # Enable Cachix binary cache for faster Nix builds
+  cachix.enable = true;
+  cachix.pull = [ "kcierzan-rigel" ];
+  cachix.push = "kcierzan-rigel";
 
   env =
     let
@@ -176,21 +184,16 @@ in
   languages.rust = {
     enable = true;
     channel = "stable";
-    # Use latest for now to ensure continuous compatibility but pin before release
-    version = "latest";
-    components = [
-      "rustfmt"
-      "clippy"
-      "rust-src"
-      "rust-analyzer"
-      "llvm-tools-preview"
-    ];
+    # Pin the toolchain so CI and local shells use the exact same Rust.
+    version = rustToolchainSpecifier;
+    components = rustComponents;
     targets = rustTargets;
   };
 
   packages =
     with pkgs;
     [
+      python3
       basedpyright
       git
       pkg-config
@@ -199,15 +202,6 @@ in
       zip
       unzip
       just
-      fd
-      ripgrep
-      neovim
-      lazygit
-      fzf
-      delta
-      eza
-      yazi
-      starship
       # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
       # without requiring a Windows VM.
       xwin
@@ -252,70 +246,13 @@ in
     # xwin replicates those redistributables so we can link with rust-lld instead.
     # The script populates a shared cache under target/ then wires the toolchain
     # env vars Cargo expects for the MSVC target.
-    "build:win".exec = ''
-      set -euo pipefail
-
-      # Share the xwin download/splat output across invocations; this keeps the
-      # sync time manageable while letting CI point at a custom CARGO_TARGET_DIR.
-      TARGET_DIR="''${CARGO_TARGET_DIR:-$PWD/target}"
-      XWIN_CACHE="''${XWIN_CACHE:-$TARGET_DIR/xwin-cache}"
-      XWIN_OUT="''${XWIN_OUT:-$TARGET_DIR/xwin}"
-      mkdir -p "$XWIN_CACHE" "$XWIN_OUT"
-
-      # Stage the Windows SDK + MSVC CRT into the local cache. download/unpack only
-      # run when new manifests show up; splat adjusts casing/symlinks for POSIX fs.
-      xwin --accept-license --cache-dir "$XWIN_CACHE" download
-      xwin --accept-license --cache-dir "$XWIN_CACHE" unpack
-      xwin --accept-license --cache-dir "$XWIN_CACHE" splat \
-        --output "$XWIN_OUT" \
-        --include-debug-libs \
-        --include-debug-symbols
-
-      # rustup exposes rust-lld/llvm-ar under the active host triple. rust-lld can
-      # consume the MSVC import libraries, so we avoid shipping link.exe.
-      SYSROOT="$(rustc --print sysroot)"
-      HOST_TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
-      RUST_LLD="$SYSROOT/lib/rustlib/$HOST_TRIPLE/bin/rust-lld"
-      LLVM_AR="$SYSROOT/lib/rustlib/$HOST_TRIPLE/bin/llvm-ar"
-
-      if [ ! -x "$RUST_LLD" ]; then
-        echo "error: rust-lld not found at $RUST_LLD; ensure llvm-tools-preview is installed." >&2
-        exit 1
-      fi
-      if [ ! -x "$LLVM_AR" ]; then
-        echo "error: llvm-ar not found at $LLVM_AR; ensure llvm-tools-preview is installed." >&2
-        exit 1
-      fi
-
-      export CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER="$RUST_LLD"
-      export CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_AR="$LLVM_AR"
-
-      # Set up LIB/LIBPATH/INCLUDE so the MSVC target sees the Windows SDK + CRT.
-      # The `;` separators mirror how MSVC tooling expects these values.
-      SDK_LIB_UM="$XWIN_OUT/sdk/lib/um/x86_64"
-      SDK_LIB_UCRT="$XWIN_OUT/sdk/lib/ucrt/x86_64"
-      CRT_LIB="$XWIN_OUT/crt/lib/x86_64"
-
-      export LIB="$SDK_LIB_UM;$SDK_LIB_UCRT;$CRT_LIB"
-      export LIBPATH="$LIB"
-      export INCLUDE="$XWIN_OUT/sdk/include/ucrt;$XWIN_OUT/sdk/include/um;$XWIN_OUT/sdk/include/shared"
-
-      # Some crates (bindgen build scripts, etc.) rely on MSVC helper binaries,
-      # so we temporarily prepend the extracted toolchain bin directory if found.
-      TOOLS_BIN="$(find "$XWIN_OUT/tools" -maxdepth 3 -type d -name bin 2>/dev/null | head -n1 || true)"
-      if [ -n "$TOOLS_BIN" ]; then
-        export PATH="$TOOLS_BIN:$PATH"
-      fi
-
-      export RUSTFLAGS="''${RUSTFLAGS:-} -Lnative=$SDK_LIB_UM -Lnative=$SDK_LIB_UCRT -Lnative=$CRT_LIB"
-
-      cargo xtask bundle rigel-plugin --release --target x86_64-pc-windows-msvc
-    '';
+    "build:win".exec = "${./ci/scripts/build-win.sh}";
     "build:clean".exec = "rm -rf target";
   };
 
   enterShell = ''
     set -euo pipefail
+    export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
     # Stage per-project cargo/rustup state so builds stay project-local.
     state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
@@ -326,7 +263,21 @@ in
 
     toolchain_bin=""
     if command -v rustup >/dev/null 2>&1; then
-      rustup show active-toolchain >/dev/null 2>&1 || rustup show >/dev/null
+      desired_toolchain="${rustToolchainSpecifier}"
+      ensure_toolchain() {
+        local toolchain="$1"
+        if ! rustup toolchain list | grep -q "^$toolchain"; then
+          rustup toolchain install "$toolchain" >/dev/null 2>&1
+        fi
+        rustup default "$toolchain" >/dev/null 2>&1 || true
+        for component in ${rustComponentList}; do
+          rustup component add --toolchain "$toolchain" "$component" >/dev/null 2>&1 || true
+        done
+        for target in ${rustTargetList}; do
+          rustup target add --toolchain "$toolchain" "$target" >/dev/null 2>&1 || true
+        done
+      }
+      ensure_toolchain "$desired_toolchain"
       active_toolchain="$(rustup show active-toolchain 2>/dev/null | awk 'NR==1 {print $1}')"
       if [ -n "$active_toolchain" ]; then
         toolchain_bin="$RUSTUP_HOME/toolchains/$active_toolchain/bin"
@@ -364,5 +315,14 @@ in
       cargo clippy --all-targets --all-features -- -D warnings
       cargo test
     '';
+  };
+
+  containers.shell = {
+    name = "rigel-shell";
+    version =
+      let
+        fromEnv = builtins.getEnv "DEVENV_CONTAINER_VERSION";
+      in
+      if fromEnv != "" then fromEnv else "latest";
   };
 }

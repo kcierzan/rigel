@@ -1,0 +1,190 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rigel-pipeline:
+    name: Rigel Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-prefix: rigel
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+
+      - name: Run Rust checks
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          devenv shell -- bash -c '
+            cargo fmt -- --check
+            cargo clippy --all-targets --all-features -- -D warnings
+            cargo test
+          '
+
+  wtgen-pipeline:
+    name: wtgen Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          devenv-path: projects/wtgen
+          cache-prefix: wtgen
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            projects/wtgen/.venv
+          key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      - name: Sync wtgen environment
+        working-directory: projects/wtgen
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          devenv shell -- uv sync --frozen --group dev
+          devenv shell -- uv pip install --quiet -e .
+          devenv shell -- uv cache prune --ci
+
+      - name: Ruff lint
+        working-directory: projects/wtgen
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- ruff check .
+
+      - name: Run wtgen tests
+        working-directory: projects/wtgen
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          LC_ALL: C.UTF-8
+          LANG: C.UTF-8
+        run: devenv shell -- uv run python -m pytest -n auto
+
+  build-linux-windows:
+    name: Build ${{ matrix.target }} Bundle
+    runs-on: ubuntu-latest
+    needs: [rigel-pipeline, wtgen-pipeline]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux
+            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
+          - target: windows
+            build_command: ./ci/scripts/build-win.sh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-prefix: rigel
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+          shared-key: ${{ matrix.target }}
+
+      - name: Build plugin (${{ matrix.target }})
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- ${{ matrix.build_command }}
+
+      - name: Create archive
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          cd target/bundled
+          tar -czf ../../rigel-plugin-${VERSION}-${{ matrix.target }}.tar.gz .
+          cd ../..
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rigel-plugin-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  build-macos:
+    name: Build macOS Bundle
+    runs-on: macos-14
+    needs: [rigel-pipeline, wtgen-pipeline]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-prefix: rigel
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+          shared-key: macos
+
+      - name: Build plugin (macOS)
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell -- build:macos
+
+      - name: Create archive
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          cd target/bundled
+          tar -czf ../../rigel-plugin-${VERSION}-macos.tar.gz .
+          cd ../..
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rigel-plugin-${{ github.ref_name }}-macos.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: false

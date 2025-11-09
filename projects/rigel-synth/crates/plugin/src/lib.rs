@@ -368,7 +368,6 @@ mod tests {
     fn test_editor_creation() {
         // Skip editor creation test as it requires complex AsyncExecutor setup
         // The editor functionality is tested through integration tests
-        assert!(true, "Editor creation skipped for unit tests");
     }
 
     #[test]
@@ -385,7 +384,6 @@ mod tests {
         let _release_smooth = plugin.params.env_release.smoothed.next();
 
         // If we get here without panicking, smoothing API is working
-        assert!(true, "Parameter smoothing API is accessible");
     }
 
     #[test]
@@ -396,10 +394,8 @@ mod tests {
         plugin.reset();
 
         // Process status test is complex due to Buffer API - skip for MVP
-        assert!(
-            true,
-            "Basic processing functionality verified through integration tests"
-        );
+        // Integration tests exercise the full processing path; this unit test
+        // simply ensures the setup/reset cycle does not panic.
     }
 
     #[test]
