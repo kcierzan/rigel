@@ -16,6 +16,9 @@
     # devenv itself, following nixpkgs so that updates stay in sync.
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
+
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # Reuse the public binary cache provided by devenv and allow access to PWD so
@@ -28,7 +31,7 @@
     impure-env = "PWD";
   };
 
-  outputs = { self, nixpkgs, devenv, systems, ... } @ inputs:
+  outputs = { self, nixpkgs, devenv, systems, rust-overlay, ... } @ inputs:
     let
       # Helper to instantiate attributes for each supported CPU/OS pair.
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
@@ -37,7 +40,10 @@
       # `devenv shell`, keeping configuration centralized in devenv.nix.
       mkDevShell = system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlays.default ];
+          };
         in
         devenv.lib.mkShell {
           inherit inputs pkgs;
