@@ -1,0 +1,41 @@
+name: 'Setup devenv'
+description: 'Setup Nix, Cachix, and devenv environment'
+inputs:
+  cachix-auth-token:
+    description: 'Cachix authentication token'
+    required: false
+  devenv-path:
+    description: 'Path to devenv root (default: current directory)'
+    required: false
+    default: '.'
+  cache-prefix:
+    description: 'Prefix for cache keys (e.g., "rigel" or "wtgen")'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Nix
+      uses: DeterminateSystems/nix-installer-action@v12
+
+    - name: Enable Magic Nix Cache
+      uses: DeterminateSystems/magic-nix-cache-action@main
+
+    - name: Setup Cachix
+      uses: cachix/cachix-action@v15
+      with:
+        name: kcierzan-rigel
+        authToken: ${{ inputs.cachix-auth-token }}
+        extraPullNames: devenv
+
+    - name: Install devenv
+      shell: bash
+      run: nix profile install --accept-flake-config github:cachix/devenv/latest
+
+    - name: Cache devenv
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.devenv-path }}/.devenv
+        key: ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{ hashFiles(format('{0}/devenv.nix', inputs.devenv-path), format('{0}/devenv.lock', inputs.devenv-path), format('{0}/flake.lock', inputs.devenv-path)) }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-

@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -12,9 +16,84 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  rigel-pipeline:
+    name: Rigel Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-prefix: rigel
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+
+      - name: Run Rust checks
+        run: |
+          devenv shell -- bash -c '
+            cargo fmt -- --check
+            cargo clippy --all-targets --all-features -- -D warnings
+            cargo test
+          '
+
+  wtgen-pipeline:
+    name: wtgen Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          devenv-path: projects/wtgen
+          cache-prefix: wtgen
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            projects/wtgen/.venv
+          key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      - name: Sync wtgen environment
+        working-directory: projects/wtgen
+        run: |
+          devenv shell -- uv sync --frozen --group dev
+          devenv shell -- uv pip install --quiet -e .
+          devenv shell -- uv cache prune --ci
+
+      - name: Ruff lint
+        working-directory: projects/wtgen
+        run: devenv shell -- ruff check .
+
+      - name: Run wtgen tests
+        working-directory: projects/wtgen
+        env:
+          LC_ALL: C.UTF-8
+          LANG: C.UTF-8
+        run: devenv shell -- uv run python -m pytest -n auto
+
   build-linux-windows:
     name: Build ${{ matrix.target }} Bundle
     runs-on: ubuntu-latest
+    needs: [rigel-pipeline, wtgen-pipeline]
     strategy:
       fail-fast: false
       matrix:
@@ -28,29 +107,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Enable Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v15
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
         with:
-          name: kcierzan-rigel
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          extraPullNames: devenv
-
-      - name: Install devenv
-        run: nix profile install --accept-flake-config github:cachix/devenv/latest
-
-      - name: Cache devenv
-        uses: actions/cache@v4
-        with:
-          path: .devenv
-          key: rigel-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
-          restore-keys: |
-            rigel-devenv-
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-prefix: rigel
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -60,8 +121,6 @@ jobs:
           shared-key: ${{ matrix.target }}
 
       - name: Build plugin (${{ matrix.target }})
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- ${{ matrix.build_command }}
 
       - name: Create archive
@@ -82,34 +141,17 @@ jobs:
   build-macos:
     name: Build macOS Bundle
     runs-on: macos-14
+    needs: [rigel-pipeline, wtgen-pipeline]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v12
-
-      - name: Enable Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
-
-      - name: Setup Cachix
-        uses: cachix/cachix-action@v15
+      - name: Setup devenv
+        uses: ./.github/actions/setup-devenv
         with:
-          name: kcierzan-rigel
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          extraPullNames: devenv
-
-      - name: Install devenv
-        run: nix profile install --accept-flake-config github:cachix/devenv/latest
-
-      - name: Cache devenv
-        uses: actions/cache@v4
-        with:
-          path: .devenv
-          key: macos-devenv-${{ hashFiles('devenv.nix', 'devenv.lock', 'flake.lock') }}
-          restore-keys: |
-            macos-devenv-
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cache-prefix: rigel
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -119,8 +161,6 @@ jobs:
           shared-key: macos
 
       - name: Build plugin (macOS)
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- build:macos
 
       - name: Create archive
