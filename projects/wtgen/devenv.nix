@@ -25,6 +25,7 @@ let
   isDarwin = pkgs.stdenv.isDarwin;
 in
 {
+  name = "wtgen";
   # Tell devenv where the project root lives when used through flakes.
   # Prefer the calling shell's $PWD (requires configurable-impure-env) so the
   # root resolves to the actual checkout instead of the Nix store copy.
@@ -35,6 +36,11 @@ in
     in
     if envPwd != "" then envPwd else fallback
   );
+
+  # Enable Cachix binary cache for faster Nix builds
+  cachix.enable = true;
+  cachix.pull = [ "kcierzan-rigel" ];
+  cachix.push = "kcierzan-rigel";
 
   # ---------------------------------------------------------------------------
   # Essential command line tools that should exist in the shell *before*
@@ -148,6 +154,7 @@ in
   # ---------------------------------------------------------------------------
   enterShell = ''
     set -euo pipefail
+    export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
     # If there is not a uv venv already, create one
     if [ ! -d ".venv" ]; then
@@ -252,4 +259,13 @@ in
     export LC_ALL=C.UTF-8
     export LANG=C.UTF-8
   '';
+
+  containers.shell = {
+    name = "wtgen-shell";
+    version =
+      let
+        fromEnv = builtins.getEnv "DEVENV_CONTAINER_VERSION";
+      in
+      if fromEnv != "" then fromEnv else "latest";
+  };
 }
