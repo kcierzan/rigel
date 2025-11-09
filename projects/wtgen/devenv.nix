@@ -40,7 +40,7 @@ in
   # Enable Cachix binary cache for faster Nix builds
   cachix.enable = true;
   cachix.pull = [ "kcierzan-rigel" ];
-  cachix.push = [ "kcierzan-rigel" ];
+  cachix.push = "kcierzan-rigel";
 
   # ---------------------------------------------------------------------------
   # Essential command line tools that should exist in the shell *before*
