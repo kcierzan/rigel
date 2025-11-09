@@ -146,7 +146,7 @@ in
   # Enable Cachix binary cache for faster Nix builds
   cachix.enable = true;
   cachix.pull = [ "kcierzan-rigel" ];
-  cachix.push = [ "kcierzan-rigel" ];
+  cachix.push = "kcierzan-rigel";
 
   env =
     let
