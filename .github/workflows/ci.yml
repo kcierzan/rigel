@@ -32,7 +32,7 @@ jobs:
 
       - name: Rust fmt/clippy/tests
         run: |
-          devenv shell -- bash -lc "set -euo pipefail; cargo fmt -- --check; cargo clippy --all-targets --all-features -- -D warnings; cargo test"
+          devenv shell -- bash -lc "set -euo pipefail; export PATH=\"\$DEVENV_PROFILE/bin:\$PATH\"; cargo fmt -- --check; cargo clippy --all-targets --all-features -- -D warnings; cargo test"
 
       - name: Cache wtgen venv
         uses: actions/cache@v4

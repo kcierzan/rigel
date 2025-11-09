@@ -148,6 +148,7 @@ in
   # ---------------------------------------------------------------------------
   enterShell = ''
     set -euo pipefail
+    export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
     # If there is not a uv venv already, create one
     if [ ! -d ".venv" ]; then
