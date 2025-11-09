@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/dsp", "crates/cli", "crates/plugin", "crates/xtask"]
+members = [
+  "projects/rigel-synth/crates/dsp",
+  "projects/rigel-synth/crates/cli",
+  "projects/rigel-synth/crates/plugin",
+  "projects/rigel-synth/crates/xtask"
+]
 resolver = "2"
 
 [workspace.package]
