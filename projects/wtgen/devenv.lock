@@ -87,6 +87,39 @@
         "type": "github"
       }
     },
+    "mk-shell-bin": {
+      "locked": {
+        "lastModified": 1677004959,
+        "owner": "rrbutani",
+        "repo": "nix-mk-shell-bin",
+        "rev": "ff5d8bd4d68a347be5042e2f16caee391cd75887",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rrbutani",
+        "repo": "nix-mk-shell-bin",
+        "type": "github"
+      }
+    },
+    "nix2container": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1761716996,
+        "owner": "nlewo",
+        "repo": "nix2container",
+        "rev": "e5496ab66e9de9e3f67dc06f692dfbc471b6316e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nlewo",
+        "repo": "nix2container",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1761313199,
@@ -126,6 +159,8 @@
       "inputs": {
         "devenv": "devenv",
         "git-hooks": "git-hooks",
+        "mk-shell-bin": "mk-shell-bin",
+        "nix2container": "nix2container",
         "nixpkgs": "nixpkgs",
         "nixpkgs-python": "nixpkgs-python",
         "pre-commit-hooks": [
