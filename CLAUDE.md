@@ -371,3 +371,10 @@ bench:all          # Run full benchmark suite
 bench:baseline     # Save performance baseline before changes
 bench:flamegraph   # Generate flamegraph for optimization
 ```
+
+## Active Technologies
+- Rust 2021 edition (workspace toolchain from rust-toolchain.toml) (001-fast-dsp-math)
+- N/A (pure computational library, no persistence) (001-fast-dsp-math)
+
+## Recent Changes
+- 001-fast-dsp-math: Added Rust 2021 edition (workspace toolchain from rust-toolchain.toml)
