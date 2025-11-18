@@ -93,6 +93,14 @@ cargo:lint          # Run clippy linter
 # Plugin Bundling
 cargo xtask bundle rigel-plugin --release [--target <triple>]
 
+# Benchmarking & Profiling
+bench:all           # Run all benchmarks (Criterion + iai-callgrind)
+bench:criterion     # Run Criterion benchmarks (wall-clock time)
+bench:iai           # Run iai-callgrind benchmarks (instruction counts)
+bench:baseline      # Save Criterion baseline for comparisons
+bench:flamegraph    # Generate flamegraph for profiling
+bench:instruments   # macOS only: Profile with Instruments.app
+
 # Clean
 build:clean         # Remove target directory
 ```
@@ -208,7 +216,8 @@ All CI commands run through devenv shell for reproducibility.
 ### Release Workflows
 
 **Continuous Release** (`.github/workflows/continuous-release.yml`):
-- Triggers: Push to `main` branch
+- Triggers: After CI workflow completes successfully on `main` branch
+- Uses `workflow_run` to avoid duplicate test execution
 - Builds plugins for Linux, Windows, macOS
 - Updates "latest" pre-release with binaries
 - Archive naming: `rigel-plugin-latest-{platform}.tar.gz`
@@ -220,19 +229,50 @@ All CI commands run through devenv shell for reproducibility.
 - Creates new GitHub release with auto-generated changelog
 - Archive naming: `rigel-plugin-{version}-{platform}.tar.gz`
 - Published as stable releases (not pre-release)
+- **Best practice**: Only tag commits that have already passed CI on `main`
 
 **Creating a Release:**
 ```bash
-# Ensure version in Cargo.toml matches desired version
+# 1. Merge your PR to main and wait for CI to pass
+# 2. Ensure version in Cargo.toml matches desired version
+# 3. Tag the commit on main that passed CI
 git tag v0.2.0
 git push origin v0.2.0
 # GitHub Actions will automatically build and create the release
 ```
 
+**Workflow Execution Flow:**
+1. **PR opened/updated**: CI workflow runs tests + builds
+2. **PR merged to main**: CI workflow runs again
+3. **After CI completes successfully**: Continuous Release workflow triggers automatically
+4. **Tag pushed**: Release workflow builds and publishes version
+
 **Notes:**
 - Bundles are created in `target/bundled/` by nih_plug_xtask
 - macOS binaries are currently unsigned
 - Future: Add code signing via GitHub secrets
+
+### Branch Protection
+
+To enforce that PRs cannot be merged with failing tests or builds:
+
+1. Go to repository **Settings** → **Branches** → **Add rule**
+2. Set **Branch name pattern**: `main`
+3. Enable **Require status checks to pass before merging**
+4. Select required check: **CI Success**
+5. Enable **Require branches to be up to date before merging** (recommended)
+6. Enable **Do not allow bypassing the above settings** (recommended)
+
+The `CI Success` job in `.github/workflows/ci.yml` aggregates all test and build results into a single status check. This job will fail if any of the following fail:
+- Rigel lint & tests (`rigel-pipeline`)
+- wtgen lint & tests (`wtgen-pipeline`)
+- Linux & Windows plugin builds (`build-plugin-linux`)
+- macOS plugin build (`build-plugin-macos`)
+
+**Additional Recommendations:**
+- Enable **Require a pull request before merging** with at least 1 approval
+- Enable **Require review from Code Owners** if using a CODEOWNERS file
+- Enable **Require linear history** to prevent merge commits
 
 ## Cross-Platform Support
 
@@ -312,7 +352,22 @@ build:macos    # or build:linux, build:win
 
 ## Performance Targets
 
-- Single voice CPU usage: ~0.1% at 44.1kHz
+- Single voice CPU usage: ~0.1% at 44.1kHz (validate with `bench:all`)
 - Full polyphonic target: <1% CPU usage
 - Zero-allocation guarantee in DSP core
 - Consistent performance across all platforms
+
+### Benchmarking
+
+All DSP performance is validated through comprehensive benchmarking:
+- **Criterion**: Wall-clock time measurements for local optimization
+- **iai-callgrind**: Deterministic instruction counts for regression detection
+- **Location**: `projects/rigel-synth/crates/dsp/benches/`
+- **Documentation**: See `docs/benchmarking.md` for detailed usage
+
+Run benchmarks regularly to validate performance claims and detect regressions:
+```bash
+bench:all          # Run full benchmark suite
+bench:baseline     # Save performance baseline before changes
+bench:flamegraph   # Generate flamegraph for optimization
+```
