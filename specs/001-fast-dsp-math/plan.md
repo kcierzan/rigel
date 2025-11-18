@@ -144,14 +144,20 @@ projects/rigel-synth/crates/
 │   │   │   ├── mod.rs
 │   │   │   ├── tanh.rs           # Hyperbolic tangent approximation
 │   │   │   ├── exp.rs            # Exponential approximation
+│   │   │   ├── exp2_log2.rs      # exp2/log2 via IEEE 754 exponent manipulation
 │   │   │   ├── log.rs            # Logarithm approximations (log1p, etc.)
 │   │   │   ├── trig.rs           # sin, cos approximations
 │   │   │   ├── inverse.rs        # Fast 1/x reciprocal
+│   │   │   ├── atan.rs           # Arctangent approximation (Remez minimax)
 │   │   │   ├── sqrt.rs           # Square root
-│   │   │   └── pow.rs            # Power functions
+│   │   │   └── pow.rs            # Power functions (via exp2/log2 decomposition)
 │   │   ├── table.rs              # Lookup table infrastructure
 │   │   ├── denormal.rs           # Denormal number protection
-│   │   ├── saturate.rs           # Saturation curves
+│   │   ├── saturate.rs           # Polynomial saturation curves (soft/hard clip, asymmetric)
+│   │   ├── sigmoid.rs            # Sigmoid curves (logistic, smoothstep, C1/C2 continuity)
+│   │   ├── interpolate.rs        # Polynomial interpolation (linear, cubic Hermite, quintic)
+│   │   ├── polyblep.rs           # PolyBLEP (band-limited step) for alias-free oscillators
+│   │   ├── noise.rs              # Vectorized random noise generation (white, pink)
 │   │   └── crossfade.rs          # Crossfade and ramping utilities
 │   ├── benches/                  # Benchmark suite
 │   │   ├── criterion_benches.rs  # Criterion wall-clock benchmarks

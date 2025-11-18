@@ -60,9 +60,9 @@ As a DSP developer, I need fundamental vector operations (arithmetic, FMA, min/m
 
 ### User Story 4 - Fast Math Kernels (Priority: P2)
 
-As a DSP developer, I need vectorized fast math kernels (tanh, exp, log1p, sin, cos, inverse, and other audio-typical functions) that work through the SIMD abstraction, so that I can apply complex mathematical transformations to audio blocks without sacrificing performance.
+As a DSP developer, I need vectorized fast math kernels (tanh, exp, exp2, log, log2, log1p, sin, cos, inverse, atan, pow, sqrt, polynomial saturators, sigmoid curves, interpolation, polyBLEP, and noise generation) that work through the SIMD abstraction, so that I can apply complex mathematical transformations to audio blocks without sacrificing performance.
 
-**Why this priority**: While the abstraction layer (P1) is foundational, these math kernels are what actually make it useful for audio DSP. They depend on the abstraction being in place first. These functions directly enable synthesizer features like oscillators, envelopes, and waveshaping.
+**Why this priority**: While the abstraction layer (P1) is foundational, these math kernels are what actually make it useful for audio DSP. They depend on the abstraction being in place first. These functions directly enable synthesizer features like oscillators, envelopes, waveshaping, modulation, and alias-free synthesis.
 
 **Independent Test**: Can be fully tested by comparing vectorized math kernel outputs against reference scalar implementations, measuring error bounds, and benchmarking performance across all backends.
 
@@ -72,6 +72,12 @@ As a DSP developer, I need vectorized fast math kernels (tanh, exp, log1p, sin, 
 2. **Given** envelope generation requiring exp, **When** using vectorized exp kernel, **Then** block processing achieves sub-nanosecond per-sample throughput on modern CPUs
 3. **Given** oscillator phase calculations, **When** using vectorized sin/cos, **Then** harmonic distortion remains below -100dB across all backends
 4. **Given** need for division-free reciprocal, **When** using fast inverse (1/x), **Then** accuracy is sufficient for audio applications (< 0.01% error) at 5-10x speedup vs division
+5. **Given** phase modulation or waveshaping requiring atan, **When** using vectorized atan approximation, **Then** absolute error remains below 0.001 radians (< 0.057 degrees) across full input range while executing 8-16x faster than scalar libm atan
+6. **Given** pitch shifting requiring pow(2, x), **When** using vectorized exp2/log2 with pow decomposition, **Then** operations execute 10-20x faster than scalar libm with < 0.01% error
+7. **Given** waveshaping distortion, **When** using polynomial saturation curves, **Then** processing completes in < 5 CPU cycles per sample on AVX2
+8. **Given** wavetable oscillator requiring interpolation, **When** using cubic Hermite interpolation kernel, **Then** phase continuity maintained with smooth C1 continuity
+9. **Given** sawtooth/square wave synthesis, **When** using polyBLEP kernel, **Then** alias-free output achieved with < 8 operations per transition
+10. **Given** need for audio noise, **When** using vectorized white noise generation, **Then** full 64-sample block generated in < 100 CPU cycles
 
 ---
 
@@ -202,7 +208,7 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **FR-006**: Backend selection MUST occur at compile time via cargo features (e.g., --features avx2)
 - **FR-007**: Only one backend MUST be active per compilation (no runtime dispatch)
 - **FR-008**: DSP code using trait abstractions MUST NOT require #[cfg] directives for different backends
-- **FR-009**: All backends MUST produce bit-identical results for the same input (deterministic across backends)
+- **FR-009**: All backends MUST produce deterministic results within documented error bounds for the same input (bit-identical for exact operations like vector arithmetic; error-bounded for approximations like math kernels)
 
 #### Block Processing
 
@@ -225,67 +231,78 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 #### Fast Math Kernels
 
 - **FR-022**: Library MUST provide vectorized tanh approximation executing 8-16x faster than scalar while maintaining error below 0.1%
-- **FR-023**: Library MUST provide vectorized exp approximation with sub-nanosecond per-sample throughput
+- **FR-023**: Library MUST provide vectorized exp approximation with sub-nanosecond per-sample throughput (< 1ns per sample on 3GHz+ x86-64 CPU with AVX2)
 - **FR-024**: Library MUST provide vectorized log1p accurate to within 0.001% for frequency calculations
 - **FR-025**: Library MUST provide vectorized sin/cos approximations with harmonic distortion below -100dB
 - **FR-026**: Library MUST provide vectorized fast inverse (1/x) with < 0.01% error at 5-10x speedup vs division
-- **FR-027**: Library MUST provide additional vectorized math functions typical for audio DSP (sqrt, pow, atan, etc.)
-- **FR-028**: All math kernels MUST operate on entire blocks for maximum efficiency
+- **FR-027**: Library MUST provide vectorized atan approximation using Remez minimax polynomial with < 0.001 radian absolute error (< 0.057 degrees) executing 8-16x faster than scalar libm atan
+- **FR-028**: Library MUST provide vectorized exp2 and log2 approximations using IEEE 754 exponent manipulation with polynomial refinement, achieving < 0.01% error at 10-20x speedup vs scalar libm
+- **FR-029**: Library MUST provide vectorized pow and powf using exp2(log2(x)*y) decomposition with optimized polynomial approximations
+- **FR-030**: Library MUST provide polynomial saturation curves (soft clip, hard clip, asymmetric) for waveshaping with < 5 CPU cycles per sample on AVX2
+- **FR-031**: Library MUST provide sigmoid curves (logistic, tanh-based, smoothstep family) with polynomial approximations maintaining smooth C1 or C2 continuity
+- **FR-032**: Library MUST provide polynomial interpolation kernels (linear, cubic Hermite, quintic) for audio resampling and wavetable synthesis
+- **FR-033**: Library MUST provide polyBLEP (band-limited step) kernels using 2nd-order polynomial approximation for alias-free oscillator synthesis with < 8 operations per transition
+- **FR-034**: Library MUST provide vectorized random noise generation (white, pink optional) using fast PRNG suitable for audio synthesis
+- **FR-035**: Library MUST provide additional vectorized math functions typical for audio DSP (sqrt, rsqrt)
+- **FR-036**: All math kernels MUST operate on entire blocks for maximum efficiency
 
 #### Lookup Tables
 
-- **FR-029**: Library MUST provide vectorized lookup table infrastructure supporting linear and cubic interpolation
-- **FR-030**: Library MUST support per-lane indexing for SIMD table lookups (gather operations or equivalent)
-- **FR-031**: Lookup tables MUST support configurable sizes optimized for cache efficiency
-- **FR-032**: Library MUST provide clear documentation on size/quality/performance tradeoffs for table sizes
+- **FR-037**: Library MUST provide vectorized lookup table infrastructure supporting linear and cubic interpolation
+- **FR-038**: Library MUST support per-lane indexing for SIMD table lookups (gather operations or equivalent)
+- **FR-039**: Lookup tables MUST support configurable sizes optimized for cache efficiency
+- **FR-040**: Library MUST provide clear documentation on size/quality/performance tradeoffs for table sizes
 
 #### Denormal Handling
 
-- **FR-033**: Library MUST implement denormal number protection that prevents CPU performance degradation
-- **FR-034**: Denormal protection MUST apply to entire blocks without per-sample overhead
-- **FR-035**: Denormal protection MUST NOT introduce audible artifacts (THD+N < -96dB)
-- **FR-036**: Denormal handling MUST work consistently across all backends without platform-specific code in user algorithms
+- **FR-041**: Library MUST implement denormal number protection that prevents CPU performance degradation
+- **FR-042**: Denormal protection MUST apply to entire blocks without per-sample overhead
+- **FR-043**: Denormal protection MUST NOT introduce audible artifacts (THD+N < -96dB)
+- **FR-044**: Denormal handling MUST work consistently across all backends without platform-specific code in user algorithms
 
 #### Additional Features
 
-- **FR-037**: Library MUST provide vectorized saturation curves (soft clip, tube-style, tape-style)
-- **FR-038**: Library MUST provide vectorized equal-power crossfade functions
-- **FR-039**: Library MUST provide vectorized parameter ramping utilities for click-free parameter changes
-- **FR-040**: All functions MUST be no_std compatible (no heap allocations) for rigel-dsp integration
-- **FR-041**: Library MUST include accuracy bounds and performance characteristics documentation for each function
-- **FR-042**: Library MUST provide both accuracy-prioritized and speed-prioritized variants where meaningful tradeoffs exist
+- **FR-045**: Library MUST provide vectorized equal-power crossfade functions
+- **FR-046**: Library MUST provide vectorized parameter ramping utilities for click-free parameter changes
+- **FR-047**: All functions MUST be no_std compatible (no heap allocations) for rigel-dsp integration
+- **FR-048**: Library MUST include accuracy bounds and performance characteristics documentation for each function
+- **FR-049**: Library MUST provide both accuracy-prioritized and speed-prioritized variants where meaningful tradeoffs exist
 
 #### Testing and Benchmarking
 
-- **FR-043**: Library MUST provide comprehensive benchmark suite that runs across all backends
-- **FR-044**: Benchmarks MUST measure both instruction counts (iai-callgrind) and wall-clock times (Criterion)
-- **FR-045**: Library MUST enable compiling and running tests for all backends via cargo features
-- **FR-046**: Benchmark results MUST clearly show performance comparison between backends (speedup ratios)
-- **FR-047**: CI MUST be able to test all backends in parallel for correctness verification
+- **FR-050**: Library MUST provide comprehensive benchmark suite that runs across all backends
+- **FR-051**: Benchmarks MUST measure both instruction counts (iai-callgrind) and wall-clock times (Criterion)
+- **FR-052**: Library MUST enable compiling and running tests for all backends via cargo features
+- **FR-053**: Benchmark results MUST clearly show performance comparison between backends (speedup ratios)
+- **FR-054**: CI MUST be able to test all backends in parallel for correctness verification
 
 #### Comprehensive Test Coverage
 
-- **FR-048**: Library MUST include property-based tests for all SIMD operations verifying mathematical invariants (commutativity, associativity, distributivity where applicable)
-- **FR-049**: Library MUST include accuracy tests for all math kernels comparing against reference implementations with error bounds verification
-- **FR-050**: Library MUST include backend consistency tests ensuring all backends produce results within acceptable error bounds for identical inputs
-- **FR-051**: Library MUST include unit tests covering edge cases (NaN, infinity, denormals, zero, extreme values) for all public functions
-- **FR-052**: Library MUST include documentation tests ensuring all code examples in API documentation compile and execute correctly
-- **FR-053**: Library MUST include performance regression tests that detect degradation from baseline measurements (instruction counts, wall-clock times)
-- **FR-054**: Test suite MUST achieve >90% line coverage overall with >95% branch coverage for critical paths (verified via code coverage tools)
-- **FR-055**: Test suite MUST run in CI pipeline across all backends on appropriate platforms (x86-64 for scalar/AVX2/AVX512, ARM64 for NEON)
-- **FR-056**: Property-based tests MUST generate thousands of test cases including normal values, denormals, boundary conditions, and edge cases
-- **FR-057**: Library MUST include integration tests demonstrating complete DSP workflows (oscillators, filters, envelopes) using the abstraction
-- **FR-058**: All test failures MUST provide clear error messages indicating which backend, operation, and input values caused the failure
-- **FR-059**: Test suite MUST complete in under 5 minutes for standard runs, with optional extended test modes for exhaustive validation
+- **FR-055**: Library MUST include property-based tests for all SIMD operations verifying mathematical invariants (commutativity, associativity, distributivity where applicable)
+- **FR-056**: Library MUST include accuracy tests for all math kernels comparing against reference implementations with error bounds verification
+- **FR-057**: Library MUST include backend consistency tests ensuring all backends produce results within acceptable error bounds for identical inputs
+- **FR-058**: Library MUST include unit tests covering edge cases (NaN, infinity, denormals, zero, extreme values) for all public functions
+- **FR-059**: Library MUST include documentation tests ensuring all code examples in API documentation compile and execute correctly
+- **FR-060**: Library MUST include performance regression tests that detect degradation from baseline measurements (instruction counts, wall-clock times)
+- **FR-061**: Test suite MUST achieve >90% line coverage overall with >95% branch coverage for critical paths (verified via code coverage tools)
+- **FR-062**: Test suite MUST run in CI pipeline across all backends on appropriate platforms (x86-64 for scalar/AVX2/AVX512, ARM64 for NEON)
+- **FR-063**: Property-based tests MUST generate thousands of test cases including normal values, denormals, boundary conditions, and edge cases
+- **FR-064**: Library MUST include integration tests demonstrating complete DSP workflows (oscillators, filters, envelopes) using the abstraction
+- **FR-065**: All test failures MUST provide clear error messages indicating which backend, operation, and input values caused the failure
+- **FR-066**: Test suite MUST complete in under 5 minutes for standard runs, with optional extended test modes for exhaustive validation
 
 ### Key Entities
 
 - **SIMD Backend**: Represents a specific instruction set implementation (scalar, AVX2, AVX512, NEON) selected at compile time via features
 - **SIMD Vector Trait**: Abstract interface defining vector operations that all backends must implement
 - **Block Processor**: Fixed-size audio buffer (64 or 128 samples) with proper alignment and packing conventions
-- **Math Kernel**: Vectorized mathematical function (tanh, exp, etc.) with implementation for each backend
+- **Math Kernel**: Vectorized mathematical function (tanh, exp, exp2, log2, atan, pow, etc.) with implementation for each backend
+- **Saturation Curve**: Polynomial-based waveshaping function (soft clip, hard clip, asymmetric) for harmonic distortion
+- **Sigmoid Curve**: Smooth interpolation function (logistic, smoothstep family) with C1/C2 continuity for parameter transitions
+- **Interpolation Kernel**: Polynomial interpolation function (linear, cubic Hermite, quintic) for resampling and wavetable lookup
+- **PolyBLEP Kernel**: Band-limited step function using 2nd-order polynomial for alias-free oscillator synthesis
+- **Noise Generator**: Vectorized pseudo-random number generator (PRNG) for white/pink noise synthesis
 - **Lookup Table**: Pre-computed function values with vectorized interpolation supporting per-lane indexing
-- **Saturation Curve**: Vectorized transfer function defining input-to-output mapping for waveshaping
 - **Crossfade Curve**: Vectorized parameter transition function with equal-power characteristics
 - **Benchmark Suite**: Collection of performance tests measuring each backend's instruction counts and wall-clock performance
 - **Property Test**: Automated test generating thousands of random inputs to verify mathematical invariants and edge case handling
@@ -300,7 +317,7 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 
 - **SC-001**: DSP algorithms written using trait abstraction compile successfully to all supported backends (scalar, AVX2, AVX512, NEON) without code changes
 - **SC-002**: Vectorized operations show expected performance scaling: AVX2 4-8x faster than scalar, AVX512 8-16x faster than scalar, NEON 4-8x faster than scalar
-- **SC-003**: All backends produce bit-identical results for the same input (verified through comprehensive test suite)
+- **SC-003**: All backends produce deterministic results within documented error bounds for the same input (bit-identical for exact operations; error-bounded for approximations; verified through backend consistency tests T024, T049)
 - **SC-004**: Developer writing DSP code using abstractions requires zero #[cfg] directives for backend selection
 - **SC-005**: Block processing with fixed sizes (64 or 128 samples) achieves full loop unrolling and vectorization (verified via assembly inspection)
 - **SC-006**: Denormal protection maintains consistent CPU usage (< 5% variance) when processing signals that decay into denormal range across all backends
@@ -315,13 +332,20 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **SC-015**: Test suite achieves >90% line coverage and >95% branch coverage for critical code paths as measured by code coverage tools
 - **SC-016**: Property-based tests generate at least 10,000 test cases per operation, catching edge cases that would be missed by hand-written tests
 - **SC-017**: All math kernels pass accuracy tests showing error bounds within specified limits across all backends (verified through automated testing)
-- **SC-018**: Backend consistency tests confirm that all backends produce results within acceptable error tolerances (bit-identical or within documented error bounds)
-- **SC-019**: Test suite runs in under 5 minutes in standard mode, enabling rapid development iteration
-- **SC-020**: CI pipeline successfully runs all tests across all backends on every pull request, catching regressions before merge
-- **SC-021**: Performance regression tests detect any degradation >5% in instruction counts or >10% in wall-clock time compared to baseline
-- **SC-022**: Integration tests demonstrate complete real-world DSP workflows (oscillators, filters, envelopes) execute correctly using library abstractions
-- **SC-023**: All code examples in API documentation compile and execute successfully as verified by documentation tests
-- **SC-024**: Test failures provide actionable error messages including backend name, operation, input values, expected result, and actual result
+- **SC-018**: Vectorized atan approximation maintains absolute error below 0.001 radians (< 0.057 degrees) across full input range while executing 8-16x faster than scalar libm atan
+- **SC-019**: Vectorized exp2/log2 approximations achieve < 0.01% error while executing 10-20x faster than scalar libm, enabling efficient pow(x,y) decomposition
+- **SC-020**: Polynomial saturation curves process audio in < 5 CPU cycles per sample on AVX2, enabling real-time waveshaping distortion
+- **SC-021**: Sigmoid curves (logistic, smoothstep) maintain smooth C1 or C2 continuity for artifact-free parameter transitions
+- **SC-022**: Cubic Hermite interpolation maintains phase continuity and smooth derivatives for wavetable synthesis and resampling
+- **SC-023**: PolyBLEP kernels achieve alias-free oscillator output with < 8 operations per transition, matching quality of 32-sample minBLEP with fraction of overhead
+- **SC-024**: Vectorized white noise generation produces full 64-sample block in < 100 CPU cycles with statistical distribution passing chi-square test
+- **SC-025**: Backend consistency tests confirm that all backends produce results within acceptable error tolerances (bit-identical or within documented error bounds)
+- **SC-026**: Test suite runs in under 5 minutes in standard mode, enabling rapid development iteration
+- **SC-027**: CI pipeline successfully runs all tests across all backends on every pull request, catching regressions before merge
+- **SC-028**: Performance regression tests detect any degradation >5% in instruction counts or >10% in wall-clock time compared to baseline
+- **SC-029**: Integration tests demonstrate complete real-world DSP workflows (oscillators, filters, envelopes) execute correctly using library abstractions
+- **SC-030**: All code examples in API documentation compile and execute successfully as verified by documentation tests
+- **SC-031**: Test failures provide actionable error messages including backend name, operation, input values, expected result, and actual result
 
 ## Assumptions
 
@@ -345,6 +369,16 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - Test coverage metrics (>90% line, >95% branch for critical paths) are measurable and enforceable via CI
 - Property-based tests generating 10,000+ cases per operation is computationally feasible in CI environment
 - Reference implementations (libm) are acceptable for accuracy comparison in tests but not in production code
+- Atan approximation will use Remez minimax polynomial (odd-polynomial on restricted domain) as research shows this provides optimal error bounds for given computational cost
+- Atan error tolerance of 0.001 radians (0.057 degrees) is sufficient for audio DSP applications including phase modulation and waveshaping
+- exp2/log2 will use IEEE 754 exponent field manipulation combined with polynomial approximation of fractional part, as this provides 10-20x speedup with audio-sufficient accuracy
+- pow(x,y) will decompose to exp2(log2(x)*y) rather than using dedicated pow approximation, as research shows this provides better performance/accuracy balance
+- Polynomial saturation curves will use Chebyshev or direct polynomial forms depending on desired harmonic characteristics, optimized for < 5 cycles/sample
+- Sigmoid curves will use polynomial approximations (e.g., smoothstep: 3x²-2x³) rather than expensive exp/tanh for C1/C2 continuity with minimal overhead
+- Cubic Hermite interpolation chosen over higher-order (quintic) for audio resampling as it provides best balance of smoothness and computational cost
+- PolyBLEP will use 2nd-order polynomial approximation requiring only 8 operations per transition, matching 32-sample minBLEP quality with fraction of cost
+- White noise generation will use fast xorshift-based PRNG rather than cryptographic-quality RNG, as audio synthesis doesn't require cryptographic properties
+- Pink noise generation (if included) will use Paul Kellet's economical algorithm or Voss-McCartney algorithm for 1/f spectral characteristic
 
 ## Non-Functional Requirements
 
@@ -383,10 +417,14 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - Trait-based SIMD abstraction layer with multiple backend implementations
 - Block processing pattern with fixed sizes (64 or 128 samples)
 - Core vector operations (arithmetic, FMA, min/max, compare, horizontal ops)
-- Fast vectorized math kernels (tanh, exp, log1p, sin, cos, inverse, sqrt, pow, etc.)
+- Fast vectorized math kernels: tanh, exp, exp2, log, log2, log1p, sin, cos, inverse, atan, pow, sqrt, rsqrt
+- Polynomial saturation curves: soft clip, hard clip, asymmetric for waveshaping
+- Sigmoid curves: logistic, tanh-based, smoothstep family (C1/C2 continuity)
+- Polynomial interpolation kernels: linear, cubic Hermite, quintic for resampling and wavetable synthesis
+- PolyBLEP (band-limited step) kernels for alias-free oscillator synthesis
+- Vectorized random noise generation: white noise (pink noise optional)
 - Vectorized lookup table infrastructure with interpolation
 - Denormal number protection integrated into block processing
-- Vectorized saturation curves and waveshaping
 - Vectorized crossfade and parameter ramping utilities
 - Comprehensive benchmarking infrastructure for backend comparison
 - SIMD backends: scalar (always available), AVX2 (x86-64 baseline), AVX512 (x86-64 bleeding edge), NEON (ARM64)
