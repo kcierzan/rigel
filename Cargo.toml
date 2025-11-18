@@ -46,6 +46,10 @@ inherits = "release"
 lto = "fat"
 codegen-units = 1
 
+# Benchmark profile matching release optimizations
+[profile.bench]
+inherits = "release"
+
 # Development profile with some optimization for audio work
 [profile.dev]
 opt-level = 1
