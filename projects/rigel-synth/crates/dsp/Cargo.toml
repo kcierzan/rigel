@@ -14,3 +14,18 @@ crate-type = ["lib"]
 
 [dependencies]
 libm = "0.2"
+
+[dev-dependencies]
+# Statistical benchmarking with wall-clock time measurements
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Deterministic instruction-count benchmarking for CI
+iai-callgrind = "0.14"
+
+[[bench]]
+name = "criterion_benches"
+harness = false
+
+[[bench]]
+name = "iai_benches"
+harness = false

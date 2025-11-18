@@ -12,6 +12,27 @@ let
   appleSdk = if isDarwin then pkgs.apple-sdk_15 else null;
   rustToolchainSpecifier = "1.91.0";
 
+  # Build cargo-instruments from crates.io (macOS only)
+  cargo-instruments = pkgs.rustPlatform.buildRustPackage rec {
+    pname = "cargo-instruments";
+    version = "0.4.13";
+
+    src = pkgs.fetchCrate {
+      inherit pname version;
+      sha256 = "sha256-rK++Z3Ni4yfkb36auyWJ9Eiqi2ATeEyQ6J4synRTpbM=";
+    };
+
+    cargoHash = "sha256-hRpWBt00MHMBZCHAsbFU0rwpsoavv6PUNj6owFHRNEw=";
+
+    nativeBuildInputs = [ pkgs.pkg-config ];
+    buildInputs = [ pkgs.openssl ];
+
+    # Only build on macOS since it requires Instruments.app
+    meta = {
+      platforms = pkgs.lib.platforms.darwin;
+    };
+  };
+
   # Rust triples we support from the primary macOS dev host. Windows/Linux builds
   # need additional SDK/tooling shims so we keep the list centralised here.
   rustTargets = [
@@ -205,6 +226,9 @@ in
       # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
       # without requiring a Windows VM.
       xwin
+      # Benchmarking and profiling tools
+      gnuplot # Criterion chart generation
+      flamegraph # Flamegraph generation (uses perf on Linux, DTrace on macOS)
     ]
     ++ lib.optionals isLinux [
       alsa-lib
@@ -221,6 +245,9 @@ in
       xorg.xcbutilrenderutil
       xorg.xcbutilwm
       xorg.xcbutilkeysyms
+      # Linux-specific profiling tools
+      valgrind # Required for iai-callgrind benchmarks
+      linuxPackages.perf # Hardware performance counters
     ]
     ++ lib.optionals isDarwin [
       # macOS host prerequisites: Xcode headers, OpenMP runtime for SIMD code,
@@ -230,6 +257,11 @@ in
       libiconv
       linuxCrossCc
       linuxCrossBinutils
+      # macOS-specific profiling tools
+      cargo-instruments # Instruments.app integration
+      # Note: Valgrind for iai-callgrind can be installed via Homebrew:
+      # brew install valgrind
+      # DTrace (built into macOS) is used by flamegraph
     ];
 
   scripts = {
@@ -248,6 +280,32 @@ in
     # env vars Cargo expects for the MSVC target.
     "build:win".exec = "${./ci/scripts/build-win.sh}";
     "build:clean".exec = "rm -rf target";
+
+    # Benchmarking and profiling
+    "bench:criterion".exec = cargoScript "cargo bench --bench criterion_benches";
+    "bench:iai".exec = cargoScript "cargo bench --bench iai_benches";
+    "bench:all".exec = cargoScript "cargo bench";
+    "bench:baseline".exec = cargoScript "cargo bench --bench criterion_benches -- --save-baseline main";
+    "bench:flamegraph".exec = cargoScript "cargo flamegraph --bench criterion_benches -- --bench";
+    # macOS Instruments profiling (requires Xcode Command Line Tools)
+    "bench:instruments".exec = ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      os_type=$(uname -s)
+      if [ "$os_type" != "Darwin" ]; then
+        echo 'Error: bench:instruments is only available on macOS'
+        exit 1
+      fi
+
+      exec cargo instruments --bench criterion_benches --template time
+    '';
   };
 
   enterShell = ''
