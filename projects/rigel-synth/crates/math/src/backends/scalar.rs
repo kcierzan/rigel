@@ -32,7 +32,10 @@ impl SimdVector for ScalarVector<f32> {
 
     #[inline(always)]
     fn from_slice(slice: &[Self::Scalar]) -> Self {
-        assert!(slice.len() >= Self::LANES, "Slice too short for scalar load");
+        assert!(
+            slice.len() >= Self::LANES,
+            "Slice too short for scalar load"
+        );
         ScalarVector(slice[0])
     }
 
@@ -145,7 +148,10 @@ impl SimdVector for ScalarVector<f64> {
 
     #[inline(always)]
     fn from_slice(slice: &[Self::Scalar]) -> Self {
-        assert!(slice.len() >= Self::LANES, "Slice too short for scalar load");
+        assert!(
+            slice.len() >= Self::LANES,
+            "Slice too short for scalar load"
+        );
         ScalarVector(slice[0])
     }
 

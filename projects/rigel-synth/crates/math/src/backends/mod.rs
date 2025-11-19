@@ -16,15 +16,15 @@ pub mod avx512;
 #[cfg(feature = "neon")]
 pub mod neon;
 
-// Compile-time checks to prevent multiple backends
-#[cfg(all(feature = "avx2", feature = "avx512"))]
-compile_error!("Cannot enable both avx2 and avx512 features simultaneously. Choose one backend per build.");
+// Compile-time checks to prevent conflicting backends for the target architecture
+// Note: AVX2/AVX512 are x86/x86_64 only, NEON is aarch64 only, so they don't conflict across architectures
 
-#[cfg(all(feature = "avx2", feature = "neon"))]
-compile_error!("Cannot enable both avx2 and neon features simultaneously. Choose one backend per build.");
-
-#[cfg(all(feature = "avx512", feature = "neon"))]
-compile_error!("Cannot enable both avx512 and neon features simultaneously. Choose one backend per build.");
-
-#[cfg(all(feature = "avx2", feature = "avx512", feature = "neon"))]
-compile_error!("Cannot enable multiple SIMD backends simultaneously. Choose one backend per build.");
+// Prevent both AVX2 and AVX512 on x86/x86_64 (they conflict)
+#[cfg(all(
+    feature = "avx2",
+    feature = "avx512",
+    any(target_arch = "x86", target_arch = "x86_64")
+))]
+compile_error!(
+    "Cannot enable both avx2 and avx512 features simultaneously on x86/x86_64. Choose one backend."
+);

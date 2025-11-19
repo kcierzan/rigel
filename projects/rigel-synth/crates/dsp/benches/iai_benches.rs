@@ -51,7 +51,11 @@ fn iai_clamp_branching(scenario: &str) -> f32 {
         "above_max" => 1.5,
         _ => 0.5,
     };
-    black_box(clamp_branching(black_box(value), black_box(0.0), black_box(1.0)))
+    black_box(clamp_branching(
+        black_box(value),
+        black_box(0.0),
+        black_box(1.0),
+    ))
 }
 
 #[library_benchmark]
@@ -63,7 +67,11 @@ fn iai_clamp_max_min(scenario: &str) -> f32 {
         "above_max" => 1.5,
         _ => 0.5,
     };
-    black_box(clamp_branchless_max_min(black_box(value), black_box(0.0), black_box(1.0)))
+    black_box(clamp_branchless_max_min(
+        black_box(value),
+        black_box(0.0),
+        black_box(1.0),
+    ))
 }
 
 #[library_benchmark]
@@ -75,7 +83,11 @@ fn iai_clamp_builtin(scenario: &str) -> f32 {
         "above_max" => 1.5,
         _ => 0.5,
     };
-    black_box(clamp_builtin(black_box(value), black_box(0.0), black_box(1.0)))
+    black_box(clamp_builtin(
+        black_box(value),
+        black_box(0.0),
+        black_box(1.0),
+    ))
 }
 
 #[library_benchmark]
@@ -312,11 +324,10 @@ library_benchmark_group!(
 );
 
 main!(
-    library_benchmark_groups =
-        utility_benches,
-        clamp_benches,
-        oscillator_benches,
-        envelope_benches,
-        synth_engine_benches,
-        polyphonic_benches
+    library_benchmark_groups = utility_benches,
+    clamp_benches,
+    oscillator_benches,
+    envelope_benches,
+    synth_engine_benches,
+    polyphonic_benches
 );
