@@ -36,7 +36,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          cache-on-failure: true
+          cache-on-failure: false
 
       - name: Run Rust checks
         env:
@@ -75,6 +75,7 @@ jobs:
           key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
           restore-keys: |
             uv-${{ runner.os }}-
+          save-always: false
 
       - name: Sync wtgen environment
         working-directory: projects/wtgen
@@ -103,7 +104,7 @@ jobs:
     name: Build Plugin (Linux & Windows)
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - target: linux
@@ -125,7 +126,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          cache-on-failure: true
+          cache-on-failure: false
           shared-key: ${{ matrix.target }}
 
       - name: Cache xwin SDK
@@ -160,7 +161,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          cache-on-failure: true
+          cache-on-failure: false
           shared-key: macos
 
       - name: Build plugin (macOS)
