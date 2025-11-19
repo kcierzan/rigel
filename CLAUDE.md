@@ -79,11 +79,11 @@ Set by devenv:
 All commands run from repository root in devenv shell. Thanks to direnv, you're likely already in the shell. If not, prefix with `devenv shell -- <command>`:
 
 ```bash
-# Building
+# Building (Native only - simple and reliable!)
 build:native        # Build for current platform
-build:macos         # Build for Apple Silicon macOS
-build:linux         # Build for x86_64 Linux
-build:win           # Build for Windows (uses xwin SDK)
+build:macos         # macOS build (requires macOS host)
+build:linux         # Linux build (requires Linux host)
+build:win           # Windows cross-build (may work from Linux via xwin)
 
 # Testing & Quality
 cargo:test          # Run all Rust tests
@@ -276,14 +276,56 @@ The `CI Success` job in `.github/workflows/ci.yml` aggregates all test and build
 
 ## Cross-Platform Support
 
-Targets configured in `rust-toolchain.toml` and `devenv.nix`:
+### Build Strategy: Platform-Native Only
+
+Rigel uses **native-only builds** for local development. Each platform builds for itself.
+
+**Local Development:**
+- **macOS developers**: Use `build:native` or `build:macos` - works perfectly
+- **Linux developers**: Use `build:native` or `build:linux` - works perfectly
+- **Cross-compilation**: **Not supported** - use CI instead
+
+**Why No Cross-Compilation?**
+
+Cross-compiling GUI applications (especially from macOS to Linux) is complex and fragile due to:
+- X11/XCB/Wayland library dependencies and different ABIs
+- Linker configuration conflicts between platforms
+- Rust toolchain limitations for cross-platform GUI builds
+
+The complexity and maintenance burden far outweigh the benefits. **Native builds + CI** is simpler and more reliable.
+
+### CI for Multi-Platform Builds
+
+All production builds use GitHub Actions with native runners:
+- **Linux builds**: `ubuntu-latest` (native x86_64 Linux)
+- **Windows builds**: `ubuntu-latest` with xwin for cross-compilation
+- **macOS builds**: `macos-14` (native Apple Silicon)
+
+This provides reliable, reproducible builds without local cross-compilation complexity.
+
+### Recommended Workflow
+
+1. **Develop on your platform**: Use `build:native` for fast iteration
+2. **Test locally**: Native builds are fast and reliable
+3. **Test other platforms**: Push to GitHub and let CI build
+4. **Release**: Tag a commit and CI creates releases for all platforms
+
+This workflow is simpler, more reliable, and matches how most cross-platform projects work.
+
+### Supported Targets
+
+Configured in `rust-toolchain.toml`:
 - **macOS**: `aarch64-apple-darwin` (Apple Silicon)
 - **Linux**: `x86_64-unknown-linux-gnu`
-- **Windows**: `x86_64-pc-windows-msvc` (via xwin cross-compilation)
+- **Windows**: `x86_64-pc-windows-msvc`
 
-Build for specific target:
+**Build Commands:**
 ```bash
-build:macos    # or build:linux, build:win
+# Native builds (simple and reliable!)
+build:native        # Build for current platform
+build:macos         # macOS build (requires macOS host)
+build:linux         # Linux build (requires Linux host)
+build:win           # Windows cross-build via xwin (may work from Linux)
 ```
 
 ## Coding Conventions
