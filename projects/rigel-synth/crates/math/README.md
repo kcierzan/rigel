@@ -11,7 +11,7 @@ Trait-based SIMD abstraction library for real-time audio DSP.
 
 ## Quick Start
 
-```rust
+```rust,ignore
 use rigel_math::{Block64, DefaultSimdVector};
 use rigel_math::ops::mul;
 
