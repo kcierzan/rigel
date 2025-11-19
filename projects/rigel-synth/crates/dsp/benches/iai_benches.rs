@@ -151,8 +151,10 @@ fn iai_oscillator_buffer(buffer_size: usize) -> f32 {
 #[library_benchmark]
 fn iai_envelope_attack() -> f32 {
     let mut env = Envelope::new(44100.0);
-    let mut params = SynthParams::default();
-    params.env_attack = 0.1;
+    let params = SynthParams {
+        env_attack: 0.1,
+        ..Default::default()
+    };
     env.note_on();
     black_box(env.process_sample(&params))
 }
@@ -160,10 +162,12 @@ fn iai_envelope_attack() -> f32 {
 #[library_benchmark]
 fn iai_envelope_sustain() -> f32 {
     let mut env = Envelope::new(44100.0);
-    let mut params = SynthParams::default();
-    params.env_attack = 0.0;
-    params.env_decay = 0.0;
-    params.env_sustain = 0.7;
+    let params = SynthParams {
+        env_attack: 0.0,
+        env_decay: 0.0,
+        env_sustain: 0.7,
+        ..Default::default()
+    };
     env.note_on();
     // Process through attack and decay to reach sustain
     for _ in 0..100 {
@@ -175,9 +179,11 @@ fn iai_envelope_sustain() -> f32 {
 #[library_benchmark]
 fn iai_envelope_release() -> f32 {
     let mut env = Envelope::new(44100.0);
-    let mut params = SynthParams::default();
-    params.env_attack = 0.0;
-    params.env_release = 0.1;
+    let params = SynthParams {
+        env_attack: 0.0,
+        env_release: 0.1,
+        ..Default::default()
+    };
     env.note_on();
     env.note_off();
     black_box(env.process_sample(&params))
@@ -212,8 +218,10 @@ fn iai_synth_buffer(buffer_size: usize) -> f32 {
 #[library_benchmark]
 fn iai_synth_with_pitch_mod() -> f32 {
     let mut engine = SynthEngine::new(44100.0);
-    let mut params = SynthParams::default();
-    params.pitch_offset = 2.0; // +2 semitones
+    let params = SynthParams {
+        pitch_offset: 2.0, // +2 semitones
+        ..Default::default()
+    };
     engine.note_on(60, 0.8);
     black_box(engine.process_sample(&params))
 }
