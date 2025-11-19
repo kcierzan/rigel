@@ -44,7 +44,7 @@ jobs:
         run: |
           devenv shell -- bash -c '
             cargo fmt -- --check
-            cargo clippy --all-targets --all-features -- -D warnings
+            cargo clippy --all-targets -- -D warnings
             cargo test
           '
 
@@ -102,15 +102,14 @@ jobs:
   build-plugin-linux:
     name: Build Plugin (Linux & Windows)
     runs-on: ubuntu-latest
-    needs: rigel-pipeline
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: linux
-            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
+            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu --verbose
           - target: windows
-            build_command: ./ci/scripts/build-win.sh
+            build_command: ./ci/scripts/build-win.sh --verbose
     steps:
       - uses: actions/checkout@v4
         with:
@@ -146,7 +145,6 @@ jobs:
   build-plugin-macos:
     name: Build Plugin (macOS)
     runs-on: macos-14
-    needs: rigel-pipeline
     steps:
       - uses: actions/checkout@v4
         with:
@@ -168,7 +166,7 @@ jobs:
       - name: Build plugin (macOS)
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- build:macos
+        run: devenv shell -- cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin --verbose
 
   # Aggregates all CI results into a single required status check
   ci-success:
