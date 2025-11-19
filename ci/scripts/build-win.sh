@@ -62,4 +62,5 @@ fi
 
 export RUSTFLAGS="${RUSTFLAGS:-} -Lnative=$SDK_LIB_UM -Lnative=$SDK_LIB_UCRT -Lnative=$CRT_LIB"
 
-cargo xtask bundle rigel-plugin --release --target x86_64-pc-windows-msvc
+# Pass through any additional arguments (e.g., --verbose)
+cargo xtask bundle rigel-plugin --release --target x86_64-pc-windows-msvc "$@"
