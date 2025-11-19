@@ -23,14 +23,14 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 **Purpose**: Initialize rigel-math crate structure and add to workspace
 
-- [ ] T001 Create rigel-math crate directory at projects/rigel-synth/crates/math/
-- [ ] T002 Create Cargo.toml for rigel-math with feature flags (scalar, avx2, avx512, neon) at projects/rigel-synth/crates/math/Cargo.toml
-- [ ] T003 Add rigel-math to workspace members in projects/rigel-synth/Cargo.toml
-- [ ] T004 Create lib.rs with no_std attribute at projects/rigel-synth/crates/math/src/lib.rs
-- [ ] T005 [P] Create benches/ directory with Cargo.toml at projects/rigel-synth/crates/math/benches/
-- [ ] T006 [P] Create tests/ directory at projects/rigel-synth/crates/math/tests/
-- [ ] T007 Configure proptest dependency for property-based testing in projects/rigel-synth/crates/math/Cargo.toml
-- [ ] T008 Configure criterion and iai-callgrind dependencies for benchmarking in projects/rigel-synth/crates/math/Cargo.toml
+- [X] T001 Create rigel-math crate directory at projects/rigel-synth/crates/math/
+- [X] T002 Create Cargo.toml for rigel-math with feature flags (scalar, avx2, avx512, neon) at projects/rigel-synth/crates/math/Cargo.toml
+- [X] T003 Add rigel-math to workspace members in projects/rigel-synth/Cargo.toml
+- [X] T004 Create lib.rs with no_std attribute at projects/rigel-synth/crates/math/src/lib.rs
+- [X] T005 [P] Create benches/ directory with Cargo.toml at projects/rigel-synth/crates/math/benches/
+- [X] T006 [P] Create tests/ directory at projects/rigel-synth/crates/math/tests/
+- [X] T007 Configure proptest dependency for property-based testing in projects/rigel-synth/crates/math/Cargo.toml
+- [X] T008 Configure criterion and iai-callgrind dependencies for benchmarking in projects/rigel-synth/crates/math/Cargo.toml
 
 ---
 
@@ -40,13 +40,13 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T009 Define SimdVector trait with associated types and method signatures in projects/rigel-synth/crates/math/src/traits.rs
-- [ ] T010 Define SimdMask trait with boolean and bitwise operations in projects/rigel-synth/crates/math/src/traits.rs
-- [ ] T011 Create backends module with cfg-based backend selection in projects/rigel-synth/crates/math/src/backends/mod.rs
-- [ ] T012 Implement ScalarVector<T> and ScalarMask in projects/rigel-synth/crates/math/src/backends/scalar.rs
-- [ ] T013 Create DefaultSimdVector type alias resolving to active backend in projects/rigel-synth/crates/math/src/lib.rs
-- [ ] T014 Re-export core traits and types from lib.rs for public API in projects/rigel-synth/crates/math/src/lib.rs
-- [ ] T015 Add compile-time checks to prevent multiple backend features in projects/rigel-synth/crates/math/src/backends/mod.rs
+- [X] T009 Define SimdVector trait with associated types and method signatures in projects/rigel-synth/crates/math/src/traits.rs
+- [X] T010 Define SimdMask trait with boolean and bitwise operations in projects/rigel-synth/crates/math/src/traits.rs
+- [X] T011 Create backends module with cfg-based backend selection in projects/rigel-synth/crates/math/src/backends/mod.rs
+- [X] T012 Implement ScalarVector<T> and ScalarMask in projects/rigel-synth/crates/math/src/backends/scalar.rs
+- [X] T013 Create DefaultSimdVector type alias resolving to active backend in projects/rigel-synth/crates/math/src/lib.rs
+- [X] T014 Re-export core traits and types from lib.rs for public API in projects/rigel-synth/crates/math/src/lib.rs
+- [X] T015 Add compile-time checks to prevent multiple backend features in projects/rigel-synth/crates/math/src/backends/mod.rs
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -60,12 +60,12 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Backend Implementations for User Story 1
 
-- [ ] T016 [P] [US1] Implement AVX2 backend: Avx2Vector<T> wrapper around __m256/__m256d in projects/rigel-synth/crates/math/src/backends/avx2.rs
-- [ ] T017 [P] [US1] Implement AVX2 mask type: Avx2Mask wrapper around __m256 in projects/rigel-synth/crates/math/src/backends/avx2.rs
+- [X] T016 [P] [US1] Implement AVX2 backend: Avx2Vector<T> wrapper around __m256/__m256d in projects/rigel-synth/crates/math/src/backends/avx2.rs
+- [X] T017 [P] [US1] Implement AVX2 mask type: Avx2Mask wrapper around __m256 in projects/rigel-synth/crates/math/src/backends/avx2.rs
 - [ ] T018 [P] [US1] Implement AVX512 backend: Avx512Vector<T> wrapper around __m512/__m512d in projects/rigel-synth/crates/math/src/backends/avx512.rs
 - [ ] T019 [P] [US1] Implement AVX512 mask type: Avx512Mask wrapper around __mmask16 in projects/rigel-synth/crates/math/src/backends/avx512.rs
-- [ ] T020 [P] [US1] Implement NEON backend: NeonVector<T> wrapper around float32x4_t/float64x2_t in projects/rigel-synth/crates/math/src/backends/neon.rs
-- [ ] T021 [P] [US1] Implement NEON mask type: NeonMask wrapper around uint32x4_t in projects/rigel-synth/crates/math/src/backends/neon.rs
+- [X] T020 [P] [US1] Implement NEON backend: NeonVector<T> wrapper around float32x4_t/float64x2_t in projects/rigel-synth/crates/math/src/backends/neon.rs
+- [X] T021 [P] [US1] Implement NEON mask type: NeonMask wrapper around uint32x4_t in projects/rigel-synth/crates/math/src/backends/neon.rs
 
 ### Tests for User Story 1
 
