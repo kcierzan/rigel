@@ -16,6 +16,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  GCC_SPECS: ""
+  FLAKEHUB_DISABLE_TELEMETRY: "1"
 
 jobs:
   rigel-pipeline:
@@ -38,6 +40,9 @@ jobs:
           workspaces: "."
           cache-on-failure: false
 
+      - name: Workaround GCC specs directory conflict
+        run: mv specs specs.bak
+
       - name: Check formatting
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -52,6 +57,10 @@ jobs:
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell cargo test
+
+      - name: Restore specs directory
+        if: always()
+        run: mv specs.bak specs
 
   wtgen-pipeline:
     name: wtgen Lint & Tests
@@ -71,8 +80,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Cache uv dependencies
-        uses: actions/cache@v4
+      - name: Restore uv cache
+        id: uv-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cache/uv
@@ -80,7 +90,6 @@ jobs:
           key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
           restore-keys: |
             uv-${{ runner.os }}-
-          save-always: false
 
       - name: Sync wtgen environment
         working-directory: projects/wtgen
@@ -105,17 +114,29 @@ jobs:
           LANG: C.UTF-8
         run: devenv shell -- uv run python -m pytest -n auto
 
+      - name: Save uv cache
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/uv
+            projects/wtgen/.venv
+          key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
+
   build-plugin-linux:
-    name: Build Plugin (Linux & Windows)
+    name: Build Plugin (${{ matrix.name }})
     runs-on: ubuntu-latest
+    needs: [rigel-pipeline, wtgen-pipeline]
     strategy:
       fail-fast: true
       matrix:
         include:
           - target: linux
-            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu --verbose
+            name: Linux
+            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
           - target: windows
-            build_command: ./ci/scripts/build-win.sh --verbose
+            name: Windows
+            build_command: ./ci/scripts/build-win.sh
     steps:
       - uses: actions/checkout@v4
         with:
@@ -143,14 +164,30 @@ jobs:
             target/xwin
           key: xwin-sdk-${{ runner.os }}-v1
 
+      - name: Workaround GCC specs directory conflict
+        run: mv specs specs.bak
+
       - name: Build plugin (${{ matrix.target }})
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- ${{ matrix.build_command }}
 
+      - name: Restore specs directory
+        if: always()
+        run: mv specs.bak specs
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigel-plugin-${{ matrix.target }}-${{ github.sha }}
+          path: target/bundled/
+          retention-days: 30
+          if-no-files-found: error
+
   build-plugin-macos:
     name: Build Plugin (macOS)
     runs-on: macos-14
+    needs: [rigel-pipeline, wtgen-pipeline]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -172,7 +209,15 @@ jobs:
       - name: Build plugin (macOS)
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin --verbose
+        run: devenv shell -- cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigel-plugin-macos-${{ github.sha }}
+          path: target/bundled/
+          retention-days: 30
+          if-no-files-found: error
 
   # Aggregates all CI results into a single required status check
   ci-success:
