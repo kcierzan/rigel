@@ -1,0 +1,39 @@
+[package]
+name = "rigel-math"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kyle Cierzan <kylecierzan@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Trait-based SIMD abstraction library for real-time audio DSP"
+repository = "https://github.com/kcierzan/rigel"
+
+[lib]
+name = "rigel_math"
+path = "src/lib.rs"
+
+[features]
+default = ["scalar"]
+scalar = []
+avx2 = []
+avx512 = []
+neon = []
+
+[dependencies]
+libm = "0.2"
+
+[dev-dependencies]
+proptest = "1.5"
+criterion = { version = "0.5", features = ["html_reports"] }
+iai-callgrind = "0.14"
+
+[[bench]]
+name = "criterion_benches"
+harness = false
+
+[[bench]]
+name = "iai_benches"
+harness = false
+
+[package.metadata.docs.rs]
+all-features = false
+default-features = true
