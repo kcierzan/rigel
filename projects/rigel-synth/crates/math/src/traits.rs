@@ -160,6 +160,88 @@ pub trait SimdVector: Copy + Clone + Sized {
 
     /// Minimum value across all SIMD lanes
     fn horizontal_min(self) -> Self::Scalar;
+
+    // Bit manipulation (for IEEE 754 logarithm extraction)
+
+    /// Reinterpret float bits as integer bits
+    ///
+    /// This enables IEEE 754 bit-level manipulation for fast logarithm implementations.
+    /// Each f32 value is reinterpreted as a u32 bit pattern without conversion.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// let vec = DefaultSimdVector::splat(1.0);
+    /// let bits = vec.to_bits();
+    /// // bits now contains 0x3F800000 (IEEE 754 representation of 1.0)
+    /// ```
+    fn to_bits(self) -> Self::IntBits;
+
+    /// Reinterpret integer bits as float bits
+    ///
+    /// Inverse of `to_bits()`, reinterprets u32 bit patterns as f32 values.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rigel_math::{DefaultSimdVector, SimdVector, SimdInt};
+    /// let bits = <DefaultSimdVector as SimdVector>::IntBits::splat(0x3F800000);
+    /// let vec = DefaultSimdVector::from_bits(bits);
+    /// // vec now contains 1.0
+    /// ```
+    fn from_bits(bits: Self::IntBits) -> Self;
+
+    /// Convert integer vector to float vector (numerical conversion, not bit reinterpretation)
+    ///
+    /// This performs actual integer-to-float conversion: u32 → f32.
+    /// For example, IntBits::splat(5) converts to SimdVector::splat(5.0).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rigel_math::{DefaultSimdVector, SimdVector, SimdInt};
+    /// let int_vec = <DefaultSimdVector as SimdVector>::IntBits::splat(5);
+    /// let float_vec = DefaultSimdVector::from_int_cast(int_vec);
+    /// // float_vec contains 5.0 in all lanes
+    /// ```
+    fn from_int_cast(int_vec: Self::IntBits) -> Self;
+
+    /// Associated integer vector type for bit manipulation
+    type IntBits: SimdInt;
+}
+
+/// Integer SIMD vector trait for bit manipulation
+///
+/// Provides integer operations needed for IEEE 754 bit-level manipulation
+/// in fast math implementations.
+pub trait SimdInt: Copy + Clone + Sized {
+    /// Number of SIMD lanes (must match associated SimdVector)
+    const LANES: usize;
+
+    /// Broadcast a scalar u32 value to all SIMD lanes
+    fn splat(value: u32) -> Self;
+
+    /// Bitwise right shift
+    fn shr(self, count: u32) -> Self;
+
+    /// Bitwise left shift
+    fn shl(self, count: u32) -> Self;
+
+    /// Bitwise AND
+    fn bitwise_and(self, rhs: u32) -> Self;
+
+    /// Bitwise OR
+    fn bitwise_or(self, rhs: u32) -> Self;
+
+    /// Subtract integer constant
+    fn sub_scalar(self, rhs: u32) -> Self;
+
+    /// Convert to f32 vector (numerical conversion, not bit reinterpretation)
+    fn to_f32(self) -> Self::FloatVec;
+
+    /// Associated float vector type
+    type FloatVec: SimdVector<IntBits = Self>;
 }
 
 /// Mask type for conditional SIMD operations
