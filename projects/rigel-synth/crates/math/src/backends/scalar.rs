@@ -3,7 +3,7 @@
 //! This backend provides a scalar (non-SIMD) fallback that always works on any platform.
 //! It serves as the reference implementation and is useful for testing backend consistency.
 
-use crate::traits::{SimdMask, SimdVector};
+use crate::traits::{SimdInt, SimdMask, SimdVector};
 
 /// Scalar vector wrapper (single-lane SIMD)
 ///
@@ -18,10 +18,66 @@ pub struct ScalarVector<T>(pub T);
 #[repr(transparent)]
 pub struct ScalarMask(pub bool);
 
+/// Scalar integer vector wrapper (single u32)
+///
+/// Used for bit manipulation operations in IEEE 754 logarithm extraction.
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(transparent)]
+pub struct ScalarInt(pub u32);
+
+/// Scalar integer vector wrapper for f64 (single u64)
+///
+/// Used for bit manipulation operations in IEEE 754 logarithm extraction for f64.
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(transparent)]
+pub struct ScalarInt64(pub u64);
+
+// Implement SimdInt for ScalarInt
+impl SimdInt for ScalarInt {
+    const LANES: usize = 1;
+    type FloatVec = ScalarVector<f32>;
+
+    #[inline(always)]
+    fn splat(value: u32) -> Self {
+        ScalarInt(value)
+    }
+
+    #[inline(always)]
+    fn shr(self, count: u32) -> Self {
+        ScalarInt(self.0 >> count)
+    }
+
+    #[inline(always)]
+    fn shl(self, count: u32) -> Self {
+        ScalarInt(self.0 << count)
+    }
+
+    #[inline(always)]
+    fn bitwise_and(self, rhs: u32) -> Self {
+        ScalarInt(self.0 & rhs)
+    }
+
+    #[inline(always)]
+    fn bitwise_or(self, rhs: u32) -> Self {
+        ScalarInt(self.0 | rhs)
+    }
+
+    #[inline(always)]
+    fn sub_scalar(self, rhs: u32) -> Self {
+        ScalarInt(self.0.wrapping_sub(rhs))
+    }
+
+    #[inline(always)]
+    fn to_f32(self) -> Self::FloatVec {
+        ScalarVector(self.0 as f32)
+    }
+}
+
 // Implement SimdVector for ScalarVector<f32>
 impl SimdVector for ScalarVector<f32> {
     type Scalar = f32;
     type Mask = ScalarMask;
+    type IntBits = ScalarInt;
 
     const LANES: usize = 1;
 
@@ -132,12 +188,165 @@ impl SimdVector for ScalarVector<f32> {
     fn horizontal_min(self) -> Self::Scalar {
         self.0
     }
+
+    #[inline(always)]
+    fn to_bits(self) -> Self::IntBits {
+        ScalarInt(self.0.to_bits())
+    }
+
+    #[inline(always)]
+    fn from_bits(bits: Self::IntBits) -> Self {
+        ScalarVector(f32::from_bits(bits.0))
+    }
+
+    #[inline(always)]
+    fn from_int_cast(int_vec: Self::IntBits) -> Self {
+        ScalarVector(int_vec.0 as f32)
+    }
+}
+
+// Libm-optimized math functions for scalar backend
+//
+// These provide best-in-class scalar performance by using libm directly,
+// while the generic polynomial implementations in src/math/*.rs are used for
+// actual SIMD backends (AVX2, AVX512, NEON).
+//
+// Usage: For scalar code, call these methods directly (e.g., x.sin_libm()).
+// For generic SIMD code, use the generic functions (e.g., sin(x)).
+impl ScalarVector<f32> {
+    /// Natural exponential function using libm
+    #[inline(always)]
+    pub fn exp_libm(self) -> Self {
+        ScalarVector(libm::expf(self.0))
+    }
+
+    /// Natural logarithm using libm
+    #[inline(always)]
+    pub fn log_libm(self) -> Self {
+        ScalarVector(libm::logf(self.0))
+    }
+
+    /// Base-2 logarithm using libm
+    #[inline(always)]
+    pub fn log2_libm(self) -> Self {
+        ScalarVector(libm::log2f(self.0))
+    }
+
+    /// Base-10 logarithm using libm
+    #[inline(always)]
+    pub fn log10_libm(self) -> Self {
+        ScalarVector(libm::log10f(self.0))
+    }
+
+    /// Natural logarithm of 1+x using libm
+    #[inline(always)]
+    pub fn log1p_libm(self) -> Self {
+        ScalarVector(libm::log1pf(self.0))
+    }
+
+    /// Sine function using libm
+    #[inline(always)]
+    pub fn sin_libm(self) -> Self {
+        ScalarVector(libm::sinf(self.0))
+    }
+
+    /// Cosine function using libm
+    #[inline(always)]
+    pub fn cos_libm(self) -> Self {
+        ScalarVector(libm::cosf(self.0))
+    }
+
+    /// Tangent function using libm
+    #[inline(always)]
+    pub fn tan_libm(self) -> Self {
+        ScalarVector(libm::tanf(self.0))
+    }
+
+    /// Arctangent function using libm
+    #[inline(always)]
+    pub fn atan_libm(self) -> Self {
+        ScalarVector(libm::atanf(self.0))
+    }
+
+    /// Two-argument arctangent using libm
+    #[inline(always)]
+    pub fn atan2_libm(self, x: Self) -> Self {
+        ScalarVector(libm::atan2f(self.0, x.0))
+    }
+
+    /// Hyperbolic tangent using libm
+    #[inline(always)]
+    pub fn tanh_libm(self) -> Self {
+        ScalarVector(libm::tanhf(self.0))
+    }
+
+    /// Power function using libm
+    #[inline(always)]
+    pub fn pow_libm(self, exp: Self) -> Self {
+        ScalarVector(libm::powf(self.0, exp.0))
+    }
+
+    /// Square root using libm
+    #[inline(always)]
+    pub fn sqrt_libm(self) -> Self {
+        ScalarVector(libm::sqrtf(self.0))
+    }
+
+    /// Compute sine and cosine simultaneously using libm
+    #[inline(always)]
+    pub fn sincos_libm(self) -> (Self, Self) {
+        let sin = libm::sinf(self.0);
+        let cos = libm::cosf(self.0);
+        (ScalarVector(sin), ScalarVector(cos))
+    }
+}
+
+// Implement SimdInt for ScalarInt64 (f64 support - placeholder)
+impl SimdInt for ScalarInt64 {
+    const LANES: usize = 1;
+    type FloatVec = ScalarVector<f64>;
+
+    #[inline(always)]
+    fn splat(value: u32) -> Self {
+        ScalarInt64(value as u64)
+    }
+
+    #[inline(always)]
+    fn shr(self, count: u32) -> Self {
+        ScalarInt64(self.0 >> count)
+    }
+
+    #[inline(always)]
+    fn shl(self, count: u32) -> Self {
+        ScalarInt64(self.0 << count)
+    }
+
+    #[inline(always)]
+    fn bitwise_and(self, rhs: u32) -> Self {
+        ScalarInt64(self.0 & (rhs as u64))
+    }
+
+    #[inline(always)]
+    fn bitwise_or(self, rhs: u32) -> Self {
+        ScalarInt64(self.0 | (rhs as u64))
+    }
+
+    #[inline(always)]
+    fn sub_scalar(self, rhs: u32) -> Self {
+        ScalarInt64(self.0.wrapping_sub(rhs as u64))
+    }
+
+    #[inline(always)]
+    fn to_f32(self) -> Self::FloatVec {
+        ScalarVector(self.0 as f64)
+    }
 }
 
 // Implement SimdVector for ScalarVector<f64>
 impl SimdVector for ScalarVector<f64> {
     type Scalar = f64;
     type Mask = ScalarMask;
+    type IntBits = ScalarInt64;
 
     const LANES: usize = 1;
 
@@ -246,6 +455,21 @@ impl SimdVector for ScalarVector<f64> {
     #[inline(always)]
     fn horizontal_min(self) -> Self::Scalar {
         self.0
+    }
+
+    #[inline(always)]
+    fn to_bits(self) -> Self::IntBits {
+        ScalarInt64(self.0.to_bits())
+    }
+
+    #[inline(always)]
+    fn from_bits(bits: Self::IntBits) -> Self {
+        ScalarVector(f64::from_bits(bits.0))
+    }
+
+    #[inline(always)]
+    fn from_int_cast(int_vec: Self::IntBits) -> Self {
+        ScalarVector(int_vec.0 as f64)
     }
 }
 
@@ -369,5 +593,96 @@ mod tests {
         assert!(mask_true.or(mask_false).0);
         assert!(!mask_true.xor(mask_true).0);
         assert!(mask_true.xor(mask_false).0);
+    }
+
+    // Tests for libm-optimized math functions
+    #[test]
+    fn test_libm_exp() {
+        let x = ScalarVector(1.0f32);
+        let result = x.exp_libm();
+        let expected = core::f32::consts::E;
+        assert!((result.0 - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_log() {
+        let x = ScalarVector(core::f32::consts::E);
+        let result = x.log_libm();
+        assert!((result.0 - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_log2() {
+        let x = ScalarVector(8.0f32);
+        let result = x.log2_libm();
+        assert!((result.0 - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_log10() {
+        let x = ScalarVector(100.0f32);
+        let result = x.log10_libm();
+        assert!((result.0 - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_trig() {
+        let x = ScalarVector(core::f32::consts::FRAC_PI_4);
+        let sin_result = x.sin_libm();
+        let cos_result = x.cos_libm();
+
+        // sin(π/4) ≈ cos(π/4) ≈ √2/2
+        let expected = 0.7071067811865476f32;
+        assert!((sin_result.0 - expected).abs() < 1e-6);
+        assert!((cos_result.0 - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_sincos() {
+        let x = ScalarVector(core::f32::consts::FRAC_PI_4);
+        let (sin_result, cos_result) = x.sincos_libm();
+
+        let expected = 0.7071067811865476f32;
+        assert!((sin_result.0 - expected).abs() < 1e-6);
+        assert!((cos_result.0 - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_atan() {
+        let x = ScalarVector(1.0f32);
+        let result = x.atan_libm();
+        let expected = core::f32::consts::FRAC_PI_4;
+        assert!((result.0 - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_atan2() {
+        let y = ScalarVector(1.0f32);
+        let x = ScalarVector(1.0f32);
+        let result = y.atan2_libm(x);
+        let expected = core::f32::consts::FRAC_PI_4;
+        assert!((result.0 - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_tanh() {
+        let x = ScalarVector(0.0f32);
+        let result = x.tanh_libm();
+        assert!((result.0 - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_pow() {
+        let base = ScalarVector(2.0f32);
+        let exp = ScalarVector(3.0f32);
+        let result = base.pow_libm(exp);
+        assert!((result.0 - 8.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_libm_sqrt() {
+        let x = ScalarVector(16.0f32);
+        let result = x.sqrt_libm();
+        assert!((result.0 - 4.0).abs() < 1e-6);
     }
 }
