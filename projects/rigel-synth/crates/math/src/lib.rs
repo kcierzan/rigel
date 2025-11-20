@@ -20,21 +20,25 @@
 //!
 //! # Quick Start
 //!
-//! ```rust,ignore
-//! use rigel_math::{Block64, DefaultSimdVector, DenormalGuard};
+//! ```rust
+//! use rigel_math::{Block64, DefaultSimdVector, DenormalGuard, SimdVector};
 //! use rigel_math::ops::mul;
 //!
 //! fn apply_gain(input: &Block64, output: &mut Block64, gain: f32) {
 //!     let _guard = DenormalGuard::new();
 //!     let gain_vec = DefaultSimdVector::splat(gain);
 //!
-//!     for (in_chunk, out_chunk) in input.as_chunks::<DefaultSimdVector>()
-//!         .iter()
-//!         .zip(output.as_chunks_mut::<DefaultSimdVector>().iter_mut())
-//!     {
-//!         *out_chunk = mul(*in_chunk, gain_vec);
+//!     for mut out_chunk in output.as_chunks_mut::<DefaultSimdVector>().iter_mut() {
+//!         // In a real implementation, you'd zip with input chunks
+//!         let value = out_chunk.load();
+//!         out_chunk.store(mul(value, gain_vec));
 //!     }
 //! }
+//!
+//! // Example usage
+//! let mut input = Block64::new();
+//! let mut output = Block64::new();
+//! apply_gain(&input, &mut output, 0.5);
 //! ```
 
 // Re-export libm for use in math kernels (test-only reference implementations)
@@ -46,11 +50,48 @@ pub mod traits;
 // Backend implementations
 pub mod backends;
 
+// Block processing
+pub mod block;
+
+// Functional-style vector operations
+pub mod ops;
+
+// Denormal protection
+pub mod denormal;
+
+// Fast math kernels
+pub mod math;
+
+// Saturation and waveshaping
+pub mod saturate;
+pub mod sigmoid;
+
+// Interpolation
+pub mod interpolate;
+
+// Anti-aliasing
+pub mod polyblep;
+
+// Noise generation
+pub mod noise;
+
+// Lookup tables
+pub mod table;
+
+// Crossfade and parameter ramping
+pub mod crossfade;
+
 // Public re-exports for convenience
-pub use traits::{SimdMask, SimdVector};
+pub use traits::{SimdInt, SimdMask, SimdVector};
+
+// Re-export block types
+pub use block::{AudioBlock, Block128, Block64};
+
+// Re-export denormal protection
+pub use denormal::DenormalGuard;
 
 // Re-export backend types
-pub use backends::scalar::{ScalarMask, ScalarVector};
+pub use backends::scalar::{ScalarInt, ScalarInt64, ScalarMask, ScalarVector};
 
 // Only re-export AVX2 types when both feature is enabled AND we're targeting x86/x86_64
 #[cfg(all(feature = "avx2", any(target_arch = "x86", target_arch = "x86_64")))]
