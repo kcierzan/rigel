@@ -396,6 +396,10 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **Regression Detection**: Performance tests must detect >5% degradation in instruction counts or >10% degradation in wall-clock time
 - **Test Isolation**: Tests must be independent and parallelizable with no shared mutable state
 - **Deterministic Testing**: Property-based tests must be reproducible via seed values for debugging failures
+- **Build Infrastructure**: CI must build for all three platforms (macOS ARM64, Linux x86-64, Windows x86-64) on every pull request
+- **Reproducible Builds**: All builds (local and CI) must run through devenv shell for consistent, reproducible environments
+- **Cross-Compilation Strategy**: Windows builds may use cross-compilation where it provides value without excessive complexity; macOS↔Linux cross-compilation is not supported due to GUI dependency complexity
+- **Local Development Performance**: Native builds must be prioritized for fast iteration during local development
 
 ## Dependencies
 
