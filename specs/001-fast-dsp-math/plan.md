@@ -20,7 +20,7 @@ Create a trait-based SIMD abstraction layer for Rigel's DSP core that provides z
   - `proptest` for property-based testing (chosen for superior SIMD edge case handling - see research.md)
 **Storage**: N/A (pure computational library, no persistence)
 **Testing**: `cargo test` with property-based tests for mathematical invariants, benchmark suite for performance validation
-**Target Platform**: macOS (x86-64 + ARM64), Linux (x86-64), Windows (x86-64) - cross-compiled via devenv
+**Target Platform**: macOS (ARM64 native), Linux (x86-64 native), Windows (x86-64 cross-compiled via xwin)
 **Project Type**: Library crate within rigel-synth monorepo workspace
 **Performance Goals**:
   - Vectorized operations: 4-8x speedup (AVX2), 8-16x speedup (AVX512), 4-8x speedup (NEON) vs scalar

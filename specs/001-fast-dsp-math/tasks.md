@@ -62,24 +62,24 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 - [X] T016 [P] [US1] Implement AVX2 backend: Avx2Vector<T> wrapper around __m256/__m256d in projects/rigel-synth/crates/math/src/backends/avx2.rs
 - [X] T017 [P] [US1] Implement AVX2 mask type: Avx2Mask wrapper around __m256 in projects/rigel-synth/crates/math/src/backends/avx2.rs
-- [ ] T018 [P] [US1] Implement AVX512 backend: Avx512Vector<T> wrapper around __m512/__m512d in projects/rigel-synth/crates/math/src/backends/avx512.rs
-- [ ] T019 [P] [US1] Implement AVX512 mask type: Avx512Mask wrapper around __mmask16 in projects/rigel-synth/crates/math/src/backends/avx512.rs
+- [X] T018 [P] [US1] Implement AVX512 backend: Avx512Vector<T> wrapper around __m512/__m512d in projects/rigel-synth/crates/math/src/backends/avx512.rs
+- [X] T019 [P] [US1] Implement AVX512 mask type: Avx512Mask wrapper around __mmask16 in projects/rigel-synth/crates/math/src/backends/avx512.rs
 - [X] T020 [P] [US1] Implement NEON backend: NeonVector<T> wrapper around float32x4_t/float64x2_t in projects/rigel-synth/crates/math/src/backends/neon.rs
 - [X] T021 [P] [US1] Implement NEON mask type: NeonMask wrapper around uint32x4_t in projects/rigel-synth/crates/math/src/backends/neon.rs
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] Property-based test: SimdVector arithmetic commutativity across all backends in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T023 [P] [US1] Property-based test: SimdVector arithmetic associativity across all backends in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T024 [P] [US1] Backend consistency test: scalar vs SIMD backends produce identical results in projects/rigel-synth/crates/math/tests/backend_consistency.rs
-- [ ] T025 [P] [US1] Integration test: Simple DSP algorithm compiles and runs with all backends in projects/rigel-synth/crates/math/tests/backend_consistency.rs
-- [ ] T026 [P] [US1] Unit tests: Edge cases (NaN, infinity, zero) for all backend implementations in projects/rigel-synth/crates/math/src/backends/mod.rs
+- [X] T022 [P] [US1] Property-based test: SimdVector arithmetic commutativity across all backends in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T023 [P] [US1] Property-based test: SimdVector arithmetic associativity across all backends in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T024 [P] [US1] Backend consistency test: scalar vs SIMD backends produce identical results in projects/rigel-synth/crates/math/tests/backend_consistency.rs
+- [X] T025 [P] [US1] Integration test: Simple DSP algorithm compiles and runs with all backends in projects/rigel-synth/crates/math/tests/backend_consistency.rs
+- [X] T026 [P] [US1] Unit tests: Edge cases (NaN, infinity, zero) for all backend implementations in projects/rigel-synth/crates/math/tests/edge_cases.rs
 
 ### Benchmarks for User Story 1
 
-- [ ] T027 [US1] Criterion benchmark: Measure wall-clock time for vector operations across backends in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T028 [US1] iai-callgrind benchmark: Measure instruction counts for vector operations in projects/rigel-synth/crates/math/benches/iai_benches.rs
-- [ ] T029 [US1] Validate performance scaling: AVX2 4-8x, AVX512 8-16x, NEON 4-8x vs scalar in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T027 [US1] Criterion benchmark: Measure wall-clock time for vector operations across backends in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T028 [US1] iai-callgrind benchmark: Measure instruction counts for vector operations in projects/rigel-synth/crates/math/benches/iai_benches.rs
+- [X] T029 [US1] Validate performance scaling: AVX2 4-8x, AVX512 8-16x, NEON 4-8x vs scalar in projects/rigel-synth/crates/math/benches/criterion_benches.rs
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - developers can write backend-agnostic SIMD code using trait abstractions
 
@@ -93,19 +93,19 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 2
 
-- [ ] T030 [P] [US2] Define AudioBlock<T, const N: usize> struct with alignment attributes in projects/rigel-synth/crates/math/src/block.rs
-- [ ] T031 [US2] Implement AudioBlock::new() and AudioBlock::from_slice() in projects/rigel-synth/crates/math/src/block.rs
-- [ ] T032 [US2] Implement AudioBlock::as_chunks<V: SimdVector>() for immutable SIMD views in projects/rigel-synth/crates/math/src/block.rs
-- [ ] T033 [US2] Implement AudioBlock::as_chunks_mut<V: SimdVector>() for mutable SIMD views in projects/rigel-synth/crates/math/src/block.rs
-- [ ] T034 [US2] Create Block64 and Block128 type aliases in projects/rigel-synth/crates/math/src/block.rs
-- [ ] T035 [US2] Document memory layout and lane packing conventions in projects/rigel-synth/crates/math/src/block.rs
+- [X] T030 [P] [US2] Define AudioBlock<T, const N: usize> struct with alignment attributes in projects/rigel-synth/crates/math/src/block.rs
+- [X] T031 [US2] Implement AudioBlock::new() and AudioBlock::from_slice() in projects/rigel-synth/crates/math/src/block.rs
+- [X] T032 [US2] Implement AudioBlock::as_chunks<V: SimdVector>() for immutable SIMD views in projects/rigel-synth/crates/math/src/block.rs
+- [X] T033 [US2] Implement AudioBlock::as_chunks_mut<V: SimdVector>() for mutable SIMD views in projects/rigel-synth/crates/math/src/block.rs
+- [X] T034 [US2] Create Block64 and Block128 type aliases in projects/rigel-synth/crates/math/src/block.rs
+- [X] T035 [US2] Document memory layout and lane packing conventions in projects/rigel-synth/crates/math/src/block.rs
 
 ### Tests for User Story 2
 
-- [ ] T036 [P] [US2] Unit test: Verify alignment (32-byte AVX2, 64-byte AVX512, 16-byte NEON) in projects/rigel-synth/crates/math/src/block.rs
-- [ ] T037 [P] [US2] Integration test: Block processing with as_chunks enables loop unrolling (assembly inspection) in projects/rigel-synth/crates/math/tests/block_processing.rs
-- [ ] T038 [P] [US2] Property-based test: Block processing with arbitrary inputs maintains correctness in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T039 [US2] Assembly inspection verification: Use `cargo asm` or llvm-mca to verify block processing compiles to unrolled vectorized loops (validates FR-014 and SC-005)
+- [X] T036 [P] [US2] Unit test: Verify alignment (32-byte AVX2, 64-byte AVX512, 16-byte NEON) in projects/rigel-synth/crates/math/src/block.rs
+- [X] T037 [P] [US2] Integration test: Block processing with as_chunks enables loop unrolling (assembly inspection) in projects/rigel-synth/crates/math/tests/block_processing.rs
+- [X] T038 [P] [US2] Property-based test: Block processing with arbitrary inputs maintains correctness in projects/rigel-synth/crates/math/tests/block_processing.rs
+- [X] T039 [US2] Assembly inspection verification: Use `cargo asm` or llvm-mca to verify block processing compiles to unrolled vectorized loops (validates FR-014 and SC-005)
 
 **Checkpoint**: Block processing infrastructure ready - enables efficient SIMD-friendly memory access patterns
 
@@ -119,25 +119,25 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 3
 
-- [ ] T040 [P] [US3] Implement vector arithmetic operations module in projects/rigel-synth/crates/math/src/ops/arithmetic.rs
-- [ ] T041 [P] [US3] Implement FMA operations module in projects/rigel-synth/crates/math/src/ops/fma.rs
-- [ ] T042 [P] [US3] Implement min/max/clamp operations module in projects/rigel-synth/crates/math/src/ops/minmax.rs
-- [ ] T043 [P] [US3] Implement comparison operations (lt, gt, eq) returning masks in projects/rigel-synth/crates/math/src/ops/compare.rs
-- [ ] T044 [P] [US3] Implement horizontal operations (sum, max, min) module in projects/rigel-synth/crates/math/src/ops/horizontal.rs
-- [ ] T045 [US3] Create ops module with re-exports in projects/rigel-synth/crates/math/src/ops/mod.rs
+- [x] T040 [P] [US3] Implement vector arithmetic operations module in projects/rigel-synth/crates/math/src/ops/arithmetic.rs
+- [x] T041 [P] [US3] Implement FMA operations module in projects/rigel-synth/crates/math/src/ops/fma.rs
+- [x] T042 [P] [US3] Implement min/max/clamp operations module in projects/rigel-synth/crates/math/src/ops/minmax.rs
+- [x] T043 [P] [US3] Implement comparison operations (lt, gt, eq) returning masks in projects/rigel-synth/crates/math/src/ops/compare.rs
+- [x] T044 [P] [US3] Implement horizontal operations (sum, max, min) module in projects/rigel-synth/crates/math/src/ops/horizontal.rs
+- [x] T045 [US3] Create ops module with re-exports in projects/rigel-synth/crates/math/src/ops/mod.rs
 
 ### Tests for User Story 3
 
-- [ ] T046 [P] [US3] Property-based test: FMA accuracy vs separate multiply-add across backends in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T047 [P] [US3] Property-based test: Min/max operations with edge cases (NaN, infinity) in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T048 [P] [US3] Property-based test: Horizontal sum correctness across all backends in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T049 [P] [US3] Unit test: Comparison masks enable conditional logic without branching in projects/rigel-synth/crates/math/src/ops/compare.rs
-- [ ] T050 [P] [US3] Backend consistency test: All vector operations produce results within error bounds in projects/rigel-synth/crates/math/tests/backend_consistency.rs
+- [x] T046 [P] [US3] Property-based test: FMA accuracy vs separate multiply-add across backends in projects/rigel-synth/crates/math/tests/properties.rs
+- [x] T047 [P] [US3] Property-based test: Min/max operations with edge cases (NaN, infinity) in projects/rigel-synth/crates/math/tests/properties.rs
+- [x] T048 [P] [US3] Property-based test: Horizontal sum correctness across all backends in projects/rigel-synth/crates/math/tests/properties.rs
+- [x] T049 [P] [US3] Unit test: Comparison masks enable conditional logic without branching in projects/rigel-synth/crates/math/src/ops/compare.rs
+- [x] T050 [P] [US3] Backend consistency test: All vector operations produce results within error bounds in projects/rigel-synth/crates/math/tests/backend_consistency.rs
 
 ### Benchmarks for User Story 3
 
-- [ ] T051 [US3] Criterion benchmark: Wall-clock performance of all vector operations in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T052 [US3] iai-callgrind benchmark: Verify FMA uses single instruction on supporting backends in projects/rigel-synth/crates/math/benches/iai_benches.rs
+- [x] T051 [US3] Criterion benchmark: Wall-clock performance of all vector operations in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [x] T052 [US3] iai-callgrind benchmark: Verify FMA uses single instruction on supporting backends in projects/rigel-synth/crates/math/benches/iai_benches.rs
 
 **Checkpoint**: Core vector operations complete - developers can build complex DSP algorithms from optimized primitives
 
@@ -151,17 +151,17 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 6
 
-- [ ] T053 [P] [US6] Implement DenormalGuard struct with RAII pattern in projects/rigel-synth/crates/math/src/denormal.rs
-- [ ] T054 [US6] Implement x86-64 denormal protection (FTZ/DAZ flags in MXCSR) in projects/rigel-synth/crates/math/src/denormal.rs
-- [ ] T055 [US6] Implement ARM64 denormal protection (FZ flag in FPCR) in projects/rigel-synth/crates/math/src/denormal.rs
-- [ ] T056 [US6] Implement Drop trait for DenormalGuard to restore FPU state in projects/rigel-synth/crates/math/src/denormal.rs
-- [ ] T057 [US6] Add with_denormal_protection convenience function in projects/rigel-synth/crates/math/src/denormal.rs
+- [X] T053 [P] [US6] Implement DenormalGuard struct with RAII pattern in projects/rigel-synth/crates/math/src/denormal.rs
+- [X] T054 [US6] Implement x86-64 denormal protection (FTZ/DAZ flags in MXCSR) in projects/rigel-synth/crates/math/src/denormal.rs
+- [X] T055 [US6] Implement ARM64 denormal protection (FZ flag in FPCR) in projects/rigel-synth/crates/math/src/denormal.rs
+- [X] T056 [US6] Implement Drop trait for DenormalGuard to restore FPU state in projects/rigel-synth/crates/math/src/denormal.rs
+- [X] T057 [US6] Add with_denormal_protection convenience function in projects/rigel-synth/crates/math/src/denormal.rs
 
 ### Tests for User Story 6
 
-- [ ] T058 [P] [US6] Performance test: CPU usage remains constant when processing denormals in projects/rigel-synth/crates/math/tests/denormal_tests.rs
-- [ ] T059 [P] [US6] Accuracy test: Denormal protection introduces no audible artifacts (THD+N < -96dB) in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T060 [P] [US6] Unit test: DenormalGuard::is_available() returns correct value per platform in projects/rigel-synth/crates/math/src/denormal.rs
+- [X] T058 [P] [US6] Performance test: CPU usage remains constant when processing denormals in projects/rigel-synth/crates/math/tests/denormal_tests.rs
+- [X] T059 [P] [US6] Accuracy test: Denormal protection introduces no audible artifacts (THD+N < -96dB) in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T060 [P] [US6] Unit test: DenormalGuard::is_available() returns correct value per platform in projects/rigel-synth/crates/math/src/denormal.rs
 
 **Checkpoint**: Denormal protection prevents catastrophic performance drops during silence processing
 
@@ -175,17 +175,17 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 9
 
-- [ ] T061 [P] [US9] Create comprehensive Criterion benchmark suite covering all operations in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T062 [P] [US9] Create iai-callgrind benchmark suite for instruction count measurements in projects/rigel-synth/crates/math/benches/iai_benches.rs
-- [ ] T063 [US9] Add benchmark configuration for running with different backends in projects/rigel-synth/crates/math/benches/Cargo.toml
-- [ ] T064 [US9] Document benchmark execution and result interpretation in projects/rigel-synth/crates/math/README.md
+- [X] T061 [P] [US9] Create comprehensive Criterion benchmark suite covering all operations in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T062 [P] [US9] Create iai-callgrind benchmark suite for instruction count measurements in projects/rigel-synth/crates/math/benches/iai_benches.rs
+- [X] T063 [US9] Add benchmark configuration for running with different backends in projects/rigel-synth/crates/math/benches/Cargo.toml
+- [X] T064 [US9] Document benchmark execution and result interpretation in projects/rigel-synth/crates/math/README.md
 
 ### Tests for User Story 9
 
-- [ ] T065 [P] [US9] CI test: Run benchmark suite with --features scalar and verify compilation in .github/workflows/ci.yml
-- [ ] T066 [P] [US9] CI test: Run benchmark suite with --features avx2 on x86-64 runner in .github/workflows/ci.yml
-- [ ] T067 [P] [US9] CI test: Run benchmark suite with --features avx512 on x86-64 runner in .github/workflows/ci.yml
-- [ ] T068 [P] [US9] CI test: Run benchmark suite with --features neon on ARM64 runner in .github/workflows/ci.yml
+- [X] T065 [P] [US9] CI test: Run benchmark suite with --features scalar and verify compilation in .github/workflows/ci.yml
+- [X] T066 [P] [US9] CI test: Run benchmark suite with --features avx2 on x86-64 runner in .github/workflows/ci.yml
+- [X] T067 [P] [US9] CI test: Run benchmark suite with --features avx512 on x86-64 runner in .github/workflows/ci.yml
+- [X] T068 [P] [US9] CI test: Run benchmark suite with --features neon on ARM64 runner in .github/workflows/ci.yml
 
 **Checkpoint**: Backend selection and benchmarking infrastructure enables validating performance claims
 
@@ -199,22 +199,22 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 10
 
-- [ ] T069 [P] [US10] Create test_utils module with reference implementations (libm) in projects/rigel-synth/crates/math/tests/test_utils.rs
-- [ ] T070 [P] [US10] Create proptest strategies for normal, denormal, and edge-case floats in projects/rigel-synth/crates/math/tests/test_utils.rs
-- [ ] T071 [US10] Implement assert_backend_consistency helper in projects/rigel-synth/crates/math/tests/test_utils.rs
-- [ ] T072 [US10] Configure proptest to generate 10,000+ test cases per operation in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T069 [P] [US10] Create test_utils module with reference implementations (libm) in projects/rigel-synth/crates/math/tests/test_utils.rs
+- [X] T070 [P] [US10] Create proptest strategies for normal, denormal, and edge-case floats in projects/rigel-synth/crates/math/tests/test_utils.rs
+- [X] T071 [US10] Implement assert_backend_consistency helper in projects/rigel-synth/crates/math/tests/test_utils.rs
+- [X] T072 [US10] Configure proptest to generate 10,000+ test cases per operation in projects/rigel-synth/crates/math/tests/properties.rs
 
 ### Tests for User Story 10
 
-- [ ] T073 [P] [US10] Property-based test: Mathematical invariants hold across thousands of random inputs in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T074 [P] [US10] Documentation tests: All code examples in API docs compile and execute in projects/rigel-synth/crates/math/src/lib.rs
-- [ ] T075 [P] [US10] Unit tests: Edge cases (NaN, infinity, denormals, zero, extreme values) handled gracefully in projects/rigel-synth/crates/math/src/
+- [X] T073 [P] [US10] Property-based test: Mathematical invariants hold across thousands of random inputs in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T074 [P] [US10] Documentation tests: All code examples in API docs compile and execute in projects/rigel-synth/crates/math/src/lib.rs
+- [X] T075 [P] [US10] Unit tests: Edge cases (NaN, infinity, denormals, zero, extreme values) handled gracefully in projects/rigel-synth/crates/math/src/
 - [ ] T076 [P] [US10] Code coverage: Verify >90% line coverage and >95% branch coverage for critical paths using tarpaulin or llvm-cov
-- [ ] T077 [US10] Performance regression test: Detect >5% instruction count or >10% wall-clock degradation in projects/rigel-synth/crates/math/tests/regression_tests.rs
-- [ ] T078 [P] [US10] Integration test: Implement simple oscillator (sine wave generation) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
-- [ ] T079 [P] [US10] Integration test: Implement basic filter (one-pole lowpass) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
-- [ ] T080 [P] [US10] Integration test: Implement envelope generator (ADSR) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
-- [ ] T081 [US10] Verify integration tests compile and execute correctly across all backends (scalar, avx2, avx512, neon) in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
+- [X] T077 [US10] Performance regression test: Detect >5% instruction count or >10% wall-clock degradation in projects/rigel-synth/crates/math/tests/regression_tests.rs
+- [X] T078 [P] [US10] Integration test: Implement simple oscillator (sine wave generation) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
+- [X] T079 [P] [US10] Integration test: Implement basic filter (one-pole lowpass) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
+- [X] T080 [P] [US10] Integration test: Implement envelope generator (ADSR) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
+- [X] T081 [US10] Verify integration tests compile and execute correctly across all backends (scalar, avx2, avx512, neon) in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
 
 **Checkpoint**: Comprehensive test infrastructure ensures library quality and catches regressions
 
@@ -228,48 +228,48 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 4
 
-- [ ] T082 [P] [US4] Implement vectorized tanh approximation in projects/rigel-synth/crates/math/src/math/tanh.rs
-- [ ] T083 [P] [US4] Implement vectorized exp approximation in projects/rigel-synth/crates/math/src/math/exp.rs
-- [ ] T084 [P] [US4] Implement vectorized log and log1p approximations in projects/rigel-synth/crates/math/src/math/log.rs
-- [ ] T085 [P] [US4] Implement vectorized sin/cos approximations with sincos variant in projects/rigel-synth/crates/math/src/math/trig.rs
-- [ ] T086 [P] [US4] Implement vectorized fast inverse (1/x) with Newton-Raphson refinement in projects/rigel-synth/crates/math/src/math/inverse.rs
-- [ ] T087 [P] [US4] Implement vectorized sqrt and rsqrt in projects/rigel-synth/crates/math/src/math/sqrt.rs
-- [ ] T088 [P] [US4] Implement vectorized pow function in projects/rigel-synth/crates/math/src/math/pow.rs
-- [ ] T089 [P] [US4] Implement vectorized atan approximation using Remez minimax polynomial in projects/rigel-synth/crates/math/src/math/atan.rs
-- [ ] T090 [P] [US4] Implement vectorized exp2 and log2 using IEEE 754 exponent manipulation with polynomial refinement in projects/rigel-synth/crates/math/src/math/exp2_log2.rs
-- [ ] T091 [P] [US4] Implement polynomial saturation curves (soft clip, hard clip, asymmetric) in projects/rigel-synth/crates/math/src/saturate.rs
-- [ ] T092 [P] [US4] Implement sigmoid curves (logistic, smoothstep family) with C1/C2 continuity in projects/rigel-synth/crates/math/src/sigmoid.rs
-- [ ] T093 [P] [US4] Implement polynomial interpolation kernels (linear, cubic Hermite, quintic) in projects/rigel-synth/crates/math/src/interpolate.rs
-- [ ] T094 [P] [US4] Implement polyBLEP kernel using 2nd-order polynomial approximation in projects/rigel-synth/crates/math/src/polyblep.rs
-- [ ] T095 [P] [US4] Implement vectorized white noise generation using xorshift PRNG in projects/rigel-synth/crates/math/src/noise.rs
-- [ ] T096 [US4] Create math module with re-exports in projects/rigel-synth/crates/math/src/math/mod.rs
+- [X] T082 [P] [US4] Implement vectorized tanh approximation in projects/rigel-synth/crates/math/src/math/tanh.rs
+- [X] T083 [P] [US4] Implement vectorized exp approximation in projects/rigel-synth/crates/math/src/math/exp.rs
+- [X] T084 [P] [US4] Implement vectorized log and log1p approximations in projects/rigel-synth/crates/math/src/math/log.rs
+- [X] T085 [P] [US4] Implement vectorized sin/cos approximations with sincos variant in projects/rigel-synth/crates/math/src/math/trig.rs
+- [X] T086 [P] [US4] Implement vectorized fast inverse (1/x) with Newton-Raphson refinement in projects/rigel-synth/crates/math/src/math/inverse.rs
+- [X] T087 [P] [US4] Implement vectorized sqrt and rsqrt in projects/rigel-synth/crates/math/src/math/sqrt.rs
+- [X] T088 [P] [US4] Implement vectorized pow function in projects/rigel-synth/crates/math/src/math/pow.rs
+- [X] T089 [P] [US4] Implement vectorized atan approximation using Remez minimax polynomial in projects/rigel-synth/crates/math/src/math/atan.rs
+- [X] T090 [P] [US4] Implement vectorized exp2 and log2 using IEEE 754 exponent manipulation with polynomial refinement in projects/rigel-synth/crates/math/src/math/exp2_log2.rs
+- [X] T091 [P] [US4] Implement polynomial saturation curves (soft clip, hard clip, asymmetric) in projects/rigel-synth/crates/math/src/saturate.rs
+- [X] T092 [P] [US4] Implement sigmoid curves (logistic, smoothstep family) with C1/C2 continuity in projects/rigel-synth/crates/math/src/sigmoid.rs
+- [X] T093 [P] [US4] Implement polynomial interpolation kernels (linear, cubic Hermite, quintic) in projects/rigel-synth/crates/math/src/interpolate.rs
+- [X] T094 [P] [US4] Implement polyBLEP kernel using 2nd-order polynomial approximation in projects/rigel-synth/crates/math/src/polyblep.rs
+- [X] T095 [P] [US4] Implement vectorized white noise generation using xorshift PRNG in projects/rigel-synth/crates/math/src/noise.rs
+- [X] T096 [US4] Create math module with re-exports in projects/rigel-synth/crates/math/src/math/mod.rs
 
 ### Tests for User Story 4
 
-- [ ] T097 [P] [US4] Accuracy test: tanh error <0.1% vs libm reference across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T098 [P] [US4] Accuracy test: exp error <0.1% vs libm reference across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T099 [P] [US4] Accuracy test: log1p error <0.001% for frequency calculations in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T100 [P] [US4] Accuracy test: sin/cos harmonic distortion <-100dB across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T101 [P] [US4] Accuracy test: fast inverse error <0.01% at 5-10x speedup in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T102 [P] [US4] Accuracy test: atan absolute error <0.001 radians (<0.057 degrees) vs libm reference across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T103 [P] [US4] Accuracy test: exp2/log2 error <0.01% for pow decomposition across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T104 [P] [US4] Accuracy test: Polynomial saturation curves produce expected harmonic characteristics in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T105 [P] [US4] Accuracy test: Sigmoid curves maintain C1/C2 continuity (smooth derivatives) in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T106 [P] [US4] Accuracy test: Cubic Hermite interpolation maintains phase continuity in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T107 [P] [US4] Accuracy test: PolyBLEP produces alias-free output (spectral analysis) in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T108 [P] [US4] Statistical test: White noise passes chi-square distribution test in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T109 [P] [US4] Property-based test: Math kernels handle edge cases (NaN, infinity, denormals) gracefully in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T097 [P] [US4] Accuracy test: tanh error <0.1% vs libm reference across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T098 [P] [US4] Accuracy test: exp error <0.1% vs libm reference across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T099 [P] [US4] Accuracy test: log1p error <0.001% for frequency calculations in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T100 [P] [US4] Accuracy test: sin/cos harmonic distortion <-100dB across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T101 [P] [US4] Accuracy test: fast inverse error <0.01% at 5-10x speedup in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T102 [P] [US4] Accuracy test: atan absolute error <0.001 radians (<0.057 degrees) vs libm reference across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T103 [P] [US4] Accuracy test: exp2/log2 error <0.01% for pow decomposition across all backends in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T104 [P] [US4] Accuracy test: Polynomial saturation curves produce expected harmonic characteristics in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T105 [P] [US4] Accuracy test: Sigmoid curves maintain C1/C2 continuity (smooth derivatives) in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T106 [P] [US4] Accuracy test: Cubic Hermite interpolation maintains phase continuity in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T107 [P] [US4] Accuracy test: PolyBLEP produces alias-free output (spectral analysis) in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T108 [P] [US4] Statistical test: White noise passes chi-square distribution test in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T109 [P] [US4] Property-based test: Math kernels handle edge cases (NaN, infinity, denormals) gracefully in projects/rigel-synth/crates/math/tests/properties.rs
 
 ### Benchmarks for User Story 4
 
-- [ ] T110 [US4] Criterion benchmark: Verify tanh executes 8-16x faster than scalar in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T111 [US4] Criterion benchmark: Verify exp achieves sub-nanosecond per-sample throughput in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T112 [US4] Criterion benchmark: Verify atan executes 8-16x faster than scalar libm atan in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T113 [US4] Criterion benchmark: Verify exp2/log2 execute 10-20x faster than scalar libm in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T114 [US4] Criterion benchmark: Verify polynomial saturation <5 cycles/sample on AVX2 in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T115 [US4] Criterion benchmark: Verify polyBLEP <8 operations per transition in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T116 [US4] Criterion benchmark: Verify white noise 64-sample block <100 CPU cycles in projects/rigel-synth/crates/math/benches/criterion_benches.rs
-- [ ] T117 [US4] iai-callgrind benchmark: Measure instruction counts for all math kernels in projects/rigel-synth/crates/math/benches/iai_benches.rs
+- [X] T110 [US4] Criterion benchmark: Verify tanh executes 8-16x faster than scalar in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T111 [US4] Criterion benchmark: Verify exp achieves sub-nanosecond per-sample throughput in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T112 [US4] Criterion benchmark: Verify atan executes 8-16x faster than scalar libm atan in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T113 [US4] Criterion benchmark: Verify exp2/log2 execute 10-20x faster than scalar libm in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T114 [US4] Criterion benchmark: Verify polynomial saturation <5 cycles/sample on AVX2 in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T115 [US4] Criterion benchmark: Verify polyBLEP <8 operations per transition in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T116 [US4] Criterion benchmark: Verify white noise 64-sample block <100 CPU cycles in projects/rigel-synth/crates/math/benches/criterion_benches.rs
+- [X] T117 [US4] iai-callgrind benchmark: Measure instruction counts for all math kernels in projects/rigel-synth/crates/math/benches/iai_benches.rs
 
 **Checkpoint**: Fast math kernels enable complex mathematical transformations in DSP algorithms
 
@@ -283,19 +283,19 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 5
 
-- [ ] T118 [P] [US5] Define LookupTable<T, const SIZE: usize> struct in projects/rigel-synth/crates/math/src/table.rs
-- [ ] T119 [P] [US5] Define IndexMode enum (Wrap, Mirror, Clamp) in projects/rigel-synth/crates/math/src/table.rs
-- [ ] T120 [US5] Implement LookupTable::from_fn constructor in projects/rigel-synth/crates/math/src/table.rs
-- [ ] T121 [US5] Implement scalar lookup_linear and lookup_cubic in projects/rigel-synth/crates/math/src/table.rs
-- [ ] T122 [US5] Implement vectorized lookup_linear_simd with SIMD gather operations in projects/rigel-synth/crates/math/src/table.rs
-- [ ] T123 [US5] Implement vectorized lookup_cubic_simd with SIMD gather operations in projects/rigel-synth/crates/math/src/table.rs
+- [X] T118 [P] [US5] Define LookupTable<T, const SIZE: usize> struct in projects/rigel-synth/crates/math/src/table.rs
+- [X] T119 [P] [US5] Define IndexMode enum (Wrap, Mirror, Clamp) in projects/rigel-synth/crates/math/src/table.rs
+- [X] T120 [US5] Implement LookupTable::from_fn constructor in projects/rigel-synth/crates/math/src/table.rs
+- [X] T121 [US5] Implement scalar lookup_linear and lookup_cubic in projects/rigel-synth/crates/math/src/table.rs
+- [X] T122 [US5] Implement vectorized lookup_linear_simd with SIMD gather operations in projects/rigel-synth/crates/math/src/table.rs
+- [X] T123 [US5] Implement vectorized lookup_cubic_simd with SIMD gather operations in projects/rigel-synth/crates/math/src/table.rs
 
 ### Tests for User Story 5
 
-- [ ] T124 [P] [US5] Performance test: 64-sample block lookup completes in <640ns (<10ns/sample) in projects/rigel-synth/crates/math/tests/table_tests.rs
-- [ ] T125 [P] [US5] Accuracy test: Linear interpolation maintains phase continuity across block in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T126 [P] [US5] Property-based test: SIMD gather provides correct per-lane indexing in projects/rigel-synth/crates/math/tests/properties.rs
-- [ ] T127 [P] [US5] Unit test: IndexMode variants (Wrap, Mirror, Clamp) behave correctly at boundaries in projects/rigel-synth/crates/math/src/table.rs
+- [X] T124 [P] [US5] Performance test: 64-sample block lookup completes in <640ns (<10ns/sample) in projects/rigel-synth/crates/math/tests/table_tests.rs
+- [X] T125 [P] [US5] Accuracy test: Linear interpolation maintains phase continuity across block in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T126 [P] [US5] Property-based test: SIMD gather provides correct per-lane indexing in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T127 [P] [US5] Unit test: IndexMode variants (Wrap, Mirror, Clamp) behave correctly at boundaries in projects/rigel-synth/crates/math/src/table.rs
 
 **Checkpoint**: Lookup table infrastructure enables efficient wavetable synthesis
 
@@ -319,15 +319,15 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 
 ### Implementation for User Story 8
 
-- [ ] T128 [P] [US8] Implement crossfade_linear, crossfade_equal_power, crossfade_scurve in projects/rigel-synth/crates/math/src/crossfade.rs
-- [ ] T129 [US8] Implement ParameterRamp struct with linear ramping in projects/rigel-synth/crates/math/src/crossfade.rs
-- [ ] T130 [US8] Implement ParameterRamp::fill_block for efficient block filling in projects/rigel-synth/crates/math/src/crossfade.rs
+- [X] T128 [P] [US8] Implement crossfade_linear, crossfade_equal_power, crossfade_scurve in projects/rigel-synth/crates/math/src/crossfade.rs
+- [X] T129 [US8] Implement ParameterRamp struct with linear ramping in projects/rigel-synth/crates/math/src/crossfade.rs
+- [X] T130 [US8] Implement ParameterRamp::fill_block for efficient block filling in projects/rigel-synth/crates/math/src/crossfade.rs
 
 ### Tests for User Story 8
 
-- [ ] T131 [P] [US8] Accuracy test: Equal-power crossfade maintains constant energy (no volume dip) in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T132 [P] [US8] Accuracy test: Parameter ramping produces no audible clicks or zipper noise in projects/rigel-synth/crates/math/tests/accuracy.rs
-- [ ] T133 [P] [US8] Property-based test: Crossfade curves are smooth and monotonic in projects/rigel-synth/crates/math/tests/properties.rs
+- [X] T131 [P] [US8] Accuracy test: Equal-power crossfade maintains constant energy (no volume dip) in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T132 [P] [US8] Accuracy test: Parameter ramping produces no audible clicks or zipper noise in projects/rigel-synth/crates/math/tests/accuracy.rs
+- [X] T133 [P] [US8] Property-based test: Crossfade curves are smooth and monotonic in projects/rigel-synth/crates/math/tests/properties.rs
 
 **Checkpoint**: Crossfade and ramping utilities enable professional-quality parameter transitions
 
