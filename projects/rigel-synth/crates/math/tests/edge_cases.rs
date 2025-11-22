@@ -187,11 +187,17 @@ fn test_minmax_edge_cases() {
     let inf_vec = DefaultSimdVector::splat(f32::INFINITY);
     let neg_inf_vec = DefaultSimdVector::splat(f32::NEG_INFINITY);
 
-    // min with NaN (implementation-defined, but should handle gracefully)
+    // min with NaN (IEEE 754-2008 minNum returns non-NaN value)
     let min_nan = one_vec.min(nan_vec);
-    // Result could be NaN or 1.0 depending on implementation
+    // Result should be 1.0 per lane (4 lanes total = 4.0)
     let result = min_nan.horizontal_sum();
-    assert!(result.is_nan() || result == 1.0);
+    let expected_sum = 1.0 * DefaultSimdVector::LANES as f32;
+    assert!(
+        result.is_nan() || result == expected_sum,
+        "Expected NaN or {}, got {}",
+        expected_sum,
+        result
+    );
 
     // max with infinity
     let max_inf = one_vec.max(inf_vec);

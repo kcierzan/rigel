@@ -171,12 +171,38 @@ impl SimdVector for NeonVector {
 
     #[inline(always)]
     fn min(self, rhs: Self) -> Self {
-        unsafe { NeonVector(vminq_f32(self.0, rhs.0)) }
+        unsafe {
+            // IEEE 754-2008 minNum semantics: if one value is NaN, return the other
+            // NEON's vminq_f32 propagates NaN, so we need to handle NaN explicitly
+            let self_is_nan = vmvnq_u32(vceqq_f32(self.0, self.0)); // NaN != NaN
+            let rhs_is_nan = vmvnq_u32(vceqq_f32(rhs.0, rhs.0));
+
+            // If self is NaN, use rhs; if rhs is NaN, use self; else use vminq_f32
+            let result = vbslq_f32(
+                self_is_nan,
+                rhs.0,
+                vbslq_f32(rhs_is_nan, self.0, vminq_f32(self.0, rhs.0))
+            );
+            NeonVector(result)
+        }
     }
 
     #[inline(always)]
     fn max(self, rhs: Self) -> Self {
-        unsafe { NeonVector(vmaxq_f32(self.0, rhs.0)) }
+        unsafe {
+            // IEEE 754-2008 maxNum semantics: if one value is NaN, return the other
+            // NEON's vmaxq_f32 propagates NaN, so we need to handle NaN explicitly
+            let self_is_nan = vmvnq_u32(vceqq_f32(self.0, self.0)); // NaN != NaN
+            let rhs_is_nan = vmvnq_u32(vceqq_f32(rhs.0, rhs.0));
+
+            // If self is NaN, use rhs; if rhs is NaN, use self; else use vmaxq_f32
+            let result = vbslq_f32(
+                self_is_nan,
+                rhs.0,
+                vbslq_f32(rhs_is_nan, self.0, vmaxq_f32(self.0, rhs.0))
+            );
+            NeonVector(result)
+        }
     }
 
     #[inline(always)]

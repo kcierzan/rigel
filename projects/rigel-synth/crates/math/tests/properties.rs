@@ -314,8 +314,9 @@ fn test_horizontal_sum_correctness() {
         // Reference: scalar sum
         let expected_sum: f32 = values.iter().sum();
 
-        // Allow for accumulated floating-point error
-        assert_approx_eq(sum, expected_sum, "horizontal_sum");
+        // Horizontal operations use tree-reduction which accumulates different
+        // rounding errors than sequential scalar addition - use relaxed tolerance
+        assert_horizontal_approx_eq(sum, expected_sum, "horizontal_sum");
     });
 }
 
