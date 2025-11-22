@@ -2,6 +2,7 @@
 //!
 //! This module provides utilities for crossfading between audio signals and
 //! smoothly ramping parameters to avoid clicks and zipper noise.
+#![allow(clippy::needless_range_loop)]
 
 use crate::SimdVector;
 
@@ -150,7 +151,7 @@ impl ParameterRamp {
     /// Get the next sample value
     ///
     /// Returns the current value and advances the ramp.
-    pub fn next(&mut self) -> f32 {
+    pub fn next_sample(&mut self) -> f32 {
         let value = self.current;
 
         if self.remaining_samples > 0 {
@@ -190,7 +191,7 @@ impl ParameterRamp {
         let mut values = [0.0f32; 16]; // Max SIMD width
 
         for i in 0..V::LANES {
-            values[i] = self.next();
+            values[i] = self.next_sample();
         }
 
         V::from_slice(&values)
@@ -214,7 +215,7 @@ impl ParameterRamp {
     /// ```
     pub fn fill_block(&mut self, output: &mut [f32]) {
         for sample in output.iter_mut() {
-            *sample = self.next();
+            *sample = self.next_sample();
         }
     }
 }
@@ -248,12 +249,12 @@ mod tests {
         assert!(!ramp.is_complete());
 
         // Sample first value
-        let first = ramp.next();
+        let first = ramp.next_sample();
         assert!((first - 0.0).abs() < 0.001);
 
         // Sample all values
         for _ in 1..10 {
-            ramp.next();
+            ramp.next_sample();
         }
 
         assert!(ramp.is_complete());

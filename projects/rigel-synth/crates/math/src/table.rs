@@ -6,6 +6,7 @@
 //! - SIMD gather operations for vectorized lookups
 //! - Multiple index wrapping modes (Wrap, Mirror, Clamp)
 //!
+#![allow(clippy::needless_range_loop)]
 //! # Example
 //!
 //! ```rust
@@ -26,7 +27,7 @@
 //! let values = table.lookup_cubic_simd(indices, IndexMode::Wrap);
 //! ```
 
-use crate::{DefaultSimdVector, SimdVector};
+use crate::SimdVector;
 
 /// Index wrapping mode for table lookups
 ///
