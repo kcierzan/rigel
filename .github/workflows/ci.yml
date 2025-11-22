@@ -231,13 +231,9 @@ jobs:
           - name: AVX2
             os: ubuntu-latest
             features: avx2
-            rustflags: "-C target-feature=+avx2"
+            rustflags: "-C target-feature=+avx2,+fma"
             command: test
-          - name: AVX512
-            os: ubuntu-latest
-            features: avx512
-            rustflags: "-C target-feature=+avx512f,+avx512dq,+avx512vl"
-            command: check  # Build-only: GitHub runners don't support AVX512
+          # AVX512 disabled: Rust intrinsics incomplete, GitHub runners lack support
           - name: NEON
             os: macos-14
             features: neon
