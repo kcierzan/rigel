@@ -338,78 +338,90 @@ mod tests {
 
     #[test]
     #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "avx2")]
-    unsafe fn test_avx2_arithmetic() {
-        let a = Avx2Vector::splat(2.0);
-        let b = Avx2Vector::splat(3.0);
+    fn test_avx2_arithmetic() {
+        #[target_feature(enable = "avx2")]
+        unsafe fn inner() {
+            let a = Avx2Vector::splat(2.0);
+            let b = Avx2Vector::splat(3.0);
 
-        let sum = a.add(b);
-        assert_eq!(sum.horizontal_sum(), 40.0); // 5.0 * 8 lanes
+            let sum = a.add(b);
+            assert_eq!(sum.horizontal_sum(), 40.0); // 5.0 * 8 lanes
 
-        let diff = a.sub(b);
-        assert_eq!(diff.horizontal_sum(), -8.0); // -1.0 * 8 lanes
+            let diff = a.sub(b);
+            assert_eq!(diff.horizontal_sum(), -8.0); // -1.0 * 8 lanes
 
-        let prod = a.mul(b);
-        assert_eq!(prod.horizontal_sum(), 48.0); // 6.0 * 8 lanes
+            let prod = a.mul(b);
+            assert_eq!(prod.horizontal_sum(), 48.0); // 6.0 * 8 lanes
+        }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "avx2", enable = "fma")]
-    unsafe fn test_avx2_fma() {
-        let a = Avx2Vector::splat(2.0);
-        let b = Avx2Vector::splat(3.0);
-        let c = Avx2Vector::splat(1.0);
+    fn test_avx2_fma() {
+        #[target_feature(enable = "avx2", enable = "fma")]
+        unsafe fn inner() {
+            let a = Avx2Vector::splat(2.0);
+            let b = Avx2Vector::splat(3.0);
+            let c = Avx2Vector::splat(1.0);
 
-        let result = a.fma(b, c);
-        assert_eq!(result.horizontal_sum(), 56.0); // 7.0 * 8 lanes
+            let result = a.fma(b, c);
+            assert_eq!(result.horizontal_sum(), 56.0); // 7.0 * 8 lanes
+        }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "avx2")]
-    unsafe fn test_avx2_comparison() {
-        let a = Avx2Vector::splat(2.0);
-        let b = Avx2Vector::splat(3.0);
+    fn test_avx2_comparison() {
+        #[target_feature(enable = "avx2")]
+        unsafe fn inner() {
+            let a = Avx2Vector::splat(2.0);
+            let b = Avx2Vector::splat(3.0);
 
-        let mask_lt = a.lt(b);
-        assert!(mask_lt.all());
+            let mask_lt = a.lt(b);
+            assert!(mask_lt.all());
 
-        let mask_gt = a.gt(b);
-        assert!(mask_gt.none());
+            let mask_gt = a.gt(b);
+            assert!(mask_gt.none());
+        }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "avx2")]
-    unsafe fn test_avx2_bit_manipulation() {
-        use crate::traits::SimdInt;
+    fn test_avx2_bit_manipulation() {
+        #[target_feature(enable = "avx2")]
+        unsafe fn inner() {
+            use crate::traits::SimdInt;
 
-        // Test to_bits / from_bits round trip
-        let vec = Avx2Vector::splat(1.0);
-        let bits = vec.to_bits();
-        let restored = Avx2Vector::from_bits(bits);
-        assert_eq!(restored.horizontal_sum(), 8.0); // 1.0 * 8 lanes
+            // Test to_bits / from_bits round trip
+            let vec = Avx2Vector::splat(1.0);
+            let bits = vec.to_bits();
+            let restored = Avx2Vector::from_bits(bits);
+            assert_eq!(restored.horizontal_sum(), 8.0); // 1.0 * 8 lanes
 
-        // Test from_int_cast (numerical conversion)
-        let int_vec = Avx2Int::splat(5);
-        let float_vec = Avx2Vector::from_int_cast(int_vec);
-        assert_eq!(float_vec.horizontal_sum(), 40.0); // 5.0 * 8 lanes
+            // Test from_int_cast (numerical conversion)
+            let int_vec = Avx2Int::splat(5);
+            let float_vec = Avx2Vector::from_int_cast(int_vec);
+            assert_eq!(float_vec.horizontal_sum(), 40.0); // 5.0 * 8 lanes
 
-        // Test Avx2Int operations
-        let int_a = Avx2Int::splat(0xF0);
-        let int_b = int_a.bitwise_and(0x0F);
-        let result = Avx2Vector::from_int_cast(int_b);
-        assert_eq!(result.horizontal_sum(), 0.0); // (0xF0 & 0x0F) = 0
+            // Test Avx2Int operations
+            let int_a = Avx2Int::splat(0xF0);
+            let int_b = int_a.bitwise_and(0x0F);
+            let result = Avx2Vector::from_int_cast(int_b);
+            assert_eq!(result.horizontal_sum(), 0.0); // (0xF0 & 0x0F) = 0
 
-        // Test shift operations
-        let int_val = Avx2Int::splat(8);
-        let shifted_right = int_val.shr(2); // 8 >> 2 = 2
-        let result_shr = Avx2Vector::from_int_cast(shifted_right);
-        assert_eq!(result_shr.horizontal_sum(), 16.0); // 2.0 * 8 lanes
+            // Test shift operations
+            let int_val = Avx2Int::splat(8);
+            let shifted_right = int_val.shr(2); // 8 >> 2 = 2
+            let result_shr = Avx2Vector::from_int_cast(shifted_right);
+            assert_eq!(result_shr.horizontal_sum(), 16.0); // 2.0 * 8 lanes
 
-        let shifted_left = int_val.shl(2); // 8 << 2 = 32
-        let result_shl = Avx2Vector::from_int_cast(shifted_left);
-        assert_eq!(result_shl.horizontal_sum(), 256.0); // 32.0 * 8 lanes
+            let shifted_left = int_val.shl(2); // 8 << 2 = 32
+            let result_shl = Avx2Vector::from_int_cast(shifted_left);
+            assert_eq!(result_shl.horizontal_sum(), 256.0); // 32.0 * 8 lanes
+        }
+        unsafe { inner() }
     }
 }

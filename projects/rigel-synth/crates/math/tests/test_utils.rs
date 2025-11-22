@@ -14,6 +14,11 @@ pub const RELATIVE_ERROR_TOLERANCE: f32 = 1e-5;
 /// Absolute error tolerance for floating-point comparisons
 pub const ABSOLUTE_ERROR_TOLERANCE: f32 = 1e-6;
 
+/// Horizontal operations (sum, min, max) use tree-reduction which can accumulate
+/// more floating-point error than sequential operations. Relax tolerances slightly.
+pub const HORIZONTAL_RELATIVE_ERROR_TOLERANCE: f32 = 1e-4; // 0.01%
+pub const HORIZONTAL_ABSOLUTE_ERROR_TOLERANCE: f32 = 5e-5;
+
 // ============================================================================
 // Reference Implementations using libm (T069)
 // ============================================================================
@@ -196,6 +201,54 @@ pub fn assert_approx_eq(actual: f32, expected: f32, context: &str) {
 
     assert!(
         abs_diff <= ABSOLUTE_ERROR_TOLERANCE || relative_error <= RELATIVE_ERROR_TOLERANCE,
+        "{}: values not approximately equal. Expected: {}, Actual: {}, Abs diff: {:.2e}, Rel error: {:.2e}",
+        context,
+        expected,
+        actual,
+        abs_diff,
+        relative_error
+    );
+}
+
+/// Assert approximate equality for horizontal operations (sum, min, max)
+///
+/// Horizontal operations use tree-reduction which accumulates different rounding
+/// errors than sequential scalar operations. This uses relaxed tolerances.
+pub fn assert_horizontal_approx_eq(actual: f32, expected: f32, context: &str) {
+    if expected.is_nan() {
+        assert!(actual.is_nan(), "{}: expected NaN, got {}", context, actual);
+        return;
+    }
+
+    if expected.is_infinite() {
+        assert!(
+            actual.is_infinite(),
+            "{}: expected infinite, got {}",
+            context,
+            actual
+        );
+        assert_eq!(
+            actual.signum(),
+            expected.signum(),
+            "{}: expected {} infinity, got {} infinity",
+            context,
+            expected.signum(),
+            actual.signum()
+        );
+        return;
+    }
+
+    let abs_diff = (actual - expected).abs();
+    let abs_expected = expected.abs();
+    let relative_error = if abs_expected > 0.0 {
+        abs_diff / abs_expected
+    } else {
+        abs_diff
+    };
+
+    assert!(
+        abs_diff <= HORIZONTAL_ABSOLUTE_ERROR_TOLERANCE
+            || relative_error <= HORIZONTAL_RELATIVE_ERROR_TOLERANCE,
         "{}: values not approximately equal. Expected: {}, Actual: {}, Abs diff: {:.2e}, Rel error: {:.2e}",
         context,
         expected,
