@@ -49,10 +49,17 @@ jobs:
           cache-on-failure: false
           shared-key: ${{ matrix.target }}
 
+      - name: Workaround GCC specs directory conflict
+        run: mv specs specs.bak
+
       - name: Build plugin (${{ matrix.target }})
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- ${{ matrix.build_command }}
+
+      - name: Restore specs directory
+        if: always()
+        run: mv specs.bak specs
 
       - name: Create archive
         run: |
@@ -90,10 +97,17 @@ jobs:
           cache-on-failure: false
           shared-key: macos
 
+      - name: Workaround GCC specs directory conflict
+        run: mv specs specs.bak
+
       - name: Build plugin (macOS)
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell -- build:macos
+
+      - name: Restore specs directory
+        if: always()
+        run: mv specs.bak specs
 
       - name: Create archive
         run: |

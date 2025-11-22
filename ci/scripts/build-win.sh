@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Workaround for GCC specs directory conflict
+# The specs/ directory at repo root confuses GCC which looks for a "specs" file
+# in the current directory. We temporarily rename it during cargo operations.
+if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+  REPO_ROOT="$(git rev-parse --show-toplevel)"
+else
+  REPO_ROOT="$PWD"
+fi
+
+SPECS_RENAMED=0
+if [ -d "$REPO_ROOT/specs" ]; then
+  mv "$REPO_ROOT/specs" "$REPO_ROOT/specs.bak"
+  SPECS_RENAMED=1
+fi
+
+# Ensure specs/ is restored on exit (even if script fails)
+cleanup() {
+  if [ $SPECS_RENAMED -eq 1 ] && [ -d "$REPO_ROOT/specs.bak" ]; then
+    mv "$REPO_ROOT/specs.bak" "$REPO_ROOT/specs"
+  fi
+}
+trap cleanup EXIT
+
 # Mirror devenv's cargoScript helper so CI and containers reuse the same layout.
 state_dir="${DEVENV_STATE:-$PWD/.devenv/state}"
 export DEVENV_STATE="$state_dir"
