@@ -33,7 +33,15 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ inputs.devenv-path }}/.devenv
-        # Use glob patterns to avoid multiple format() calls which can cause intermittent parser failures
-        key: ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{ hashFiles(format('{0}/devenv.*', inputs.devenv-path), format('{0}/flake.lock', inputs.devenv-path)) }}
+        # Use single format() call with newline-separated patterns.
+        # macOS runners have a bug where multiple format() calls get concatenated
+        # into a single string './pattern1, ./pattern2' which is invalid.
+        # The >- YAML block chomping allows clean multiline formatting.
+        key: >-
+          ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{
+            hashFiles(format('{0}/devenv.nix
+{0}/devenv.lock
+{0}/flake.lock', inputs.devenv-path, inputs.devenv-path, inputs.devenv-path))
+          }}
         restore-keys: |
           ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-
