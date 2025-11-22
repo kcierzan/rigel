@@ -186,7 +186,7 @@ jobs:
 
   build-plugin-macos:
     name: Build Plugin (macOS)
-    runs-on: macos-14
+    runs-on: macos-latest
     needs: [rigel-pipeline, wtgen-pipeline]
     steps:
       - uses: actions/checkout@v4
@@ -235,7 +235,7 @@ jobs:
             command: test
           # AVX512 disabled: Rust intrinsics incomplete, GitHub runners lack support
           - name: NEON
-            os: macos-14
+            os: macos-latest
             features: neon
             rustflags: ""
             command: test
