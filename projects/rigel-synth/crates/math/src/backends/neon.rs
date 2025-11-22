@@ -181,7 +181,7 @@ impl SimdVector for NeonVector {
             let result = vbslq_f32(
                 self_is_nan,
                 rhs.0,
-                vbslq_f32(rhs_is_nan, self.0, vminq_f32(self.0, rhs.0))
+                vbslq_f32(rhs_is_nan, self.0, vminq_f32(self.0, rhs.0)),
             );
             NeonVector(result)
         }
@@ -199,7 +199,7 @@ impl SimdVector for NeonVector {
             let result = vbslq_f32(
                 self_is_nan,
                 rhs.0,
-                vbslq_f32(rhs_is_nan, self.0, vmaxq_f32(self.0, rhs.0))
+                vbslq_f32(rhs_is_nan, self.0, vmaxq_f32(self.0, rhs.0)),
             );
             NeonVector(result)
         }
