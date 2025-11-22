@@ -48,6 +48,8 @@ jobs:
         with:
           name: rigel-plugin-${{ matrix.target }}-${{ github.event.workflow_run.head_sha }}
           path: bundled/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create archive
         run: |
@@ -80,6 +82,8 @@ jobs:
         with:
           name: rigel-plugin-macos-${{ github.event.workflow_run.head_sha }}
           path: bundled/
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create archive
         run: |

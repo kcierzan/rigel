@@ -210,8 +210,8 @@ This feature creates `rigel-math` crate at `projects/rigel-synth/crates/math/` w
 - [X] T073 [P] [US10] Property-based test: Mathematical invariants hold across thousands of random inputs in projects/rigel-synth/crates/math/tests/properties.rs
 - [X] T074 [P] [US10] Documentation tests: All code examples in API docs compile and execute in projects/rigel-synth/crates/math/src/lib.rs
 - [X] T075 [P] [US10] Unit tests: Edge cases (NaN, infinity, denormals, zero, extreme values) handled gracefully in projects/rigel-synth/crates/math/src/
-- [ ] T076 [P] [US10] Code coverage: Verify >90% line coverage and >95% branch coverage for critical paths using tarpaulin or llvm-cov
-- [ ] T076.1 [US10] If T076 reveals coverage <90% line or <95% branch for critical paths, analyze gaps and add targeted tests for: (1) uncovered error handling paths, (2) backend-specific edge cases, (3) untested math kernel input ranges, then re-run coverage to verify >90%/95% targets met in projects/rigel-synth/crates/math/
+- [X] T076 [P] [US10] Code coverage: Verify >90% line coverage and >95% branch coverage for critical paths using tarpaulin or llvm-cov
+- [X] T076.1 [US10] If T076 reveals coverage <90% line or <95% branch for critical paths, analyze gaps and add targeted tests for: (1) uncovered error handling paths, (2) backend-specific edge cases, (3) untested math kernel input ranges, then re-run coverage to verify >90%/95% targets met in projects/rigel-synth/crates/math/
 - [X] T077 [US10] Performance regression test: Detect >5% instruction count or >10% wall-clock degradation in projects/rigel-synth/crates/math/tests/regression_tests.rs
 - [X] T078 [P] [US10] Integration test: Implement simple oscillator (sine wave generation) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
 - [X] T079 [P] [US10] Integration test: Implement basic filter (one-pole lowpass) using rigel-math abstractions in projects/rigel-synth/crates/math/tests/integration_dsp_workflows.rs
@@ -385,16 +385,16 @@ All benchmark targets **met or exceeded**:
 - MIDI conversion: 2.9x speedup ✅
 - Harmonic series: 2.65x speedup ✅
 
-### Remaining Work (3 tasks - tracked in GitHub issues)
+### Remaining Work (2 tasks - tracked in GitHub issues)
 All remaining tasks have GitHub issues created for tracking:
 1. **T135** - API documentation → **GitHub Issue #16**
 2. **T136** - Doc tests → **GitHub Issue #17**
-3. **T141/T076** - Code coverage (needs per-backend strategy) → **GitHub Issue #18**
-4. **T143/T144** - CI configuration → **GitHub Issue #19**
+3. **T143/T144** - CI configuration → **GitHub Issue #19**
 
-### Completed Quick Wins (2 tasks)
+### Completed Quick Wins (3 tasks)
 - ✅ **T139** - Quickstart validation (identified API corrections needed, covered by #16/#17)
 - ✅ **T142** - Workspace metadata (added keywords, categories, docs URL)
+- ✅ **T076/T076.1** - Code coverage verification (per-backend strategy implemented, critical paths exceed 90% target) → Closes **GitHub Issue #18**
 
 **Status**: **Ready for merge** - Core functionality complete, polish items can be addressed in follow-up PRs
 
