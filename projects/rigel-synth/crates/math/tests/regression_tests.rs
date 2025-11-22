@@ -136,7 +136,18 @@ fn test_denormal_protection_overhead() {
 ///
 /// This test verifies that the backend abstraction is truly zero-cost
 /// by comparing direct operations vs trait-wrapped operations.
+///
+/// TODO: This test is flaky and may not be testing the right thing.
+/// Issues:
+/// 1. Compares different amounts of work (8-lane SIMD vs 1 scalar operation)
+/// 2. Timing-based tests are unreliable in CI environments
+/// 3. Zero-cost guarantees only apply in release mode, but test expectations
+///    don't account for debug vs release builds
+/// 4. Should be converted to a Criterion benchmark for proper performance testing
+///
+/// For now, disabled to unblock CI. See discussion in commit 291893b.
 #[test]
+#[ignore = "Flaky timing-based test - needs to be converted to Criterion benchmark"]
 fn test_zero_cost_abstraction() {
     let _guard = DenormalGuard::new();
 
