@@ -3,6 +3,7 @@
 //! This module provides fast sin/cos approximations optimized for audio DSP,
 //! particularly oscillators, phase modulation, and LFOs.
 //!
+#![allow(clippy::excessive_precision)]
 //! # Functions
 //!
 //! - `sin`: Sine approximation (<-100dB THD)
@@ -115,8 +116,9 @@ pub fn sin<V: SimdVector<Scalar = f32>>(x: V) -> V {
     let c5 = V::splat(0.008333333333); // 1/120
     let c7 = V::splat(-0.000198412698); // -1/5040
 
-    // Horner's method: x * (c1 + x²*(c3 + x²*(c5 + x²*c7)))
-    let poly = c1.add(x2.mul(c3.add(x2.mul(c5.add(x2.mul(c7))))));
+    // Horner's method using FMA: x * (c1 + x²*(c3 + x²*(c5 + x²*c7)))
+    // Using FMA reduces operations and improves accuracy
+    let poly = x2.fma(x2.fma(x2.fma(c7, c5), c3), c1);
     let result = x_half_pi.mul(poly);
 
     // Apply sign flip if x was in [π, 2π]

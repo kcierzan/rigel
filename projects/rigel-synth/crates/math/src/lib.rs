@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 #![warn(clippy::all)]
+#![allow(unexpected_cfgs)]
 
 //! rigel-math: Trait-based SIMD abstraction library for real-time audio DSP
 //!
