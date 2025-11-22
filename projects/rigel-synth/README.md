@@ -225,7 +225,7 @@ Rigel's `flake.nix` simply re-exports the shell described in `devenv.nix`, so ke
 4. Sanity-check the toolchain before committing:
    ```bash
    cargo fmt -- --check
-   cargo clippy --all-targets --all-features -- -D warnings
+   cargo clippy --all-targets -- -D warnings
    cargo test
    ```
    (This matches the `ci:check` task defined in `devenv.nix`.)

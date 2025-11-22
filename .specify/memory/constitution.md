@@ -48,10 +48,12 @@ All DSP changes MUST be validated through both automated tests and audible verif
 
 **Requirements**:
 - Rust: Unit tests embedded in crates, integration tests in `tests/` directories
+- Rust: ALWAYS run `cargo fmt`, `cargo clippy`, and `cargo test` before considering changes complete
+- Rust: ALWAYS add tests for new code and run them before task completion
 - Python (wtgen): 103+ tests including property-based testing with Hypothesis
+- Python (wtgen): ALWAYS run pytest, mypy, basedpyright, and ruff before considering changes complete
+- Python (wtgen): ALWAYS add tests for new code and run them before task completion
 - For audio changes: Regenerate WAV fixtures via CLI and verify audibly
-- wtgen: ALWAYS run pytest, mypy, basedpyright, and ruff before considering changes complete
-- wtgen: ALWAYS add tests for new code and run them before task completion
 
 **Rationale**: Audio bugs are often imperceptible in code review but immediately audible. Combining automated testing (for regression prevention) with audible verification (for quality assurance) ensures both correctness and musicality.
 
