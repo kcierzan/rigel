@@ -3,6 +3,7 @@
 //! This module provides fast logarithm approximations for audio DSP applications,
 //! particularly frequency calculations and musical interval computations.
 //!
+#![allow(clippy::excessive_precision)]
 //! # Functions
 //!
 //! - `log`: Natural logarithm (ln)

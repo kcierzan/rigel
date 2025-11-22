@@ -63,9 +63,7 @@ pub fn recip<V: SimdVector<Scalar = f32>>(x: V) -> V {
 
     // One Newton-Raphson iteration for refinement
     // r1 = r0 * (2 - x * r0)
-    let r1 = r0.mul(two.sub(x.mul(r0)));
-
-    r1
+    r0.mul(two.sub(x.mul(r0)))
 }
 
 /// Fast vectorized reciprocal (hardware estimate only)
