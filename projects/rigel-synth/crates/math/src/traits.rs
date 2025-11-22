@@ -161,6 +161,28 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// Minimum value across all SIMD lanes
     fn horizontal_min(self) -> Self::Scalar;
 
+    // Rounding operations
+
+    /// Round toward negative infinity (floor function)
+    ///
+    /// Returns the largest integer value less than or equal to each lane.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// let vec = DefaultSimdVector::splat(2.7);
+    /// let floored = vec.floor();
+    /// // floored contains 2.0 in all lanes
+    /// ```
+    fn floor(self) -> Self;
+
+    /// Convert float to signed i32 (for IEEE 754 exponent manipulation)
+    ///
+    /// Performs numerical conversion from f32 to i32, then reinterprets as u32 bits.
+    /// This is used for IEEE 754 exponent manipulation in exp2.
+    fn to_int_bits_i32(self) -> Self::IntBits;
+
     // Bit manipulation (for IEEE 754 logarithm extraction)
 
     /// Reinterpret float bits as integer bits
@@ -236,6 +258,15 @@ pub trait SimdInt: Copy + Clone + Sized {
 
     /// Subtract integer constant
     fn sub_scalar(self, rhs: u32) -> Self;
+
+    /// Add integer constant
+    fn add_scalar(self, rhs: u32) -> Self;
+
+    /// Convert float vector to signed i32, then reinterpret as u32
+    ///
+    /// This performs numerical conversion from f32 to i32, then reinterprets
+    /// the bits as u32. Used for IEEE 754 exponent manipulation in exp2.
+    fn from_f32_to_i32(float_vec: Self::FloatVec) -> Self;
 
     /// Convert to f32 vector (numerical conversion, not bit reinterpretation)
     fn to_f32(self) -> Self::FloatVec;
