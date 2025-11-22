@@ -3,6 +3,14 @@
 //! This module provides fast exp(x) approximations optimized for audio DSP applications,
 //! particularly envelope generation and exponential decay curves.
 //!
+#![allow(clippy::excessive_precision)]
+//! # Safe Input Range
+//!
+//! **IMPORTANT**: To avoid overflow across all SIMD backends:
+//! - **Safe range**: `x ∈ [-87.0, 85.0]`
+//! - Values outside this range are automatically clamped
+//! - The limit of 85.0 (not 88.0) prevents intermediate overflow during calculations
+//!
 //! # Error Bounds
 //!
 //! - `exp`: <0.1% error for typical audio ranges (x ∈ [-10, 10])
@@ -21,25 +29,43 @@
 //! use rigel_math::{DefaultSimdVector, SimdVector};
 //! use rigel_math::math::exp;
 //!
-//! // Exponential decay envelope
+//! // Exponential decay envelope (typical audio use case)
 //! let decay_rate = DefaultSimdVector::splat(-5.0);
 //! let time = DefaultSimdVector::splat(0.1);
 //! let envelope = exp(decay_rate.mul(time));
 //! // envelope ≈ 0.6065 (e^(-0.5))
+//!
+//! // Large values are safely clamped
+//! let large_value = DefaultSimdVector::splat(100.0);
+//! let clamped = exp(large_value); // Automatically clamped to exp(85)
 //! ```
 
 use crate::traits::SimdVector;
 
 /// Vectorized exponential function with <0.1% error
 ///
-/// Uses a polynomial approximation optimized for the range typically used in audio DSP.
+/// Uses a Padé[5/5] approximation with range reduction optimized for audio DSP.
 /// For values outside the safe range, the function clamps to prevent overflow/underflow.
 ///
-/// # Error Bounds
+/// # Safe Range
+///
+/// **IMPORTANT**: To avoid overflow during intermediate calculations across all SIMD backends:
+/// - **Safe input range**: `x ∈ [-87.0, 85.0]`
+/// - Values outside this range are clamped automatically
+/// - Overflow protection: Returns f32::MAX for x > 85
+/// - Underflow protection: Returns 0.0 for x < -87
+///
+/// # Accuracy
 ///
 /// - Maximum relative error: <0.1% for x ∈ [-10, 10]
-/// - Overflow protection: Returns f32::MAX for x > 88
-/// - Underflow protection: Returns 0.0 for x < -87
+/// - Good accuracy maintained across the full safe range
+///
+/// # Implementation Notes
+///
+/// The function uses 5 repeated squarings after Padé approximation:
+/// - For x=85: after 5 halvings → x_reduced ≈ 2.65, then squared 5 times
+/// - For x≥86: intermediate squaring operations may overflow to infinity on some backends
+/// - This is a limitation of the algorithm, not a bug in any specific backend
 ///
 /// # Example
 ///
@@ -47,10 +73,14 @@ use crate::traits::SimdVector;
 /// use rigel_math::{DefaultSimdVector, SimdVector};
 /// use rigel_math::math::exp;
 ///
-/// // Envelope generation
+/// // Envelope generation (typical audio use case)
 /// let x = DefaultSimdVector::splat(-2.0);
 /// let result = exp(x);
 /// // result ≈ 0.1353 (e^(-2))
+///
+/// // Large values are safely clamped
+/// let large_x = DefaultSimdVector::splat(100.0);
+/// let result = exp(large_x); // Clamped to exp(85) ≈ 1.55e37
 /// ```
 #[inline(always)]
 pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
@@ -63,8 +93,11 @@ pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
     let half = V::splat(0.5);
 
     // Overflow/underflow protection
-    // exp(x) > f32::MAX for x > 88.72, exp(x) < f32::MIN_POSITIVE for x < -87.33
-    let max_x = V::splat(88.0);
+    // SAFETY: Max is 85.0 (not 88.0) to prevent intermediate overflow during squaring
+    // operations across all SIMD backends. Values >= 86 can overflow to infinity
+    // during the 5 repeated squarings even though the theoretical limit is ~88.72.
+    // Values outside [-87, 85] are automatically clamped.
+    let max_x = V::splat(85.0);
     let min_x = V::splat(-87.0);
     let x_clamped = x.max(min_x).min(max_x);
 
@@ -256,11 +289,17 @@ mod tests {
 
     #[test]
     fn test_exp_overflow_protection() {
-        // Should not overflow for large positive values
+        // Should not overflow for large positive values (clamped to 85)
         let x = DefaultSimdVector::splat(100.0);
         let result = exp(x);
         let value = result.horizontal_sum() / DefaultSimdVector::LANES as f32;
-        assert!(value.is_finite(), "exp(100) should not overflow");
+        assert!(
+            value.is_finite(),
+            "exp(100) should be clamped and finite, got {} (is_infinite: {}, is_nan: {})",
+            value,
+            value.is_infinite(),
+            value.is_nan()
+        );
     }
 
     #[test]
