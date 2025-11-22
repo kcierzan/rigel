@@ -279,7 +279,7 @@ impl<const SIZE: usize> LookupTable<f32, SIZE> {
     /// use rigel_math::{DefaultSimdVector, SimdVector};
     ///
     /// let table = LookupTable::<f32, 256>::from_fn(|i, _| i as f32);
-    /// let indices = DefaultSimdVector::from_slice(&[10.5, 20.3, 30.7, 40.1]);
+    /// let indices = DefaultSimdVector::from_slice(&[10.5, 20.3, 30.7, 40.1, 50.2, 60.8, 70.4, 80.9]);
     /// let values = table.lookup_linear_simd(indices, IndexMode::Wrap);
     /// ```
     pub fn lookup_linear_simd<V: SimdVector<Scalar = f32>>(
@@ -324,7 +324,7 @@ impl<const SIZE: usize> LookupTable<f32, SIZE> {
     ///     let x = i as f32 / size as f32 * 2.0 * std::f32::consts::PI;
     ///     x.sin()
     /// });
-    /// let indices = DefaultSimdVector::from_slice(&[256.5, 512.3, 768.7, 1000.1]);
+    /// let indices = DefaultSimdVector::from_slice(&[256.5, 512.3, 768.7, 1000.1, 128.2, 384.6, 640.8, 896.3]);
     /// let values = table.lookup_cubic_simd(indices, IndexMode::Wrap);
     /// ```
     pub fn lookup_cubic_simd<V: SimdVector<Scalar = f32>>(&self, indices: V, mode: IndexMode) -> V {
