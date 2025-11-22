@@ -219,26 +219,30 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  benchmark-tests:
-    name: Benchmark Tests (${{ matrix.name }})
+  backend-tests:
+    name: Backend Tests (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     needs: [rigel-pipeline]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Scalar
-            os: ubuntu-latest
-            features: scalar
+          # Scalar is tested in rigel-pipeline (default features)
           - name: AVX2
             os: ubuntu-latest
             features: avx2
+            rustflags: "-C target-feature=+avx2"
+            command: test
           - name: AVX512
             os: ubuntu-latest
             features: avx512
+            rustflags: "-C target-feature=+avx512f,+avx512dq,+avx512vl"
+            command: check  # Build-only: GitHub runners don't support AVX512
           - name: NEON
             os: macos-14
             features: neon
+            rustflags: ""
+            command: test
     steps:
       - uses: actions/checkout@v4
         with:
@@ -255,18 +259,17 @@ jobs:
         with:
           workspaces: "."
           cache-on-failure: false
-          shared-key: bench-${{ matrix.features }}
+          shared-key: backend-${{ matrix.features }}
 
       - name: Workaround GCC specs directory conflict
         if: matrix.os == 'ubuntu-latest'
         run: mv specs specs.bak
 
-      - name: Build benchmarks with ${{ matrix.features }}
+      - name: Test ${{ matrix.features }} backend
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: |
-          devenv shell -- cargo bench --bench criterion_benches --features ${{ matrix.features }} --no-run
-          devenv shell -- cargo bench --bench iai_benches --features ${{ matrix.features }} --no-run
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: devenv shell -- cargo ${{ matrix.command }} --features ${{ matrix.features }}
 
       - name: Restore specs directory
         if: always() && matrix.os == 'ubuntu-latest'
@@ -276,7 +279,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [rigel-pipeline, wtgen-pipeline, build-plugin-linux, build-plugin-macos, benchmark-tests]
+    needs: [rigel-pipeline, wtgen-pipeline, build-plugin-linux, build-plugin-macos, backend-tests]
     if: always()
     steps:
       - name: Check all jobs succeeded
