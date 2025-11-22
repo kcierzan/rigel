@@ -77,7 +77,7 @@ fn test_simd_gather_per_lane_correctness() {
     let table = LookupTable::<f32, 256>::from_fn(|i, _| (i * 10) as f32);
 
     // Create SIMD vector with different indices per lane
-    let indices = DefaultSimdVector::from_slice(&[0.0, 10.5, 20.3, 30.7]);
+    let indices = DefaultSimdVector::from_slice(&[0.0, 10.5, 20.3, 30.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
     // Perform SIMD lookup
     let simd_results = table.lookup_linear_simd(indices, IndexMode::Wrap);
@@ -187,7 +187,7 @@ fn test_simd_cubic_interpolation() {
         libm::sinf(x)
     });
 
-    let indices = DefaultSimdVector::from_slice(&[64.5, 128.3, 192.7, 200.1]);
+    let indices = DefaultSimdVector::from_slice(&[64.5, 128.3, 192.7, 200.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     let results = table.lookup_cubic_simd(indices, IndexMode::Wrap);
 
     // Verify results are in valid range for sine wave
