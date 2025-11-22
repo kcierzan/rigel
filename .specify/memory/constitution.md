@@ -1,8 +1,9 @@
 <!--
 Sync Impact Report:
-Version: 0.0.0 → 1.0.0 (Initial constitution)
-Modified Principles: N/A (new document)
-Added Sections: All sections are new
+Version: 1.0.0 → 1.0.1 (Architecture-specific testing clarification)
+Modified Principles:
+  - Principle III (Test-Driven Validation): Added explicit requirement for architecture-specific tests (NEON on aarch64, AVX2/512 on x86_64)
+Added Sections: None
 Removed Sections: None
 Templates Requiring Updates:
   ✅ .specify/templates/plan-template.md - Reviewed, no updates needed (generic constitution check)
@@ -49,13 +50,14 @@ All DSP changes MUST be validated through both automated tests and audible verif
 **Requirements**:
 - Rust: Unit tests embedded in crates, integration tests in `tests/` directories
 - Rust: ALWAYS run `cargo fmt`, `cargo clippy`, and `cargo test` before considering changes complete
+- Rust: ALWAYS run architecture-specific tests for features available on the current host (NEON on aarch64, AVX2/AVX-512 on x86_64)
 - Rust: ALWAYS add tests for new code and run them before task completion
 - Python (wtgen): 103+ tests including property-based testing with Hypothesis
 - Python (wtgen): ALWAYS run pytest, mypy, basedpyright, and ruff before considering changes complete
 - Python (wtgen): ALWAYS add tests for new code and run them before task completion
 - For audio changes: Regenerate WAV fixtures via CLI and verify audibly
 
-**Rationale**: Audio bugs are often imperceptible in code review but immediately audible. Combining automated testing (for regression prevention) with audible verification (for quality assurance) ensures both correctness and musicality.
+**Rationale**: Audio bugs are often imperceptible in code review but immediately audible. Combining automated testing (for regression prevention) with audible verification (for quality assurance) ensures both correctness and musicality. Architecture-specific SIMD optimizations (NEON, AVX) require dedicated test coverage to ensure correctness across all supported platforms.
 
 ### IV. Performance Accountability
 
@@ -179,4 +181,4 @@ Development guidance for AI agents (Claude Code) is maintained in `CLAUDE.md`. T
 - CI/CD pipeline information
 - Performance targets and benchmarking procedures
 
-**Version**: 1.0.0 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-17
+**Version**: 1.0.1 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-22
