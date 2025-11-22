@@ -33,16 +33,8 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ inputs.devenv-path }}/.devenv
-        # Use comma-separated format() calls with YAML multiline syntax
-        # This matches the pattern from official actions/cache examples
-        # See: https://github.com/actions/cache/blob/master/examples.md
-        key: >-
-          ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{
-            hashFiles(
-              format('{0}/devenv.nix', inputs.devenv-path),
-              format('{0}/devenv.lock', inputs.devenv-path),
-              format('{0}/flake.lock', inputs.devenv-path)
-            )
-          }}
+        # Use git SHA for cache key to avoid hashFiles parsing issues
+        # This reliably invalidates cache on any code change
+        key: ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-
