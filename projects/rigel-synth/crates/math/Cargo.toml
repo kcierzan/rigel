@@ -6,6 +6,11 @@ authors = ["Kyle Cierzan <kylecierzan@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Trait-based SIMD abstraction library for real-time audio DSP"
 repository = "https://github.com/kcierzan/rigel"
+homepage = "https://github.com/kcierzan/rigel"
+documentation = "https://docs.rs/rigel-math"
+readme = "README.md"
+keywords = ["audio", "dsp", "simd", "synthesizer", "real-time"]
+categories = ["multimedia::audio", "no-std", "algorithms"]
 
 [lib]
 name = "rigel_math"
