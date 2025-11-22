@@ -9,7 +9,7 @@
 // This backend only compiles on x86/x86_64 targets
 #![cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 
-use crate::traits::{SimdMask, SimdVector};
+use crate::traits::{SimdInt, SimdMask, SimdVector};
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
@@ -31,10 +31,89 @@ pub struct Avx2Vector(__m256);
 #[repr(transparent)]
 pub struct Avx2Mask(__m256);
 
+/// AVX2 integer vector wrapper (8 lanes of u32)
+///
+/// Used for bit manipulation operations in IEEE 754 logarithm extraction.
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct Avx2Int(__m256i);
+
+// Implement SimdInt for Avx2Int
+impl SimdInt for Avx2Int {
+    const LANES: usize = 8;
+    type FloatVec = Avx2Vector;
+
+    #[inline(always)]
+    fn splat(value: u32) -> Self {
+        unsafe { Avx2Int(_mm256_set1_epi32(value as i32)) }
+    }
+
+    #[inline(always)]
+    fn shr(self, count: u32) -> Self {
+        unsafe {
+            // AVX2 shift requires a 128-bit count vector
+            let shift_count = _mm_cvtsi32_si128(count as i32);
+            Avx2Int(_mm256_srl_epi32(self.0, shift_count))
+        }
+    }
+
+    #[inline(always)]
+    fn shl(self, count: u32) -> Self {
+        unsafe {
+            // AVX2 shift requires a 128-bit count vector
+            let shift_count = _mm_cvtsi32_si128(count as i32);
+            Avx2Int(_mm256_sll_epi32(self.0, shift_count))
+        }
+    }
+
+    #[inline(always)]
+    fn bitwise_and(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm256_set1_epi32(rhs as i32);
+            Avx2Int(_mm256_and_si256(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn bitwise_or(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm256_set1_epi32(rhs as i32);
+            Avx2Int(_mm256_or_si256(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn sub_scalar(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm256_set1_epi32(rhs as i32);
+            Avx2Int(_mm256_sub_epi32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn add_scalar(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm256_set1_epi32(rhs as i32);
+            Avx2Int(_mm256_add_epi32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn from_f32_to_i32(float_vec: Self::FloatVec) -> Self {
+        unsafe { Avx2Int(_mm256_cvtps_epi32(float_vec.0)) }
+    }
+
+    #[inline(always)]
+    fn to_f32(self) -> Self::FloatVec {
+        unsafe { Avx2Vector(_mm256_cvtepi32_ps(self.0)) }
+    }
+}
+
 // Implement SimdVector for Avx2Vector
 impl SimdVector for Avx2Vector {
     type Scalar = f32;
     type Mask = Avx2Mask;
+    type IntBits = Avx2Int;
 
     const LANES: usize = 8;
 
@@ -175,6 +254,31 @@ impl SimdVector for Avx2Vector {
             _mm_cvtss_f32(result)
         }
     }
+
+    #[inline(always)]
+    fn floor(self) -> Self {
+        unsafe { Avx2Vector(_mm256_floor_ps(self.0)) }
+    }
+
+    #[inline(always)]
+    fn to_int_bits_i32(self) -> Self::IntBits {
+        unsafe { Avx2Int(_mm256_cvtps_epi32(self.0)) }
+    }
+
+    #[inline(always)]
+    fn to_bits(self) -> Self::IntBits {
+        unsafe { Avx2Int(_mm256_castps_si256(self.0)) }
+    }
+
+    #[inline(always)]
+    fn from_bits(bits: Self::IntBits) -> Self {
+        unsafe { Avx2Vector(_mm256_castsi256_ps(bits.0)) }
+    }
+
+    #[inline(always)]
+    fn from_int_cast(int_vec: Self::IntBits) -> Self {
+        unsafe { Avx2Vector(_mm256_cvtepi32_ps(int_vec.0)) }
+    }
 }
 
 // Implement SimdMask for Avx2Mask
@@ -272,6 +376,41 @@ mod tests {
 
             let mask_gt = a.gt(b);
             assert!(mask_gt.none());
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_bit_manipulation() {
+        if is_x86_feature_detected!("avx2") {
+            use crate::traits::SimdInt;
+
+            // Test to_bits / from_bits round trip
+            let vec = Avx2Vector::splat(1.0);
+            let bits = vec.to_bits();
+            let restored = Avx2Vector::from_bits(bits);
+            assert_eq!(restored.horizontal_sum(), 8.0); // 1.0 * 8 lanes
+
+            // Test from_int_cast (numerical conversion)
+            let int_vec = Avx2Int::splat(5);
+            let float_vec = Avx2Vector::from_int_cast(int_vec);
+            assert_eq!(float_vec.horizontal_sum(), 40.0); // 5.0 * 8 lanes
+
+            // Test Avx2Int operations
+            let int_a = Avx2Int::splat(0xF0);
+            let int_b = int_a.bitwise_and(0x0F);
+            let result = Avx2Vector::from_int_cast(int_b);
+            assert_eq!(result.horizontal_sum(), 0.0); // (0xF0 & 0x0F) = 0
+
+            // Test shift operations
+            let int_val = Avx2Int::splat(8);
+            let shifted_right = int_val.shr(2); // 8 >> 2 = 2
+            let result_shr = Avx2Vector::from_int_cast(shifted_right);
+            assert_eq!(result_shr.horizontal_sum(), 16.0); // 2.0 * 8 lanes
+
+            let shifted_left = int_val.shl(2); // 8 << 2 = 32
+            let result_shl = Avx2Vector::from_int_cast(shifted_left);
+            assert_eq!(result_shl.horizontal_sum(), 256.0); // 32.0 * 8 lanes
         }
     }
 }

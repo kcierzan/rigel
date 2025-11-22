@@ -68,6 +68,16 @@ impl SimdInt for ScalarInt {
     }
 
     #[inline(always)]
+    fn add_scalar(self, rhs: u32) -> Self {
+        ScalarInt(self.0.wrapping_add(rhs))
+    }
+
+    #[inline(always)]
+    fn from_f32_to_i32(float_vec: Self::FloatVec) -> Self {
+        ScalarInt(float_vec.0 as i32 as u32)
+    }
+
+    #[inline(always)]
     fn to_f32(self) -> Self::FloatVec {
         ScalarVector(self.0 as f32)
     }
@@ -187,6 +197,16 @@ impl SimdVector for ScalarVector<f32> {
     #[inline(always)]
     fn horizontal_min(self) -> Self::Scalar {
         self.0
+    }
+
+    #[inline(always)]
+    fn floor(self) -> Self {
+        ScalarVector(libm::floorf(self.0))
+    }
+
+    #[inline(always)]
+    fn to_int_bits_i32(self) -> Self::IntBits {
+        ScalarInt(self.0 as i32 as u32)
     }
 
     #[inline(always)]
@@ -337,6 +357,16 @@ impl SimdInt for ScalarInt64 {
     }
 
     #[inline(always)]
+    fn add_scalar(self, rhs: u32) -> Self {
+        ScalarInt64(self.0.wrapping_add(rhs as u64))
+    }
+
+    #[inline(always)]
+    fn from_f32_to_i32(float_vec: Self::FloatVec) -> Self {
+        ScalarInt64(float_vec.0 as i64 as u64)
+    }
+
+    #[inline(always)]
     fn to_f32(self) -> Self::FloatVec {
         ScalarVector(self.0 as f64)
     }
@@ -455,6 +485,16 @@ impl SimdVector for ScalarVector<f64> {
     #[inline(always)]
     fn horizontal_min(self) -> Self::Scalar {
         self.0
+    }
+
+    #[inline(always)]
+    fn floor(self) -> Self {
+        ScalarVector(libm::floor(self.0))
+    }
+
+    #[inline(always)]
+    fn to_int_bits_i32(self) -> Self::IntBits {
+        ScalarInt64(self.0 as i64 as u64)
     }
 
     #[inline(always)]
@@ -632,7 +672,7 @@ mod tests {
         let cos_result = x.cos_libm();
 
         // sin(π/4) ≈ cos(π/4) ≈ √2/2
-        let expected = 0.7071067811865476f32;
+        let expected = core::f32::consts::FRAC_1_SQRT_2;
         assert!((sin_result.0 - expected).abs() < 1e-6);
         assert!((cos_result.0 - expected).abs() < 1e-6);
     }
@@ -642,7 +682,7 @@ mod tests {
         let x = ScalarVector(core::f32::consts::FRAC_PI_4);
         let (sin_result, cos_result) = x.sincos_libm();
 
-        let expected = 0.7071067811865476f32;
+        let expected = core::f32::consts::FRAC_1_SQRT_2;
         assert!((sin_result.0 - expected).abs() < 1e-6);
         assert!((cos_result.0 - expected).abs() < 1e-6);
     }

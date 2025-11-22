@@ -9,7 +9,7 @@
 // This backend only compiles on x86/x86_64 targets
 #![cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 
-use crate::traits::{SimdMask, SimdVector};
+use crate::traits::{SimdInt, SimdMask, SimdVector};
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
@@ -31,10 +31,89 @@ pub struct Avx512Vector(__m512);
 #[repr(transparent)]
 pub struct Avx512Mask(__mmask16);
 
+/// AVX512 integer vector wrapper (16 lanes of u32)
+///
+/// Used for bit manipulation operations in IEEE 754 logarithm extraction.
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct Avx512Int(__m512i);
+
+// Implement SimdInt for Avx512Int
+impl SimdInt for Avx512Int {
+    const LANES: usize = 16;
+    type FloatVec = Avx512Vector;
+
+    #[inline(always)]
+    fn splat(value: u32) -> Self {
+        unsafe { Avx512Int(_mm512_set1_epi32(value as i32)) }
+    }
+
+    #[inline(always)]
+    fn shr(self, count: u32) -> Self {
+        unsafe {
+            // AVX-512 shift requires a 128-bit count vector (same as AVX2)
+            let shift_count = _mm_cvtsi32_si128(count as i32);
+            Avx512Int(_mm512_srl_epi32(self.0, shift_count))
+        }
+    }
+
+    #[inline(always)]
+    fn shl(self, count: u32) -> Self {
+        unsafe {
+            // AVX-512 shift requires a 128-bit count vector (same as AVX2)
+            let shift_count = _mm_cvtsi32_si128(count as i32);
+            Avx512Int(_mm512_sll_epi32(self.0, shift_count))
+        }
+    }
+
+    #[inline(always)]
+    fn bitwise_and(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm512_set1_epi32(rhs as i32);
+            Avx512Int(_mm512_and_si512(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn bitwise_or(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm512_set1_epi32(rhs as i32);
+            Avx512Int(_mm512_or_si512(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn sub_scalar(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm512_set1_epi32(rhs as i32);
+            Avx512Int(_mm512_sub_epi32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn add_scalar(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = _mm512_set1_epi32(rhs as i32);
+            Avx512Int(_mm512_add_epi32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn from_f32_to_i32(float_vec: Self::FloatVec) -> Self {
+        unsafe { Avx512Int(_mm512_cvtps_epi32(float_vec.0)) }
+    }
+
+    #[inline(always)]
+    fn to_f32(self) -> Self::FloatVec {
+        unsafe { Avx512Vector(_mm512_cvtepi32_ps(self.0)) }
+    }
+}
+
 // Implement SimdVector for Avx512Vector
 impl SimdVector for Avx512Vector {
     type Scalar = f32;
     type Mask = Avx512Mask;
+    type IntBits = Avx512Int;
 
     const LANES: usize = 16;
 
@@ -142,6 +221,31 @@ impl SimdVector for Avx512Vector {
     #[inline(always)]
     fn horizontal_min(self) -> Self::Scalar {
         unsafe { _mm512_reduce_min_ps(self.0) }
+    }
+
+    #[inline(always)]
+    fn floor(self) -> Self {
+        unsafe { Avx512Vector(_mm512_floor_ps(self.0)) }
+    }
+
+    #[inline(always)]
+    fn to_int_bits_i32(self) -> Self::IntBits {
+        unsafe { Avx512Int(_mm512_cvtps_epi32(self.0)) }
+    }
+
+    #[inline(always)]
+    fn to_bits(self) -> Self::IntBits {
+        unsafe { Avx512Int(_mm512_castps_si512(self.0)) }
+    }
+
+    #[inline(always)]
+    fn from_bits(bits: Self::IntBits) -> Self {
+        unsafe { Avx512Vector(_mm512_castsi512_ps(bits.0)) }
+    }
+
+    #[inline(always)]
+    fn from_int_cast(int_vec: Self::IntBits) -> Self {
+        unsafe { Avx512Vector(_mm512_cvtepi32_ps(int_vec.0)) }
     }
 }
 
@@ -258,6 +362,41 @@ mod tests {
             // XOR: all true XOR all false = all true
             let xor_mask = mask_lt.xor(mask_gt);
             assert!(xor_mask.all());
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx512_bit_manipulation() {
+        if is_x86_feature_detected!("avx512f") {
+            use crate::traits::SimdInt;
+
+            // Test to_bits / from_bits round trip
+            let vec = Avx512Vector::splat(1.0);
+            let bits = vec.to_bits();
+            let restored = Avx512Vector::from_bits(bits);
+            assert_eq!(restored.horizontal_sum(), 16.0); // 1.0 * 16 lanes
+
+            // Test from_int_cast (numerical conversion)
+            let int_vec = Avx512Int::splat(5);
+            let float_vec = Avx512Vector::from_int_cast(int_vec);
+            assert_eq!(float_vec.horizontal_sum(), 80.0); // 5.0 * 16 lanes
+
+            // Test Avx512Int operations
+            let int_a = Avx512Int::splat(0xF0);
+            let int_b = int_a.bitwise_and(0x0F);
+            let result = Avx512Vector::from_int_cast(int_b);
+            assert_eq!(result.horizontal_sum(), 0.0); // (0xF0 & 0x0F) = 0
+
+            // Test shift operations
+            let int_val = Avx512Int::splat(8);
+            let shifted_right = int_val.shr(2); // 8 >> 2 = 2
+            let result_shr = Avx512Vector::from_int_cast(shifted_right);
+            assert_eq!(result_shr.horizontal_sum(), 32.0); // 2.0 * 16 lanes
+
+            let shifted_left = int_val.shl(2); // 8 << 2 = 32
+            let result_shl = Avx512Vector::from_int_cast(shifted_left);
+            assert_eq!(result_shl.horizontal_sum(), 512.0); // 32.0 * 16 lanes
         }
     }
 }
