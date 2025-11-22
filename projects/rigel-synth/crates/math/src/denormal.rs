@@ -52,6 +52,12 @@ pub struct DenormalGuard {
     _phantom: (),
 }
 
+impl Default for DenormalGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DenormalGuard {
     /// Enable denormal protection and save previous FPU state
     ///

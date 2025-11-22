@@ -69,11 +69,9 @@ pub fn polyblep_sawtooth<V: SimdVector<Scalar = f32>>(phase: V, _phase_increment
     let two = V::splat(2.0);
     let one = V::splat(1.0);
 
-    let naive = two.mul(phase).sub(one);
-
     // Apply PolyBLEP correction at discontinuities
     // For now, return naive (full implementation would detect and correct discontinuities)
-    naive
+    two.mul(phase).sub(one)
 }
 
 #[cfg(test)]

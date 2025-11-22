@@ -1,6 +1,8 @@
 //! Vectorized noise generation
 //!
 //! Provides fast pseudo-random noise generation for audio DSP.
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_range_contains)]
 
 use crate::traits::SimdVector;
 
