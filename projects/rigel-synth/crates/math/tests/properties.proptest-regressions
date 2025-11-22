@@ -1,0 +1,12 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 32f6e53bd9209f7b024c3a2c0f8877d76962b922526271f0c056440009804473 # shrinks to a = 0.0, b = -4.3833735e17, c = -4.646685e29
+cc 531a49cc6f67d974a4b0714a72c593f89e290bc1e6a3626554b5f760f13ec17a # shrinks to (a, b, c) = (747.7767, 930.18744, -930.0107)
+cc 48b95d164e0483633da4e3fad11bf3bd2fe3d5912968e1eb6f596056a5954701 # shrinks to a = -4.6988968e-38, b = -1.4443655e24, c = -3.1755638e22
+cc b63d708703a4196fcc06e696a8216c93de861c8a1076b03f71552ff2138bfd59 # shrinks to (a, b) = (NaN, inf)
+cc 5bdc73abcc75dc2fb1a09205eccdcdb95de599f81d66e46e042f92218a9eb224 # shrinks to values = [-543.92584, 429.41745, -442.2588, 554.8076]
+cc 70c3faee9fc98f7ec1f500047818b3179b4301fd7c41aec8b6dfbeb82da9a4d7 # shrinks to (a, b, c) = (-227.58488, 3.410258, 774.6872)
