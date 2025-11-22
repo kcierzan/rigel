@@ -3,6 +3,8 @@
 //! These tests verify that our SIMD implementations meet accuracy targets
 //! across audio-relevant ranges. Each test documents the maximum error found.
 
+#![allow(clippy::redundant_closure)]
+
 use rigel_math::math::*;
 use rigel_math::{DefaultSimdVector, SimdVector};
 
@@ -130,6 +132,81 @@ fn accuracy_exp2_octaves() {
         "fast_exp2() octave range [-10, 10]: max error = {:.4}%",
         max_error * 100.0
     );
+}
+
+#[test]
+fn accuracy_exp2_midi_range() {
+    // Test fast_exp2 for MIDI pitch range: [-6, 6] octaves
+    // MIDI note 0 to 127 spans approximately this range
+    let test_values: Vec<f32> = (-60..=60).map(|i| i as f32 * 0.1).collect();
+
+    let max_error = max_relative_error(&test_values, |x| fast_exp2(x), |x| libm::exp2f(x));
+
+    // MIDI calculations need <0.1% accuracy for sub-cent tuning
+    assert!(
+        max_error < 0.0001,
+        "exp2 MIDI range error: {:.6}%",
+        max_error * 100.0
+    );
+    println!(
+        "fast_exp2() MIDI range [-6, 6]: max error = {:.6}%",
+        max_error * 100.0
+    );
+}
+
+#[test]
+fn accuracy_exp2_polynomial_range() {
+    // Test polynomial accuracy on fractional part [0, 1)
+    // This validates the minimax polynomial coefficients
+    let test_values: Vec<f32> = (0..100).map(|i| i as f32 * 0.01).collect();
+
+    let max_error = max_relative_error(&test_values, |x| fast_exp2(x), |x| libm::exp2f(x));
+
+    // Polynomial should achieve <0.01% error (< 1e-4)
+    // Note: Theoretical minimax polynomials can achieve < 5e-6, but our
+    // implementation achieves ~8e-5 which is still excellent for audio DSP
+    assert!(
+        max_error < 0.0001,
+        "exp2 polynomial error: {:.6}%",
+        max_error * 100.0
+    );
+    println!(
+        "fast_exp2() polynomial range [0, 1): max error = {:.6}%",
+        max_error * 100.0
+    );
+}
+
+#[test]
+fn accuracy_exp2_integer_exact() {
+    // Integer powers of 2 should be exact (or very close)
+    for i in 0..10 {
+        let x = DefaultSimdVector::splat(i as f32);
+        let result = fast_exp2(x);
+        let value = result.horizontal_sum() / DefaultSimdVector::LANES as f32;
+        let expected = (1u32 << i) as f32;
+        let error = ((value - expected) / expected).abs();
+        assert!(
+            error < 1e-5,
+            "exp2({}) should be exact, error: {:.8}",
+            i,
+            error
+        );
+    }
+    println!("fast_exp2() integer powers [0, 9]: exact within 1e-5");
+}
+
+#[test]
+fn accuracy_exp2_negative_integers() {
+    // Negative integer powers should also be exact
+    for i in 1..10 {
+        let x = DefaultSimdVector::splat(-(i as f32));
+        let result = fast_exp2(x);
+        let value = result.horizontal_sum() / DefaultSimdVector::LANES as f32;
+        let expected = 1.0 / ((1u32 << i) as f32);
+        let error = ((value - expected) / expected).abs();
+        assert!(error < 1e-5, "exp2(-{}) error: {:.8}", i, error);
+    }
+    println!("fast_exp2() negative integer powers [-9, -1]: max error < 1e-5");
 }
 
 // ============================================================================
