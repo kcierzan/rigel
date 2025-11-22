@@ -97,26 +97,40 @@ fn bench_clamp_implementations(c: &mut Criterion) {
     let mut group = c.benchmark_group("clamp_implementations");
 
     // Test cases: in_range, below_min, above_max
-    let test_cases = [
-        ("in_range", 0.5),
-        ("below_min", -0.5),
-        ("above_max", 1.5),
-    ];
+    let test_cases = [("in_range", 0.5), ("below_min", -0.5), ("above_max", 1.5)];
 
     for (name, value) in test_cases.iter() {
         // Current implementation (branching)
         group.bench_function(format!("branching_{}", name), |b| {
-            b.iter(|| black_box(clamp_branching(black_box(*value), black_box(0.0), black_box(1.0))))
+            b.iter(|| {
+                black_box(clamp_branching(
+                    black_box(*value),
+                    black_box(0.0),
+                    black_box(1.0),
+                ))
+            })
         });
 
         // Branchless using max/min
         group.bench_function(format!("max_min_{}", name), |b| {
-            b.iter(|| black_box(clamp_branchless_max_min(black_box(*value), black_box(0.0), black_box(1.0))))
+            b.iter(|| {
+                black_box(clamp_branchless_max_min(
+                    black_box(*value),
+                    black_box(0.0),
+                    black_box(1.0),
+                ))
+            })
         });
 
         // Built-in clamp
         group.bench_function(format!("builtin_{}", name), |b| {
-            b.iter(|| black_box(clamp_builtin(black_box(*value), black_box(0.0), black_box(1.0))))
+            b.iter(|| {
+                black_box(clamp_builtin(
+                    black_box(*value),
+                    black_box(0.0),
+                    black_box(1.0),
+                ))
+            })
         });
     }
 
@@ -227,8 +241,10 @@ fn bench_envelope(c: &mut Criterion) {
     // Attack stage
     group.bench_function("attack_stage", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.1;
+        let params = SynthParams {
+            env_attack: 0.1,
+            ..Default::default()
+        };
         env.note_on();
         b.iter(|| black_box(env.process_sample(black_box(&params))))
     });
@@ -236,10 +252,12 @@ fn bench_envelope(c: &mut Criterion) {
     // Decay stage
     group.bench_function("decay_stage", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.0;
-        params.env_decay = 0.1;
-        params.env_sustain = 0.5;
+        let params = SynthParams {
+            env_attack: 0.0,
+            env_decay: 0.1,
+            env_sustain: 0.5,
+            ..Default::default()
+        };
         env.note_on();
         // Process through attack instantly
         for _ in 0..10 {
@@ -251,10 +269,12 @@ fn bench_envelope(c: &mut Criterion) {
     // Sustain stage
     group.bench_function("sustain_stage", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.0;
-        params.env_decay = 0.0;
-        params.env_sustain = 0.7;
+        let params = SynthParams {
+            env_attack: 0.0,
+            env_decay: 0.0,
+            env_sustain: 0.7,
+            ..Default::default()
+        };
         env.note_on();
         // Process through attack and decay
         for _ in 0..100 {
@@ -266,9 +286,11 @@ fn bench_envelope(c: &mut Criterion) {
     // Release stage
     group.bench_function("release_stage", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.0;
-        params.env_release = 0.1;
+        let params = SynthParams {
+            env_attack: 0.0,
+            env_release: 0.1,
+            ..Default::default()
+        };
         env.note_on();
         env.note_off();
         b.iter(|| black_box(env.process_sample(black_box(&params))))
@@ -277,11 +299,13 @@ fn bench_envelope(c: &mut Criterion) {
     // Full ADSR cycle
     group.bench_function("full_adsr_cycle", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.01;
-        params.env_decay = 0.1;
-        params.env_sustain = 0.7;
-        params.env_release = 0.2;
+        let params = SynthParams {
+            env_attack: 0.01,
+            env_decay: 0.1,
+            env_sustain: 0.7,
+            env_release: 0.2,
+            ..Default::default()
+        };
 
         b.iter(|| {
             env.note_on();
@@ -304,11 +328,13 @@ fn bench_envelope(c: &mut Criterion) {
     // Fast envelope (percussive)
     group.bench_function("percussive_envelope", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.001;
-        params.env_decay = 0.05;
-        params.env_sustain = 0.0;
-        params.env_release = 0.1;
+        let params = SynthParams {
+            env_attack: 0.001,
+            env_decay: 0.05,
+            env_sustain: 0.0,
+            env_release: 0.1,
+            ..Default::default()
+        };
 
         b.iter(|| {
             env.note_on();
@@ -322,11 +348,13 @@ fn bench_envelope(c: &mut Criterion) {
     // Slow envelope (pad)
     group.bench_function("pad_envelope", |b| {
         let mut env = Envelope::new(sample_rate);
-        let mut params = SynthParams::default();
-        params.env_attack = 0.5;
-        params.env_decay = 0.5;
-        params.env_sustain = 0.8;
-        params.env_release = 1.0;
+        let params = SynthParams {
+            env_attack: 0.5,
+            env_decay: 0.5,
+            env_sustain: 0.8,
+            env_release: 1.0,
+            ..Default::default()
+        };
 
         b.iter(|| {
             env.note_on();
@@ -426,49 +454,63 @@ fn bench_synth_engine_buffers(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
 
         // Standard buffer processing
-        group.bench_with_input(BenchmarkId::new("buffer_processing", size), size, |b, &size| {
-            let mut engine = SynthEngine::new(sample_rate);
-            engine.note_on(60, 0.8);
+        group.bench_with_input(
+            BenchmarkId::new("buffer_processing", size),
+            size,
+            |b, &size| {
+                let mut engine = SynthEngine::new(sample_rate);
+                engine.note_on(60, 0.8);
 
-            b.iter(|| {
-                for _ in 0..size {
-                    black_box(engine.process_sample(black_box(&params)));
-                }
-            });
-        });
+                b.iter(|| {
+                    for _ in 0..size {
+                        black_box(engine.process_sample(black_box(&params)));
+                    }
+                });
+            },
+        );
 
         // Sustained note (envelope in sustain stage)
-        group.bench_with_input(BenchmarkId::new("sustained_note", size), size, |b, &size| {
-            let mut engine = SynthEngine::new(sample_rate);
-            engine.note_on(60, 0.8);
-            // Process enough samples to reach sustain stage
-            for _ in 0..10000 {
-                engine.process_sample(&params);
-            }
-
-            b.iter(|| {
-                for _ in 0..size {
-                    black_box(engine.process_sample(black_box(&params)));
+        group.bench_with_input(
+            BenchmarkId::new("sustained_note", size),
+            size,
+            |b, &size| {
+                let mut engine = SynthEngine::new(sample_rate);
+                engine.note_on(60, 0.8);
+                // Process enough samples to reach sustain stage
+                for _ in 0..10000 {
+                    engine.process_sample(&params);
                 }
-            });
-        });
+
+                b.iter(|| {
+                    for _ in 0..size {
+                        black_box(engine.process_sample(black_box(&params)));
+                    }
+                });
+            },
+        );
 
         // Percussive note (fast attack/release)
-        group.bench_with_input(BenchmarkId::new("percussive_note", size), size, |b, &size| {
-            let mut engine = SynthEngine::new(sample_rate);
-            let mut params = SynthParams::default();
-            params.env_attack = 0.001;
-            params.env_decay = 0.05;
-            params.env_sustain = 0.0;
-            params.env_release = 0.1;
+        group.bench_with_input(
+            BenchmarkId::new("percussive_note", size),
+            size,
+            |b, &size| {
+                let mut engine = SynthEngine::new(sample_rate);
+                let params = SynthParams {
+                    env_attack: 0.001,
+                    env_decay: 0.05,
+                    env_sustain: 0.0,
+                    env_release: 0.1,
+                    ..Default::default()
+                };
 
-            b.iter(|| {
-                engine.note_on(60, 0.8);
-                for _ in 0..size {
-                    black_box(engine.process_sample(black_box(&params)));
-                }
-            });
-        });
+                b.iter(|| {
+                    engine.note_on(60, 0.8);
+                    for _ in 0..size {
+                        black_box(engine.process_sample(black_box(&params)));
+                    }
+                });
+            },
+        );
     }
 
     group.finish();

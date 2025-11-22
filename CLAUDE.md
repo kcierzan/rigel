@@ -79,11 +79,11 @@ Set by devenv:
 All commands run from repository root in devenv shell. Thanks to direnv, you're likely already in the shell. If not, prefix with `devenv shell -- <command>`:
 
 ```bash
-# Building
+# Building (Native only - simple and reliable!)
 build:native        # Build for current platform
-build:macos         # Build for Apple Silicon macOS
-build:linux         # Build for x86_64 Linux
-build:win           # Build for Windows (uses xwin SDK)
+build:macos         # macOS build (requires macOS host)
+build:linux         # Linux build (requires Linux host)
+build:win           # Windows cross-build (may work from Linux via xwin)
 
 # Testing & Quality
 cargo:test          # Run all Rust tests
@@ -208,10 +208,15 @@ Runs on all PRs and pushes:
    - `wtgen-pipeline`: ruff lint, pytest
 
 2. **Plugin Builds**:
-   - Linux & Windows: Matrix build on ubuntu-latest
-   - macOS: Native build on macos-14 runner
+   - Linux: Native build on ubuntu-latest (`x86_64-unknown-linux-gnu`)
+   - Windows: Cross-compiled on ubuntu-latest via xwin (`x86_64-pc-windows-msvc`)
+   - macOS: Native build on macos-14 runner (`aarch64-apple-darwin`)
 
 All CI commands run through devenv shell for reproducibility.
+
+**Build Quirks:**
+- CI temporarily renames `specs/` directory to avoid GCC specs directory conflicts
+- Restored via `if: always()` cleanup step to ensure directory is available even on failure
 
 ### Release Workflows
 
@@ -276,15 +281,76 @@ The `CI Success` job in `.github/workflows/ci.yml` aggregates all test and build
 
 ## Cross-Platform Support
 
-Targets configured in `rust-toolchain.toml` and `devenv.nix`:
+### Build Strategy: Native-First with Windows Exception
+
+Rigel uses **native builds** for local development where possible, with Windows cross-compilation as a pragmatic exception.
+
+**Local Development:**
+- **macOS developers**: Use `build:native` or `build:macos` (native builds only, requires macOS host)
+- **Linux developers**: Use `build:native` or `build:linux` (native builds only, requires Linux host)
+- **Windows developers**: Use `build:win` (cross-compilation via xwin, works on Linux/macOS)
+- **macOS↔Linux cross-compilation**: **Not supported** - use CI instead
+
+**Why Limited Cross-Compilation?**
+
+Cross-compiling GUI applications between macOS and Linux is complex and fragile due to:
+- X11/XCB/Wayland library dependencies with different ABIs
+- Linker configuration conflicts between platforms
+- Rust toolchain limitations for cross-platform GUI builds
+
+The complexity and maintenance burden outweigh the benefits. **Native builds + CI** is simpler and more reliable.
+
+**Why Windows Cross-Compilation Works:**
+
+Windows is the exception because:
+- MSVC SDK can be downloaded via `xwin` without a Windows VM
+- `rust-lld` can link MSVC binaries from any platform
+- No GUI-specific Linux/macOS dependencies required
+- Proven reliable in CI and local development
+
+### CI for Multi-Platform Builds
+
+All production builds use GitHub Actions:
+- **Linux builds**: `ubuntu-latest` (native x86_64 build for `x86_64-unknown-linux-gnu`)
+- **Windows builds**: `ubuntu-latest` (cross-compiled via xwin for `x86_64-pc-windows-msvc`)
+- **macOS builds**: `macos-14` (native Apple Silicon build for `aarch64-apple-darwin`)
+
+This provides reliable, reproducible builds with minimal complexity.
+
+### Recommended Workflow
+
+1. **Develop on your platform**: Use `build:native` for fast iteration
+2. **Test locally**: Native builds are fast and reliable
+3. **Test other platforms**: Push to GitHub and let CI build
+4. **Release**: Tag a commit and CI creates releases for all platforms
+
+This workflow is simpler, more reliable, and matches how most cross-platform projects work.
+
+### Supported Targets
+
+Configured in `rust-toolchain.toml`:
 - **macOS**: `aarch64-apple-darwin` (Apple Silicon)
 - **Linux**: `x86_64-unknown-linux-gnu`
-- **Windows**: `x86_64-pc-windows-msvc` (via xwin cross-compilation)
+- **Windows**: `x86_64-pc-windows-msvc`
 
-Build for specific target:
+**Build Commands:**
 ```bash
-build:macos    # or build:linux, build:win
+# Native builds (fast and reliable!)
+build:native        # Build for current platform (auto-detects)
+build:macos         # macOS native build (requires macOS host)
+build:linux         # Linux native build (requires Linux host)
+build:win           # Windows cross-build via xwin (works on Linux/macOS)
 ```
+
+**Windows Cross-Build Details:**
+
+The `build:win` command uses `ci/scripts/build-win.sh` which:
+1. Downloads Windows SDK via `xwin` (cached in `~/.cache/xwin`)
+2. Configures MSVC linker environment variables (LIB, INCLUDE, LIBPATH)
+3. Uses `rust-lld` and `llvm-ar` from rustc sysroot
+4. Invokes `cargo xtask bundle rigel-plugin --release --target x86_64-pc-windows-msvc`
+
+This approach avoids needing a Windows VM or GitHub runner for local testing.
 
 ## Coding Conventions
 
@@ -371,3 +437,10 @@ bench:all          # Run full benchmark suite
 bench:baseline     # Save performance baseline before changes
 bench:flamegraph   # Generate flamegraph for optimization
 ```
+
+## Active Technologies
+- Rust 2021 edition (workspace toolchain from rust-toolchain.toml) (001-fast-dsp-math)
+- N/A (pure computational library, no persistence) (001-fast-dsp-math)
+
+## Recent Changes
+- 001-fast-dsp-math: Added Rust 2021 edition (workspace toolchain from rust-toolchain.toml)
