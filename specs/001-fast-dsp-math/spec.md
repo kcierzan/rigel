@@ -69,11 +69,11 @@ As a DSP developer, I need vectorized fast math kernels (tanh, exp, exp2, log, l
 **Acceptance Scenarios**:
 
 1. **Given** a block of 64 samples, **When** applying vectorized tanh, **Then** operation executes 8-16x faster than scalar tanh while maintaining error below 0.1%
-2. **Given** envelope generation requiring exp, **When** using vectorized exp kernel, **Then** block processing achieves sub-nanosecond per-sample throughput on modern CPUs
+2. **Given** envelope generation requiring exp, **When** using vectorized exp kernel, **Then** block processing meets FR-023 performance target (sub-nanosecond per-sample throughput on 3GHz+ x86-64 with AVX2)
 3. **Given** oscillator phase calculations, **When** using vectorized sin/cos, **Then** harmonic distortion remains below -100dB across all backends
 4. **Given** need for division-free reciprocal, **When** using fast inverse (1/x), **Then** accuracy is sufficient for audio applications (< 0.01% error) at 5-10x speedup vs division
 5. **Given** phase modulation or waveshaping requiring atan, **When** using vectorized atan approximation, **Then** absolute error remains below 0.001 radians (< 0.057 degrees) across full input range while executing 8-16x faster than scalar libm atan
-6. **Given** pitch shifting requiring pow(2, x), **When** using vectorized exp2/log2 with pow decomposition, **Then** operations execute 10-20x faster than scalar libm with < 0.01% error
+6. **Given** pitch shifting requiring pow(2, x), **When** using vectorized exp2/log2 with pow decomposition, **Then** operations execute 10-20x faster than scalar libm with exp2 error <0.0005% for MIDI range (FR-028) and pow error <0.01% for general inputs
 7. **Given** waveshaping distortion, **When** using polynomial saturation curves, **Then** processing completes in < 5 CPU cycles per sample on AVX2
 8. **Given** wavetable oscillator requiring interpolation, **When** using cubic Hermite interpolation kernel, **Then** phase continuity maintained with smooth C1 continuity
 9. **Given** sawtooth/square wave synthesis, **When** using polyBLEP kernel, **Then** alias-free output achieved with < 8 operations per transition
@@ -123,9 +123,9 @@ As a DSP developer, I need vectorized saturation curves (soft clipping, tube-sty
 
 **Acceptance Scenarios**:
 
-1. **Given** an audio block approaching 0dBFS, **When** vectorized soft saturation is applied, **Then** output remains smooth without digital clipping and introduces harmonically-rich content
-2. **Given** different saturation curve options, **When** applied to audio blocks via SIMD abstraction, **Then** each produces distinct harmonic characteristics while maintaining block processing performance
-3. **Given** real-time processing requirements, **When** saturation is applied to 64-sample blocks, **Then** performance is at least 3x faster than per-sample polynomial-based implementations
+1. **Given** an audio block with peaks at -0.1dBFS, **When** vectorized soft saturation (tanh-based or polynomial) is applied, **Then** output peaks remain ≤0dBFS, THD+N <0.1% (-60dB) for musical harmonic richness, and all harmonics <-40dB relative to fundamental
+2. **Given** hard clip, soft clip, and asymmetric saturation curves, **When** applied to identical test signals via SIMD abstraction, **Then** FFT analysis shows distinct harmonic profiles (hard clip: odd harmonics, asymmetric: even+odd harmonics, soft clip: smooth rolloff) while processing completes in <5 cycles/sample (AVX2)
+3. **Given** real-time processing requirements, **When** saturation is applied to 64-sample blocks, **Then** vectorized implementation executes in <320 cycles (64 samples × 5 cycles/sample), achieving 3x speedup vs per-sample scalar implementation
 
 ---
 
@@ -139,9 +139,9 @@ As a DSP developer, I need vectorized crossfade and parameter ramping functions 
 
 **Acceptance Scenarios**:
 
-1. **Given** two audio blocks to blend, **When** vectorized crossfade is applied, **Then** total energy remains constant (equal-power crossfade) with no perceived volume dip
-2. **Given** a parameter change (e.g., filter cutoff), **When** ramping across block boundary, **Then** no audible clicks or zipper noise are introduced
-3. **Given** different crossfade curve shapes, **When** applied via SIMD abstraction, **Then** block processing maintains optimal performance
+1. **Given** two audio blocks to blend, **When** vectorized equal-power crossfade is applied with curve √(1-t²) and √(t²), **Then** RMS energy remains constant within 0.1dB across entire crossfade, amplitude sum follows sin²(t) + cos²(t) = 1 identity, and no perceived volume dip occurs at midpoint
+2. **Given** a parameter change from 440Hz to 880Hz cutoff, **When** ramping linearly across 64-sample block (1.45ms @ 44.1kHz), **Then** spectrogram shows smooth frequency transition with no vertical artifacts, THD+N remains <-96dB, and zero-crossing analysis reveals no discontinuities
+3. **Given** linear, equal-power, and S-curve crossfade shapes, **When** applied to 64-sample blocks via SIMD abstraction, **Then** all variants complete in <10ns per sample (<640ns per block) while preserving curve-specific energy profiles (linear: -3dB dip, equal-power: 0dB, S-curve: smooth acceleration)
 
 ---
 
@@ -236,7 +236,7 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **FR-025**: Library MUST provide vectorized sin/cos approximations with harmonic distortion below -100dB
 - **FR-026**: Library MUST provide vectorized fast inverse (1/x) with < 0.01% error at 5-10x speedup vs division
 - **FR-027**: Library MUST provide vectorized atan approximation using Remez minimax polynomial with < 0.001 radian absolute error (< 0.057 degrees) executing 8-16x faster than scalar libm atan
-- **FR-028**: Library MUST provide vectorized exp2 and log2 approximations using IEEE 754 exponent manipulation with polynomial refinement, achieving < 0.01% error at 10-20x speedup vs scalar libm
+- **FR-028**: Library MUST provide vectorized exp2 approximation using IEEE 754 exponent field manipulation for integer part and degree-5 minimax polynomial for fractional part [0,1), achieving < 0.0005% error for MIDI range [-6, 6], exact results for integer inputs, and 1.5-2x speedup vs exp(x*ln(2)) / 10-20x speedup vs scalar libm
 - **FR-029**: Library MUST provide vectorized pow and powf using exp2(log2(x)*y) decomposition with optimized polynomial approximations
 - **FR-030**: Library MUST provide polynomial saturation curves (soft clip, hard clip, asymmetric) for waveshaping with < 5 CPU cycles per sample on AVX2
 - **FR-031**: Library MUST provide sigmoid curves (logistic, tanh-based, smoothstep family) with polynomial approximations maintaining smooth C1 or C2 continuity
@@ -245,6 +245,29 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **FR-034**: Library MUST provide vectorized random noise generation (white, pink optional) using fast PRNG suitable for audio synthesis
 - **FR-035**: Library MUST provide additional vectorized math functions typical for audio DSP (sqrt, rsqrt)
 - **FR-036**: All math kernels MUST operate on entire blocks for maximum efficiency
+
+#### Math Kernel Performance Specification Matrix
+
+The table below clarifies the primary performance metric for each math kernel:
+
+| Math Kernel | Primary Metric | Target Value | Secondary Metrics |
+|-------------|---------------|--------------|-------------------|
+| tanh | Speedup vs scalar | 8-16x | Error <0.1% |
+| exp | Absolute throughput | <1ns per sample (3GHz+ AVX2) | Speedup 8-16x |
+| log, log1p | Accuracy | Error <0.001% | Speedup 8-16x |
+| sin, cos | Harmonic distortion | THD <-100dB | Speedup 8-16x |
+| inverse (1/x) | Speedup vs division | 5-10x | Error <0.01% |
+| atan | Speedup vs scalar libm | 8-16x | Error <0.001 rad |
+| exp2 | Speedup vs exp(x*ln2) | 1.5-2x (vs exp decomp), 10-20x (vs libm) | Error <0.0005% MIDI range |
+| pow | Speedup vs scalar libm | 10-20x | Error <0.01% |
+| sqrt, rsqrt | Speedup vs scalar | 8-16x | Hardware instruction where available |
+| Polynomial saturation | Absolute cycles | <5 cycles/sample (AVX2) | Harmonically rich output |
+| Sigmoid curves | Smoothness | C1 or C2 continuity | Minimal overhead |
+| Cubic Hermite interp | Phase continuity | Smooth C1 derivatives | <10ns per sample |
+| polyBLEP | Complexity | <8 operations per transition | Alias-free output |
+| White noise | Block throughput | 64 samples <100 cycles | Chi-square statistical test pass |
+
+**Rationale**: Different kernels optimize for different properties. Tanh prioritizes speedup, exp prioritizes absolute throughput, sin/cos prioritize audio quality (THD), log prioritizes accuracy for frequency calculations. This matrix eliminates ambiguity about success criteria.
 
 #### Lookup Tables
 
@@ -305,8 +328,8 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **Lookup Table**: Pre-computed function values with vectorized interpolation supporting per-lane indexing
 - **Crossfade Curve**: Vectorized parameter transition function with equal-power characteristics
 - **Benchmark Suite**: Collection of performance tests measuring each backend's instruction counts and wall-clock performance
-- **Property Test**: Automated test generating thousands of random inputs to verify mathematical invariants and edge case handling
-- **Accuracy Test**: Comparison test validating math kernel error bounds against reference implementations
+- **Property Test**: Automated test generating thousands of random inputs to verify mathematical invariants and edge case handling. Examples: commutativity (a+b == b+a), associativity ((a+b)+c == a+(b+c)), idempotence (max(a,a) == a), range properties (tanh output ∈ [-1,1]). Property tests validate *structural correctness* independent of specific numeric values.
+- **Accuracy Test**: Comparison test validating math kernel error bounds against reference implementations. Examples: tanh(x) error <0.1% vs libm::tanh, sin(x) THD <-100dB vs libm::sin, exp2(x) error <0.0005% for x∈[-6,6]. Accuracy tests validate *numeric precision* by comparing against ground truth.
 - **Backend Consistency Test**: Cross-backend validation ensuring all implementations produce results within acceptable error tolerances
 - **Regression Test**: Performance baseline comparison detecting degradation in instruction counts or execution time
 - **Integration Test**: End-to-end test demonstrating complete DSP workflows using the library's abstractions
@@ -333,7 +356,7 @@ As a library maintainer, I need comprehensive test coverage that ensures correct
 - **SC-016**: Property-based tests generate at least 10,000 test cases per operation, catching edge cases that would be missed by hand-written tests
 - **SC-017**: All math kernels pass accuracy tests showing error bounds within specified limits across all backends (verified through automated testing)
 - **SC-018**: Vectorized atan approximation maintains absolute error below 0.001 radians (< 0.057 degrees) across full input range while executing 8-16x faster than scalar libm atan
-- **SC-019**: Vectorized exp2/log2 approximations achieve < 0.01% error while executing 10-20x faster than scalar libm, enabling efficient pow(x,y) decomposition
+- **SC-019**: Vectorized exp2 achieves < 0.0005% error for x ∈ [-6, 6] (MIDI range), < 5e-6 error for fractional part [0, 1), exact results for integer inputs, while executing 1.5-2x faster than exp(x*ln(2)) and 10-20x faster than scalar libm, enabling efficient MIDI-to-frequency conversion and pitch calculations
 - **SC-020**: Polynomial saturation curves process audio in < 5 CPU cycles per sample on AVX2, enabling real-time waveshaping distortion
 - **SC-021**: Sigmoid curves (logistic, smoothstep) maintain smooth C1 or C2 continuity for artifact-free parameter transitions
 - **SC-022**: Cubic Hermite interpolation maintains phase continuity and smooth derivatives for wavetable synthesis and resampling

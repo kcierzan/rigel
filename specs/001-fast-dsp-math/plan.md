@@ -36,7 +36,7 @@ Create a trait-based SIMD abstraction layer for Rigel's DSP core that provides z
 **Scale/Scope**:
   - ~4 SIMD backends (scalar, AVX2, AVX512, NEON)
   - ~20 vector operations (arithmetic, FMA, min/max, compare, horizontal)
-  - ~10 fast math kernels (tanh, exp, log1p, sin, cos, inverse, sqrt, pow, etc.)
+  - 15 fast math kernels (tanh, exp, log, log1p, sin, cos, inverse, atan, exp2, log2, pow, sqrt, rsqrt, polynomial saturation, sigmoid curves, interpolation, polyBLEP, white noise)
   - Block sizes: 64 or 128 samples
   - Comprehensive benchmark suite covering all operations across all backends
 
