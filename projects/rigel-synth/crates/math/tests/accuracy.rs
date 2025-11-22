@@ -210,9 +210,7 @@ fn test_denormal_protection_preserves_normal_values() {
 // Fast Math Kernel Accuracy Tests (User Story 4)
 // =============================================================================
 
-use rigel_math::math::{
-    atan, cos, exp, fast_exp2, fast_log2, log1p, pow, recip, rsqrt, sin, sincos, sqrt, tanh,
-};
+use rigel_math::math::{atan, exp, fast_exp2, fast_log2, log1p, recip, sin, sincos, tanh};
 
 /// Helper function to calculate relative error as a percentage
 fn relative_error_percent(actual: f32, expected: f32) -> f32 {
@@ -229,6 +227,7 @@ fn absolute_error(actual: f32, expected: f32) -> f32 {
 
 /// Calculate Total Harmonic Distortion (THD) in dB
 /// Simplified implementation for basic validation
+#[allow(dead_code)]
 fn calculate_thd_db(fundamental: f32, harmonics: &[f32]) -> f32 {
     let harmonic_power: f32 = harmonics.iter().map(|h| h * h).sum();
     let total_power = fundamental * fundamental + harmonic_power;
@@ -331,6 +330,7 @@ fn test_log1p_accuracy() {
 // T100: Accuracy test for sin/cos harmonic distortion
 #[test]
 fn test_sincos_harmonic_distortion() {
+    #[allow(dead_code)]
     const THD_THRESHOLD_DB: f32 = -100.0; // <-100dB THD required
 
     // Test at various frequencies
@@ -516,7 +516,7 @@ fn test_polynomial_saturation_harmonics() {
         let soft_result = soft_clip(vec_x);
         let soft_val = soft_result.horizontal_sum() / DefaultSimdVector::LANES as f32;
         assert!(
-            soft_val >= -1.0 && soft_val <= 1.0,
+            (-1.0..=1.0).contains(&soft_val),
             "soft_clip({}) = {} should be in [-1, 1]",
             x,
             soft_val
@@ -526,7 +526,7 @@ fn test_polynomial_saturation_harmonics() {
         let hard_result = hard_clip(vec_x, 1.0);
         let hard_val = hard_result.horizontal_sum() / DefaultSimdVector::LANES as f32;
         assert!(
-            hard_val >= -1.0 && hard_val <= 1.0,
+            (-1.0..=1.0).contains(&hard_val),
             "hard_clip({}) = {} should be in [-1, 1]",
             x,
             hard_val
@@ -556,13 +556,13 @@ fn test_sigmoid_continuity() {
 
         // Values should be in [0, 1]
         assert!(
-            smooth_val >= 0.0 && smooth_val <= 1.0,
+            (0.0..=1.0).contains(&smooth_val),
             "smoothstep({}) = {} should be in [0, 1]",
             t,
             smooth_val
         );
         assert!(
-            smoother_val >= 0.0 && smoother_val <= 1.0,
+            (0.0..=1.0).contains(&smoother_val),
             "smootherstep({}) = {} should be in [0, 1]",
             t,
             smoother_val
@@ -609,7 +609,7 @@ fn test_cubic_hermite_phase_continuity() {
 
     // Sample the interpolation
     let num_samples = 100;
-    let mut prev_value = None;
+    let mut prev_value: Option<f32> = None;
 
     for i in 0..num_samples {
         let t = i as f32 / (num_samples - 1) as f32;
@@ -638,7 +638,7 @@ fn test_cubic_hermite_phase_continuity() {
 
         // Check for smoothness (no large jumps)
         if let Some(prev) = prev_value {
-            let jump = (value - prev as f32).abs();
+            let jump = (value - prev).abs();
             assert!(
                 jump < 0.05, // Maximum allowed jump per sample
                 "Interpolation should be continuous: jump of {} between {} and {}",
@@ -732,7 +732,7 @@ fn test_white_noise_distribution() {
     // Check that samples are in expected range [-1, 1]
     for (i, &sample) in all_samples.iter().enumerate() {
         assert!(
-            sample >= -1.0 && sample <= 1.0,
+            (-1.0..=1.0).contains(&sample),
             "Sample {} out of range: {}",
             i,
             sample

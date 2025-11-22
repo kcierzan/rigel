@@ -165,8 +165,8 @@ fn test_cubic_interpolation_smoother_than_linear() {
         let cubic = table.lookup_cubic(idx, IndexMode::Wrap);
 
         // Both should be in valid range
-        assert!(linear >= -1.0 && linear <= 1.0);
-        assert!(cubic >= -1.0 && cubic <= 1.0);
+        assert!((-1.0..=1.0).contains(&linear));
+        assert!((-1.0..=1.0).contains(&cubic));
 
         // They should be similar but not identical
         let diff = (linear - cubic).abs();
@@ -194,9 +194,10 @@ fn test_simd_cubic_interpolation() {
     let mut results_buf = [0.0f32; 16];
     results.to_slice(&mut results_buf);
 
+    #[allow(clippy::needless_range_loop)]
     for lane in 0..DefaultSimdVector::LANES.min(4) {
         assert!(
-            results_buf[lane] >= -1.1 && results_buf[lane] <= 1.1,
+            (-1.1..=1.1).contains(&results_buf[lane]),
             "Sine wave result out of range: {}",
             results_buf[lane]
         );

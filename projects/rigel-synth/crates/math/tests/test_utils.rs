@@ -3,6 +3,8 @@
 //! Provides reference implementations, proptest strategies, and assertion helpers
 //! for validating SIMD operations across all backends.
 
+#![allow(dead_code)]
+
 use proptest::prelude::*;
 use rigel_math::{DefaultSimdVector, SimdVector};
 
@@ -167,9 +169,8 @@ pub fn assert_approx_eq(actual: f32, expected: f32, context: &str) {
     }
 
     if expected.is_infinite() {
-        assert_eq!(
+        assert!(
             actual.is_infinite(),
-            true,
             "{}: expected infinite, got {}",
             context,
             actual
