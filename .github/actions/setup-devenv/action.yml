@@ -33,6 +33,10 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ inputs.devenv-path }}/.devenv
-        key: ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{ hashFiles(format('{0}/devenv.nix', inputs.devenv-path), format('{0}/devenv.lock', inputs.devenv-path), format('{0}/flake.lock', inputs.devenv-path)) }}
+        # hashFiles requires newline-separated patterns in a single format() call
+        # Multiple format() arguments cause expression parser to concatenate incorrectly
+        key: ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-${{ hashFiles(format('{0}/devenv.nix
+{0}/devenv.lock
+{0}/flake.lock', inputs.devenv-path, inputs.devenv-path, inputs.devenv-path)) }}
         restore-keys: |
           ${{ runner.os }}-${{ inputs.cache-prefix }}-devenv-
