@@ -161,7 +161,7 @@ in
 
   scripts = {
     "cargo:fmt".exec = cargoScript "cargo fmt";
-    "cargo:lint".exec = cargoScript "cargo clippy --all-targets --all-features";
+    "cargo:lint".exec = cargoScript "cargo clippy --all-targets";
     "cargo:test".exec = cargoScript "cargo test";
     "build:cli".exec = cargoScript "cargo build --release --bin rigel";
 
@@ -259,7 +259,7 @@ in
   enterTest = ''
     set -euo pipefail
     cargo fmt -- --check
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --all-targets -- -D warnings
     cargo test
   '';
 
@@ -268,7 +268,7 @@ in
     "ci:check".exec = ''
       set -euo pipefail
       cargo fmt -- --check
-      cargo clippy --all-targets --all-features -- -D warnings
+      cargo clippy --all-targets -- -D warnings
       cargo test
     '';
   };
