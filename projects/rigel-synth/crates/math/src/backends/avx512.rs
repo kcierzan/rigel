@@ -180,12 +180,44 @@ impl SimdVector for Avx512Vector {
 
     #[inline(always)]
     fn min(self, rhs: Self) -> Self {
-        unsafe { Avx512Vector(_mm512_min_ps(self.0, rhs.0)) }
+        unsafe {
+            // IEEE 754-2008 minNum semantics: if one value is NaN, return the other
+            // AVX-512's _mm512_min_ps may still propagate NaN in some cases
+            let min_result = _mm512_min_ps(self.0, rhs.0);
+
+            // Check for NaN using mask: value != value
+            let self_is_nan = _mm512_cmp_ps_mask::<_CMP_UNORD_Q>(self.0, self.0);
+            let rhs_is_nan = _mm512_cmp_ps_mask::<_CMP_UNORD_Q>(rhs.0, rhs.0);
+
+            // If self is NaN, use rhs; if rhs is NaN, use self; else use min_result
+            let result = _mm512_mask_blend_ps(
+                self_is_nan,
+                _mm512_mask_blend_ps(rhs_is_nan, min_result, self.0),
+                rhs.0,
+            );
+            Avx512Vector(result)
+        }
     }
 
     #[inline(always)]
     fn max(self, rhs: Self) -> Self {
-        unsafe { Avx512Vector(_mm512_max_ps(self.0, rhs.0)) }
+        unsafe {
+            // IEEE 754-2008 maxNum semantics: if one value is NaN, return the other
+            // AVX-512's _mm512_max_ps may still propagate NaN in some cases
+            let max_result = _mm512_max_ps(self.0, rhs.0);
+
+            // Check for NaN using mask: value != value
+            let self_is_nan = _mm512_cmp_ps_mask::<_CMP_UNORD_Q>(self.0, self.0);
+            let rhs_is_nan = _mm512_cmp_ps_mask::<_CMP_UNORD_Q>(rhs.0, rhs.0);
+
+            // If self is NaN, use rhs; if rhs is NaN, use self; else use max_result
+            let result = _mm512_mask_blend_ps(
+                self_is_nan,
+                _mm512_mask_blend_ps(rhs_is_nan, max_result, self.0),
+                rhs.0,
+            );
+            Avx512Vector(result)
+        }
     }
 
     #[inline(always)]
@@ -225,7 +257,10 @@ impl SimdVector for Avx512Vector {
 
     #[inline(always)]
     fn floor(self) -> Self {
-        unsafe { Avx512Vector(_mm512_floor_ps(self.0)) }
+        // _mm512_floor_ps doesn't exist in Rust std::arch
+        // Use _mm512_roundscale_ps with floor rounding mode instead
+        // 0x09 = _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC
+        unsafe { Avx512Vector(_mm512_roundscale_ps::<0x09>(self.0)) }
     }
 
     #[inline(always)]
@@ -291,10 +326,14 @@ impl SimdMask for Avx512Mask {
 mod tests {
     use super::*;
 
+    // Tests assume AVX-512 is available when compiled with target-feature=+avx512f
+    // No runtime detection needed - this is a compile-time backend selection library
+
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn test_avx512_arithmetic() {
-        if is_x86_feature_detected!("avx512f") {
+        #[target_feature(enable = "avx512f")]
+        unsafe fn inner() {
             let a = Avx512Vector::splat(2.0);
             let b = Avx512Vector::splat(3.0);
 
@@ -307,12 +346,14 @@ mod tests {
             let prod = a.mul(b);
             assert_eq!(prod.horizontal_sum(), 96.0); // 6.0 * 16 lanes
         }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn test_avx512_fma() {
-        if is_x86_feature_detected!("avx512f") {
+        #[target_feature(enable = "avx512f")]
+        unsafe fn inner() {
             let a = Avx512Vector::splat(2.0);
             let b = Avx512Vector::splat(3.0);
             let c = Avx512Vector::splat(1.0);
@@ -320,12 +361,14 @@ mod tests {
             let result = a.fma(b, c);
             assert_eq!(result.horizontal_sum(), 112.0); // 7.0 * 16 lanes
         }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn test_avx512_comparison() {
-        if is_x86_feature_detected!("avx512f") {
+        #[target_feature(enable = "avx512f")]
+        unsafe fn inner() {
             let a = Avx512Vector::splat(2.0);
             let b = Avx512Vector::splat(3.0);
 
@@ -335,12 +378,14 @@ mod tests {
             let mask_gt = a.gt(b);
             assert!(mask_gt.none());
         }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn test_avx512_mask_operations() {
-        if is_x86_feature_detected!("avx512f") {
+        #[target_feature(enable = "avx512f")]
+        unsafe fn inner() {
             let a = Avx512Vector::splat(1.0);
             let b = Avx512Vector::splat(2.0);
 
@@ -363,12 +408,14 @@ mod tests {
             let xor_mask = mask_lt.xor(mask_gt);
             assert!(xor_mask.all());
         }
+        unsafe { inner() }
     }
 
     #[test]
     #[cfg(target_arch = "x86_64")]
     fn test_avx512_bit_manipulation() {
-        if is_x86_feature_detected!("avx512f") {
+        #[target_feature(enable = "avx512f")]
+        unsafe fn inner() {
             use crate::traits::SimdInt;
 
             // Test to_bits / from_bits round trip
@@ -398,5 +445,6 @@ mod tests {
             let result_shl = Avx512Vector::from_int_cast(shifted_left);
             assert_eq!(result_shl.horizontal_sum(), 512.0); // 32.0 * 16 lanes
         }
+        unsafe { inner() }
     }
 }

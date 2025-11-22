@@ -193,7 +193,23 @@ Single-operation targets:
 
 ## Documentation
 
-See the [quickstart guide](../../specs/001-fast-dsp-math/quickstart.md) for more examples.
+`rigel-math` includes comprehensive documentation for development, testing, and performance optimization:
+
+### User Guides
+
+- **[API Reference](docs/api-reference.md)** - Complete function reference with error bounds, performance characteristics, and usage examples
+- **[Testing Guide](docs/testing.md)** - How to run unit tests, doctests, and property-based tests across all backends
+- **[Benchmarking Guide](docs/benchmarking.md)** - Performance measurement with Criterion and iai-callgrind
+- **[Coverage Guide](docs/coverage.md)** - Generating and interpreting code coverage reports
+
+### Development
+
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Complete development workflow, pre-commit checklist, and contribution guidelines
+
+### Quick Links
+
+- **[Main README](../../README.md)** - Rigel synthesizer project overview
+- **[Root Documentation](../../docs/)** - Additional rigel-synth documentation
 
 ## License
 
