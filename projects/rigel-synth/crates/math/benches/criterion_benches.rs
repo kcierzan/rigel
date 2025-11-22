@@ -659,6 +659,7 @@ fn bench_dsp_utilities_block(c: &mut Criterion) {
     use rigel_math::Block64;
 
     let mut group = c.benchmark_group("dsp_utilities_block");
+    #[allow(dead_code)]
     const BLOCK_SIZE: usize = 64;
 
     // T114: Soft clipping a block
@@ -743,6 +744,122 @@ fn bench_performance_targets(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark exp2 implementations (optimized vs previous)
+fn bench_exp2_comparison(c: &mut Criterion) {
+    let mut group = c.benchmark_group("exp2_comparison");
+
+    let x = DefaultSimdVector::splat(3.5);
+
+    // New optimized implementation using bit manipulation + polynomial
+    group.bench_function("fast_exp2_optimized", |bencher| {
+        bencher.iter(|| black_box(fast_exp2(black_box(x))))
+    });
+
+    // Previous implementation (via exp)
+    group.bench_function("exp2_via_exp", |bencher| {
+        let ln_2 = DefaultSimdVector::splat(core::f32::consts::LN_2);
+        bencher.iter(|| {
+            let scaled = black_box(x).mul(ln_2);
+            black_box(exp(scaled))
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmark MIDI-to-frequency conversion (real-world use case)
+fn bench_midi_to_frequency(c: &mut Criterion) {
+    let mut group = c.benchmark_group("midi_to_frequency");
+
+    let midi_notes = DefaultSimdVector::splat(60.0); // Middle C
+    let a4_midi = DefaultSimdVector::splat(69.0);
+    let semitones_from_a4 = midi_notes.sub(a4_midi);
+    let octaves = semitones_from_a4.div(DefaultSimdVector::splat(12.0));
+
+    // Using optimized fast_exp2
+    group.bench_function("fast_exp2_method", |bencher| {
+        bencher.iter(|| {
+            let ratio = fast_exp2(black_box(octaves));
+            black_box(ratio.mul(DefaultSimdVector::splat(440.0)))
+        })
+    });
+
+    // Using exp(x * ln(2))
+    group.bench_function("exp_method", |bencher| {
+        let ln_2 = DefaultSimdVector::splat(core::f32::consts::LN_2);
+        bencher.iter(|| {
+            let scaled = black_box(octaves).mul(ln_2);
+            let ratio = exp(scaled);
+            black_box(ratio.mul(DefaultSimdVector::splat(440.0)))
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmark pow implementations (optimized vs old decomposition)
+fn bench_pow_comparison(c: &mut Criterion) {
+    let mut group = c.benchmark_group("pow_comparison");
+
+    let base = DefaultSimdVector::splat(2.0);
+    let exponent = 3.5;
+
+    // New optimized implementation using fast_exp2/fast_log2
+    group.bench_function("pow_optimized_exp2_log2", |bencher| {
+        bencher.iter(|| black_box(pow(black_box(base), black_box(exponent))))
+    });
+
+    // Old implementation using exp/ln (for comparison)
+    group.bench_function("pow_old_exp_ln", |bencher| {
+        let exp_scalar = DefaultSimdVector::splat(exponent);
+        bencher.iter(|| {
+            let ln_base = log(black_box(base));
+            let product = ln_base.mul(exp_scalar);
+            black_box(exp(product))
+        })
+    });
+
+    // Scalar libm baseline
+    group.bench_function("pow_scalar_libm", |bencher| {
+        bencher.iter(|| black_box(libm::powf(2.0, black_box(exponent))))
+    });
+
+    group.finish();
+}
+
+/// Benchmark pow for harmonic series generation (audio use case)
+fn bench_pow_harmonic_series(c: &mut Criterion) {
+    let mut group = c.benchmark_group("pow_harmonic_series");
+
+    // Generate amplitude falloff for harmonics: amplitude_n = 1/n^falloff
+    // Common in additive synthesis
+    let falloff = 0.8;
+
+    group.bench_function("harmonic_series_optimized", |bencher| {
+        bencher.iter(|| {
+            let mut sum = DefaultSimdVector::splat(0.0);
+            for n in 1..=8 {
+                let harmonic = DefaultSimdVector::splat(n as f32);
+                let amplitude = pow(harmonic, falloff);
+                sum = sum.add(amplitude);
+            }
+            black_box(sum)
+        })
+    });
+
+    group.bench_function("harmonic_series_scalar", |bencher| {
+        bencher.iter(|| {
+            let mut sum = 0.0f32;
+            for n in 1..=8 {
+                sum += libm::powf(n as f32, falloff);
+            }
+            black_box(sum)
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_arithmetic,
@@ -760,6 +877,10 @@ criterion_group!(
     bench_scalar_libm_vs_polynomial,
     bench_dsp_utilities,
     bench_dsp_utilities_block,
-    bench_performance_targets
+    bench_performance_targets,
+    bench_exp2_comparison,
+    bench_midi_to_frequency,
+    bench_pow_comparison,
+    bench_pow_harmonic_series
 );
 criterion_main!(benches);
