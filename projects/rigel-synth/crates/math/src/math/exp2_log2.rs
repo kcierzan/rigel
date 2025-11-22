@@ -196,7 +196,9 @@ mod tests {
         let x = DefaultSimdVector::splat(200.0);
 
         // Debug: test clamping separately
-        let x_clamped = x.max(DefaultSimdVector::splat(-126.0)).min(DefaultSimdVector::splat(126.0));
+        let x_clamped = x
+            .max(DefaultSimdVector::splat(-126.0))
+            .min(DefaultSimdVector::splat(126.0));
         let clamped_value = x_clamped.horizontal_sum() / DefaultSimdVector::LANES as f32;
         assert!(
             (clamped_value - 126.0).abs() < 0.001,
