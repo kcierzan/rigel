@@ -41,7 +41,7 @@ jobs:
           cache-on-failure: false
 
       - name: Workaround GCC specs directory conflict
-        run: mv specs specs.bak
+        run: test -d specs && mv specs specs.bak || true
 
       - name: Check formatting
         env:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Restore specs directory
         if: always()
-        run: mv specs.bak specs
+        run: test -d specs.bak && mv specs.bak specs || true
 
   wtgen-pipeline:
     name: wtgen Lint & Tests
@@ -165,7 +165,7 @@ jobs:
           key: xwin-sdk-${{ runner.os }}-v1
 
       - name: Workaround GCC specs directory conflict
-        run: mv specs specs.bak
+        run: test -d specs && mv specs specs.bak || true
 
       - name: Build plugin (${{ matrix.target }})
         env:
@@ -174,7 +174,7 @@ jobs:
 
       - name: Restore specs directory
         if: always()
-        run: mv specs.bak specs
+        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -259,7 +259,7 @@ jobs:
 
       - name: Workaround GCC specs directory conflict
         if: matrix.os == 'ubuntu-latest'
-        run: mv specs specs.bak
+        run: test -d specs && mv specs specs.bak || true
 
       - name: Test ${{ matrix.features }} backend
         env:
@@ -269,7 +269,7 @@ jobs:
 
       - name: Restore specs directory
         if: always() && matrix.os == 'ubuntu-latest'
-        run: mv specs.bak specs
+        run: test -d specs.bak && mv specs.bak specs || true
 
   # Aggregates all CI results into a single required status check
   ci-success:

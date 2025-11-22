@@ -50,7 +50,7 @@ jobs:
           shared-key: ${{ matrix.target }}
 
       - name: Workaround GCC specs directory conflict
-        run: mv specs specs.bak
+        run: test -d specs && mv specs specs.bak || true
 
       - name: Build plugin (${{ matrix.target }})
         env:
@@ -59,7 +59,7 @@ jobs:
 
       - name: Restore specs directory
         if: always()
-        run: mv specs.bak specs
+        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Create archive
         run: |
@@ -98,7 +98,7 @@ jobs:
           shared-key: macos
 
       - name: Workaround GCC specs directory conflict
-        run: mv specs specs.bak
+        run: test -d specs && mv specs specs.bak || true
 
       - name: Build plugin (macOS)
         env:
@@ -107,7 +107,7 @@ jobs:
 
       - name: Restore specs directory
         if: always()
-        run: mv specs.bak specs
+        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Create archive
         run: |
