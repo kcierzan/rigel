@@ -85,10 +85,21 @@ build:macos         # macOS build (requires macOS host)
 build:linux         # Linux build (requires Linux host)
 build:win           # Windows cross-build (may work from Linux via xwin)
 
+# SIMD-Optimized Builds
+# These enable specific SIMD backends with scalar fallback for remainder samples
+build:avx2          # Build with AVX2 support (x86_64 Linux/Windows)
+build:avx512        # Build with AVX-512 support (x86_64 Linux/Windows)
+build:neon          # Build with NEON support (aarch64 macOS only)
+
 # Testing & Quality
 cargo:test          # Run all Rust tests
 cargo:fmt           # Format Rust code
 cargo:lint          # Run clippy linter
+
+# SIMD-Specific Tests
+test:avx2           # Test with AVX2 backend enabled
+test:avx512         # Test with AVX-512 backend enabled
+test:neon           # Test with NEON backend enabled (macOS only)
 
 # Plugin Bundling
 cargo xtask bundle rigel-plugin --release [--target <triple>]
@@ -103,6 +114,14 @@ bench:instruments   # macOS only: Profile with Instruments.app
 
 # Clean
 build:clean         # Remove target directory
+```
+
+**Note on GCC Specs Directory Conflict:**
+All devenv scripts (`cargo:test`, `cargo:lint`, `build:*`, `bench:*`) automatically handle the GCC specs directory workaround. The repository's `specs/` directory can confuse GCC which looks for a specs file in the current directory. The devenv scripts temporarily rename it during builds/tests. If running cargo commands directly (not through devenv scripts), you may need to manually rename the directory:
+
+```bash
+# Manual workaround (only needed if NOT using devenv scripts)
+mv specs specs.bak && cargo test; mv specs.bak specs
 ```
 
 ### Python Development (wtgen)
@@ -173,7 +192,10 @@ Critical DSP properties that must be preserved:
 Run with `cargo:test` or `cargo test` from root:
 - Unit tests embedded in crate modules
 - Integration tests in `tests/` directories
+- Architecture-specific tests for SIMD optimizations (NEON on aarch64, AVX2/AVX-512 on x86_64)
 - Audio validation via WAV file generation
+
+**IMPORTANT**: Always run ALL tests including architecture-specific features available on the current host before considering a feature complete.
 
 ### Python Tests (wtgen)
 
@@ -215,8 +237,11 @@ Runs on all PRs and pushes:
 All CI commands run through devenv shell for reproducibility.
 
 **Build Quirks:**
-- CI temporarily renames `specs/` directory to avoid GCC specs directory conflicts
-- Restored via `if: always()` cleanup step to ensure directory is available even on failure
+- **GCC Specs Directory Workaround**: The `specs/` directory at the repository root confuses GCC, which searches for a specs file in the current directory. This causes build failures on Linux/Windows with errors like `gcc: fatal error: cannot read spec file './specs': Is a directory`.
+  - **Automated in devenv**: All local devenv scripts (`cargo:test`, `build:*`, `bench:*`) automatically handle this by temporarily renaming `specs/` to `specs.bak` during execution
+  - **Automated in CI**: CI workflows and build scripts (`.github/workflows/*.yml`, `ci/scripts/build-win.sh`) implement the same workaround
+  - **Manual workaround**: Only needed when running cargo commands directly without devenv: `mv specs specs.bak && cargo test; mv specs.bak specs`
+  - The directory is always restored via cleanup traps, even on failures
 
 ### Release Workflows
 
