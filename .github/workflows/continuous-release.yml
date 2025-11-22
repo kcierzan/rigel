@@ -44,12 +44,12 @@ jobs:
             name: Windows
     steps:
       - name: Download build artifacts from CI
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: rigel-plugin-${{ matrix.target }}-${{ github.event.workflow_run.head_sha }}
           path: bundled/
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run_id: ${{ github.event.workflow_run.id }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create archive
         run: |
@@ -78,12 +78,12 @@ jobs:
     needs: check-ci-success
     steps:
       - name: Download build artifacts from CI
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: rigel-plugin-macos-${{ github.event.workflow_run.head_sha }}
           path: bundled/
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run_id: ${{ github.event.workflow_run.id }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create archive
         run: |
