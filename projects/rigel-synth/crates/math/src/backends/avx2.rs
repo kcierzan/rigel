@@ -177,12 +177,44 @@ impl SimdVector for Avx2Vector {
 
     #[inline(always)]
     fn min(self, rhs: Self) -> Self {
-        unsafe { Avx2Vector(_mm256_min_ps(self.0, rhs.0)) }
+        unsafe {
+            // IEEE 754-2008 minNum semantics: if one value is NaN, return the other
+            // AVX2's _mm256_min_ps propagates NaN, so we need to handle NaN explicitly
+            let min_result = _mm256_min_ps(self.0, rhs.0);
+
+            // Check for NaN: value != value
+            let self_is_nan = _mm256_cmp_ps::<_CMP_UNORD_Q>(self.0, self.0);
+            let rhs_is_nan = _mm256_cmp_ps::<_CMP_UNORD_Q>(rhs.0, rhs.0);
+
+            // If self is NaN, use rhs; if rhs is NaN, use self; else use min_result
+            let result = _mm256_blendv_ps(
+                _mm256_blendv_ps(min_result, self.0, rhs_is_nan),
+                rhs.0,
+                self_is_nan,
+            );
+            Avx2Vector(result)
+        }
     }
 
     #[inline(always)]
     fn max(self, rhs: Self) -> Self {
-        unsafe { Avx2Vector(_mm256_max_ps(self.0, rhs.0)) }
+        unsafe {
+            // IEEE 754-2008 maxNum semantics: if one value is NaN, return the other
+            // AVX2's _mm256_max_ps propagates NaN, so we need to handle NaN explicitly
+            let max_result = _mm256_max_ps(self.0, rhs.0);
+
+            // Check for NaN: value != value
+            let self_is_nan = _mm256_cmp_ps::<_CMP_UNORD_Q>(self.0, self.0);
+            let rhs_is_nan = _mm256_cmp_ps::<_CMP_UNORD_Q>(rhs.0, rhs.0);
+
+            // If self is NaN, use rhs; if rhs is NaN, use self; else use max_result
+            let result = _mm256_blendv_ps(
+                _mm256_blendv_ps(max_result, self.0, rhs_is_nan),
+                rhs.0,
+                self_is_nan,
+            );
+            Avx2Vector(result)
+        }
     }
 
     #[inline(always)]
