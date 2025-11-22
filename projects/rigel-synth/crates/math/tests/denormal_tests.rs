@@ -80,7 +80,11 @@ fn test_denormal_protection_prevents_slowdown() {
 }
 
 /// Test that denormal protection maintains stable performance across multiple iterations
+///
+/// Note: Ignored by default because performance tests are flaky under coverage instrumentation.
+/// Run with: cargo test -- --ignored
 #[test]
+#[ignore]
 fn test_denormal_protection_stable_performance() {
     const NUM_RUNS: usize = 5;
     const NUM_ITERATIONS: usize = 5000;

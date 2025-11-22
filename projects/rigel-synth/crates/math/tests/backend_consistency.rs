@@ -86,6 +86,7 @@ fn test_backend_fma_consistency() {
         let mut result = vec![0.0; DefaultSimdVector::LANES];
         fma_result.to_slice(&mut result);
 
+        #[allow(clippy::needless_range_loop)]
         for i in 0..DefaultSimdVector::LANES {
             // FMA might have slightly different precision
             let diff = (result[i] - expected_fma).abs();
@@ -179,8 +180,8 @@ fn test_simple_dsp_gain_adjustment() {
     let mut output = [0.0f32; BLOCK_SIZE];
 
     // Create a simple test signal (sine-like pattern)
-    for i in 0..BLOCK_SIZE {
-        input[i] = (i as f32 / BLOCK_SIZE as f32) * 2.0 - 1.0; // -1.0 to 1.0
+    for (i, item) in input.iter_mut().enumerate() {
+        *item = (i as f32 / BLOCK_SIZE as f32) * 2.0 - 1.0; // -1.0 to 1.0
     }
 
     let gain = 0.5;
@@ -219,7 +220,7 @@ fn test_simple_dsp_mixing() {
 
     // Create test signals
     for i in 0..BLOCK_SIZE {
-        signal_a[i] = (i as f32 / BLOCK_SIZE as f32);
+        signal_a[i] = i as f32 / BLOCK_SIZE as f32;
         signal_b[i] = 1.0 - (i as f32 / BLOCK_SIZE as f32);
     }
 
@@ -264,8 +265,8 @@ fn test_simple_dsp_clipping() {
     let mut output = [0.0f32; BLOCK_SIZE];
 
     // Create test signal with values exceeding [-1, 1]
-    for i in 0..BLOCK_SIZE {
-        input[i] = (i as f32 / BLOCK_SIZE as f32) * 4.0 - 2.0; // -2.0 to 2.0
+    for (i, item) in input.iter_mut().enumerate() {
+        *item = (i as f32 / BLOCK_SIZE as f32) * 4.0 - 2.0; // -2.0 to 2.0
     }
 
     let min_val = DefaultSimdVector::splat(-1.0);
