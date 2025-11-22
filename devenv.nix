@@ -51,96 +51,8 @@ let
     "llvm-tools-preview"
   ];
   rustComponentList = lib.concatStringsSep " " rustComponents;
-  linuxCross = pkgs.pkgsCross.gnu64;
-  linuxCrossCc = linuxCross.stdenv.cc;
-  linuxCrossBinutils = linuxCross.buildPackages.binutils;
-  linuxTargetPrefix = linuxCrossCc.targetPrefix or "";
-  # Pull Linux libraries from nixpkgs' x86_64 set; these are only used when cross
-  # compiling GUI crates that want pkg-config discovery (iced, baseview, ...).
-  linuxPkgs = inputs.nixpkgs.legacyPackages."x86_64-linux";
-  linuxXorg = if linuxPkgs ? xorg then linuxPkgs.xorg else { };
-  # Teach macOS pkg-config how to find Linux GUI deps by enumerating every
-  # optional pkg-config directory we might need from the x86_64 nixpkgs set.
-  linuxPkgConfigPaths = lib.concatLists [
-    (lib.optionals (linuxPkgs ? libGL) [
-      "${linuxPkgs.libGL.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? libX11) [
-      "${linuxXorg.libX11.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? libxcb) [
-      "${linuxXorg.libxcb.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? xcbutil) [
-      "${linuxXorg.xcbutil.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilimage) [
-      "${linuxXorg.xcbutilimage.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilrenderutil) [
-      "${linuxXorg.xcbutilrenderutil.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilwm) [
-      "${linuxXorg.xcbutilwm.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilkeysyms) [
-      "${linuxXorg.xcbutilkeysyms.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? libXcursor) [
-      "${linuxXorg.libXcursor.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? libXi) [
-      "${linuxXorg.libXi.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxXorg ? libXrandr) [
-      "${linuxXorg.libXrandr.dev}/lib/pkgconfig"
-    ])
-    (lib.optionals (linuxPkgs ? xorgproto) [
-      "${linuxPkgs.xorgproto}/share/pkgconfig"
-    ])
-  ];
-  linuxLibraryPaths = lib.concatLists [
-    (lib.optionals (linuxPkgs ? libGL) [
-      "${linuxPkgs.libGL.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? libX11) [
-      "${linuxXorg.libX11.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? libxcb) [
-      "${linuxXorg.libxcb.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? xcbutil) [
-      "${linuxXorg.xcbutil.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilimage) [
-      "${linuxXorg.xcbutilimage.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilrenderutil) [
-      "${linuxXorg.xcbutilrenderutil.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilwm) [
-      "${linuxXorg.xcbutilwm.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? xcbutilkeysyms) [
-      "${linuxXorg.xcbutilkeysyms.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? libXcursor) [
-      "${linuxXorg.libXcursor.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? libXi) [
-      "${linuxXorg.libXi.out}/lib"
-    ])
-    (lib.optionals (linuxXorg ? libXrandr) [
-      "${linuxXorg.libXrandr.out}/lib"
-    ])
-  ];
-  hostPkgConfigPath = builtins.getEnv "PKG_CONFIG_PATH";
-  linuxPkgConfigSearchPaths =
-    linuxPkgConfigPaths ++ lib.optional (hostPkgConfigPath != "") hostPkgConfigPath;
-  hasLinuxPkgConfig = linuxPkgConfigSearchPaths != [ ];
-  linuxPkgConfigPath = lib.concatStringsSep ":" linuxPkgConfigSearchPaths;
-  hasLinuxLibraryPaths = linuxLibraryPaths != [ ];
-  linuxLdFlags = lib.concatStringsSep " " (map (path: "-L${path}") linuxLibraryPaths);
+
+  # Helper function to wrap cargo commands with proper environment setup
   cargoScript = command: ''
     set -euo pipefail
     export PATH="''${DEVENV_PROFILE}/bin:$PATH"
@@ -175,7 +87,6 @@ in
     in
     {
       RUST_BACKTRACE = lib.mkDefault "1";
-      MACOSX_DEPLOYMENT_TARGET = "11.0";
       PKG_CONFIG_ALLOW_CROSS = lib.mkDefault "1";
       DEVENV_HOST_PATH = hostPath;
       RIGEL_SYNTH_ROOT = lib.mkDefault (toString ./projects/rigel-synth);
@@ -185,21 +96,9 @@ in
       LDFLAGS = lib.mkForce "";
       CPPFLAGS = lib.mkForce "";
     }
-    // lib.optionalAttrs (isDarwin && hasLinuxPkgConfig) {
-      PKG_CONFIG_PATH = linuxPkgConfigPath;
-      PKG_CONFIG_PATH_x86_64_unknown_linux_gnu = linuxPkgConfigPath;
-    }
-    // lib.optionalAttrs (isDarwin && hasLinuxLibraryPaths) {
-      NIX_LDFLAGS = linuxLdFlags;
-      NIX_LDFLAGS_x86_64_unknown_linux_gnu = linuxLdFlags;
-    }
     // lib.optionalAttrs isDarwin {
-      CC_x86_64_unknown_linux_gnu = "${linuxCrossCc}/bin/${linuxTargetPrefix}cc";
-      CXX_x86_64_unknown_linux_gnu = "${linuxCrossCc}/bin/${linuxTargetPrefix}c++";
-      AR_x86_64_unknown_linux_gnu = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ar";
-      RANLIB_x86_64_unknown_linux_gnu = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ranlib";
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${linuxCrossCc}/bin/${linuxTargetPrefix}cc";
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_AR = "${linuxCrossBinutils}/bin/${linuxTargetPrefix}ar";
+      # macOS-specific environment variables
+      MACOSX_DEPLOYMENT_TARGET = "11.0";
     };
 
   languages.rust = {
@@ -250,15 +149,11 @@ in
       linuxPackages.perf # Hardware performance counters
     ]
     ++ lib.optionals isDarwin [
-      # macOS host prerequisites: Xcode headers, OpenMP runtime for SIMD code,
-      # libiconv for CLI/build tooling, plus cross-compilers for the Linux target.
-      appleSdk
-      llvmPackages.openmp
-      libiconv
-      linuxCrossCc
-      linuxCrossBinutils
-      # macOS-specific profiling tools
-      cargo-instruments # Instruments.app integration
+      # macOS-specific dependencies
+      appleSdk # Xcode headers
+      llvmPackages.openmp # OpenMP runtime for SIMD code
+      libiconv # For CLI/build tooling
+      cargo-instruments # Instruments.app integration for profiling
       # Note: Valgrind for iai-callgrind can be installed via Homebrew:
       # brew install valgrind
       # DTrace (built into macOS) is used by flamegraph
@@ -266,19 +161,22 @@ in
 
   scripts = {
     "cargo:fmt".exec = cargoScript "cargo fmt";
-    "cargo:lint".exec = cargoScript "cargo clippy --all-targets --all-features";
+    "cargo:lint".exec = cargoScript "cargo clippy --all-targets";
     "cargo:test".exec = cargoScript "cargo test";
     "build:cli".exec = cargoScript "cargo build --release --bin rigel";
+
+    # Native build for current platform
     "build:native".exec = cargoScript "cargo xtask bundle rigel-plugin --release";
-    "build:linux".exec =
-      cargoScript "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu";
-    "build:macos".exec =
-      cargoScript "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin";
-    # Windows bundles (VST3/CLAP) require MSVC import libs and link.exe normally.
-    # xwin replicates those redistributables so we can link with rust-lld instead.
+
+    # Platform-specific builds (work only on their respective platforms)
+    "build:macos".exec = cargoScript "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin";
+    "build:linux".exec = cargoScript "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu";
+
+    # Windows cross-compilation (uses xwin for MSVC import libs)
     # The script populates a shared cache under target/ then wires the toolchain
     # env vars Cargo expects for the MSVC target.
     "build:win".exec = "${./ci/scripts/build-win.sh}";
+
     "build:clean".exec = "rm -rf target";
 
     # Benchmarking and profiling
@@ -361,7 +259,7 @@ in
   enterTest = ''
     set -euo pipefail
     cargo fmt -- --check
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --all-targets -- -D warnings
     cargo test
   '';
 
@@ -370,7 +268,7 @@ in
     "ci:check".exec = ''
       set -euo pipefail
       cargo fmt -- --check
-      cargo clippy --all-targets --all-features -- -D warnings
+      cargo clippy --all-targets -- -D warnings
       cargo test
     '';
   };

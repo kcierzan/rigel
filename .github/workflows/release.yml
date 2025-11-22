@@ -14,18 +14,22 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  GCC_SPECS: ""
+  FLAKEHUB_DISABLE_TELEMETRY: "1"
 
 jobs:
   build-linux-windows:
-    name: Build ${{ matrix.target }} Bundle
+    name: Build ${{ matrix.name }} Bundle
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: linux
+            name: Linux
             build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
           - target: windows
+            name: Windows
             build_command: ./ci/scripts/build-win.sh
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +46,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          cache-on-failure: true
+          cache-on-failure: false
           shared-key: ${{ matrix.target }}
 
       - name: Build plugin (${{ matrix.target }})
@@ -83,7 +87,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          cache-on-failure: true
+          cache-on-failure: false
           shared-key: macos
 
       - name: Build plugin (macOS)
