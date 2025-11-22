@@ -136,14 +136,26 @@ impl DenormalGuard {
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     fn get_mxcsr() -> u32 {
-        unsafe { core::arch::x86_64::_mm_getcsr() }
+        let mut mxcsr: u32 = 0;
+        unsafe {
+            core::arch::asm!(
+                "stmxcsr [{}]",
+                in(reg) &mut mxcsr,
+                options(nostack, preserves_flags)
+            );
+        }
+        mxcsr
     }
 
     #[cfg(target_arch = "x86_64")]
     #[inline(always)]
     fn set_mxcsr(mxcsr: u32) {
         unsafe {
-            core::arch::x86_64::_mm_setcsr(mxcsr);
+            core::arch::asm!(
+                "ldmxcsr [{}]",
+                in(reg) &mxcsr,
+                options(nostack, preserves_flags)
+            );
         }
     }
 
