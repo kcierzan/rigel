@@ -9,7 +9,7 @@
 // This backend only compiles on aarch64 targets
 #![cfg(target_arch = "aarch64")]
 
-use crate::traits::{SimdMask, SimdVector};
+use crate::traits::{SimdInt, SimdMask, SimdVector};
 use core::arch::aarch64::*;
 
 /// NEON vector wrapper (4 lanes of f32)
@@ -26,10 +26,92 @@ pub struct NeonVector(float32x4_t);
 #[repr(transparent)]
 pub struct NeonMask(uint32x4_t);
 
+/// NEON integer vector wrapper (4 lanes of u32)
+///
+/// Used for bit manipulation operations in IEEE 754 logarithm extraction.
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct NeonInt(uint32x4_t);
+
+// Implement SimdInt for NeonInt
+impl SimdInt for NeonInt {
+    const LANES: usize = 4;
+    type FloatVec = NeonVector;
+
+    #[inline(always)]
+    fn splat(value: u32) -> Self {
+        unsafe { NeonInt(vdupq_n_u32(value)) }
+    }
+
+    #[inline(always)]
+    fn shr(self, count: u32) -> Self {
+        unsafe {
+            // For variable shift, use vshlq_u32 with negative count (right shift)
+            let shift_vec = vdupq_n_s32(-(count as i32));
+            NeonInt(vshlq_u32(self.0, shift_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn shl(self, count: u32) -> Self {
+        unsafe {
+            // For variable shift, use vshlq_u32 with positive count (left shift)
+            let shift_vec = vdupq_n_s32(count as i32);
+            NeonInt(vshlq_u32(self.0, shift_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn bitwise_and(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = vdupq_n_u32(rhs);
+            NeonInt(vandq_u32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn bitwise_or(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = vdupq_n_u32(rhs);
+            NeonInt(vorrq_u32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn sub_scalar(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = vdupq_n_u32(rhs);
+            NeonInt(vsubq_u32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn add_scalar(self, rhs: u32) -> Self {
+        unsafe {
+            let rhs_vec = vdupq_n_u32(rhs);
+            NeonInt(vaddq_u32(self.0, rhs_vec))
+        }
+    }
+
+    #[inline(always)]
+    fn from_f32_to_i32(float_vec: Self::FloatVec) -> Self {
+        unsafe {
+            let s32 = vcvtq_s32_f32(float_vec.0);
+            NeonInt(vreinterpretq_u32_s32(s32))
+        }
+    }
+
+    #[inline(always)]
+    fn to_f32(self) -> Self::FloatVec {
+        unsafe { NeonVector(vcvtq_f32_u32(self.0)) }
+    }
+}
+
 // Implement SimdVector for NeonVector
 impl SimdVector for NeonVector {
     type Scalar = f32;
     type Mask = NeonMask;
+    type IntBits = NeonInt;
 
     const LANES: usize = 4;
 
@@ -146,6 +228,34 @@ impl SimdVector for NeonVector {
             let min = vpminq_f32(min_pair, min_pair);
             vgetq_lane_f32(min, 0)
         }
+    }
+
+    #[inline(always)]
+    fn floor(self) -> Self {
+        unsafe { NeonVector(vrndmq_f32(self.0)) }
+    }
+
+    #[inline(always)]
+    fn to_int_bits_i32(self) -> Self::IntBits {
+        unsafe {
+            let s32 = vcvtq_s32_f32(self.0);
+            NeonInt(vreinterpretq_u32_s32(s32))
+        }
+    }
+
+    #[inline(always)]
+    fn to_bits(self) -> Self::IntBits {
+        unsafe { NeonInt(vreinterpretq_u32_f32(self.0)) }
+    }
+
+    #[inline(always)]
+    fn from_bits(bits: Self::IntBits) -> Self {
+        unsafe { NeonVector(vreinterpretq_f32_u32(bits.0)) }
+    }
+
+    #[inline(always)]
+    fn from_int_cast(int_vec: Self::IntBits) -> Self {
+        unsafe { NeonVector(vcvtq_f32_u32(int_vec.0)) }
     }
 }
 
@@ -296,5 +406,87 @@ mod tests {
         assert!(mask_true.or(mask_false).all());
         assert!(!mask_true.xor(mask_true).any());
         assert!(mask_true.xor(mask_false).all());
+    }
+
+    #[test]
+    fn test_neon_bit_manipulation() {
+        use crate::traits::SimdInt;
+
+        // Test to_bits / from_bits round trip
+        let vec = NeonVector::splat(1.0);
+        let bits = vec.to_bits();
+        let restored = NeonVector::from_bits(bits);
+        assert_eq!(restored.horizontal_sum(), 4.0); // 1.0 * 4 lanes
+
+        // Test from_int_cast (numerical conversion)
+        let int_vec = NeonInt::splat(5);
+        let float_vec = NeonVector::from_int_cast(int_vec);
+        assert_eq!(float_vec.horizontal_sum(), 20.0); // 5.0 * 4 lanes
+
+        // Test NeonInt operations
+        let int_a = NeonInt::splat(0xF0);
+        let int_b = int_a.bitwise_and(0x0F);
+        let result = NeonVector::from_int_cast(int_b);
+        assert_eq!(result.horizontal_sum(), 0.0); // (0xF0 & 0x0F) = 0
+
+        // Test shift operations
+        let int_val = NeonInt::splat(8);
+        let shifted_right = int_val.shr(2); // 8 >> 2 = 2
+        let result_shr = NeonVector::from_int_cast(shifted_right);
+        assert_eq!(result_shr.horizontal_sum(), 8.0); // 2.0 * 4 lanes
+
+        let shifted_left = int_val.shl(2); // 8 << 2 = 32
+        let result_shl = NeonVector::from_int_cast(shifted_left);
+        assert_eq!(result_shl.horizontal_sum(), 128.0); // 32.0 * 4 lanes
+    }
+
+    #[test]
+    fn test_neon_infinity_handling() {
+        // Test that min with f32::MAX works correctly on infinity
+        let inf_vec = NeonVector::splat(f32::INFINITY);
+        let max_vec = NeonVector::splat(f32::MAX);
+        let result = inf_vec.min(max_vec);
+
+        let mut buf = [0.0f32; 4];
+        result.to_slice(&mut buf);
+
+        // Should clamp to f32::MAX
+        assert!(
+            buf[0].is_finite(),
+            "min(inf, MAX) should be finite, got {}",
+            buf[0]
+        );
+        assert_eq!(buf[0], f32::MAX, "min(inf, MAX) should equal MAX");
+    }
+
+    #[test]
+    fn test_neon_div_edge_cases() {
+        // Test division edge cases
+        let a = NeonVector::splat(1.0);
+        let b = NeonVector::splat(0.0);
+        let result = a.div(b);
+
+        let mut buf = [0.0f32; 4];
+        result.to_slice(&mut buf);
+
+        // 1.0 / 0.0 should be infinity
+        assert!(
+            buf[0].is_infinite(),
+            "1.0/0.0 should be inf, got {}",
+            buf[0]
+        );
+
+        // Test large number division
+        let large = NeonVector::splat(1e38);
+        let small = NeonVector::splat(1e-10);
+        let result2 = large.div(small);
+        result2.to_slice(&mut buf);
+
+        // Should produce infinity or very large number
+        assert!(
+            buf[0] > 1e30 || buf[0].is_infinite(),
+            "1e38/1e-10 should be very large or inf, got {}",
+            buf[0]
+        );
     }
 }
