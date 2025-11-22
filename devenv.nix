@@ -65,6 +65,38 @@ let
 
     exec ${command}
   '';
+
+  # Workaround for GCC specs directory conflict
+  # The specs/ directory at repo root confuses GCC which looks for a "specs" file
+  # in the current directory. We temporarily rename it during cargo operations.
+  withSpecsWorkaround = command: ''
+    set -euo pipefail
+
+    # Determine repository root
+    if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+      REPO_ROOT="$(git rev-parse --show-toplevel)"
+    else
+      REPO_ROOT="$PWD"
+    fi
+
+    # Rename specs directory if it exists
+    SPECS_RENAMED=0
+    if [ -d "$REPO_ROOT/specs" ]; then
+      mv "$REPO_ROOT/specs" "$REPO_ROOT/specs.bak"
+      SPECS_RENAMED=1
+    fi
+
+    # Ensure specs/ is restored on exit (even if command fails)
+    cleanup() {
+      if [ $SPECS_RENAMED -eq 1 ] && [ -d "$REPO_ROOT/specs.bak" ]; then
+        mv "$REPO_ROOT/specs.bak" "$REPO_ROOT/specs"
+      fi
+    }
+    trap cleanup EXIT
+
+    # Execute the command
+    ${command}
+  '';
 in
 {
   name = "rigel";
@@ -161,16 +193,66 @@ in
 
   scripts = {
     "cargo:fmt".exec = cargoScript "cargo fmt";
-    "cargo:lint".exec = cargoScript "cargo clippy --all-targets";
-    "cargo:test".exec = cargoScript "cargo test";
-    "build:cli".exec = cargoScript "cargo build --release --bin rigel";
+    "cargo:lint".exec = withSpecsWorkaround (cargoScript "cargo clippy --all-targets");
+    "cargo:test".exec = withSpecsWorkaround (cargoScript "cargo test");
+
+    # SIMD-specific tests
+    "test:avx2".exec = withSpecsWorkaround ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      export RUSTFLAGS="-C target-feature=+avx2,+fma"
+      exec cargo test --features avx2
+    '';
+
+    "test:avx512".exec = withSpecsWorkaround ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      export RUSTFLAGS="-C target-feature=+avx512f,+avx512dq,+avx512cd,+avx512bw,+avx512vl"
+      exec cargo test --features avx512
+    '';
+
+    "test:neon".exec = withSpecsWorkaround ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      os_type=$(uname -s)
+      if [ "$os_type" != "Darwin" ]; then
+        echo 'Error: test:neon is only available on macOS (aarch64-apple-darwin)'
+        exit 1
+      fi
+
+      export RUSTFLAGS="-C target-feature=+neon"
+      exec cargo test --features neon
+    '';
+
+    "build:cli".exec = withSpecsWorkaround (cargoScript "cargo build --release --bin rigel");
 
     # Native build for current platform
-    "build:native".exec = cargoScript "cargo xtask bundle rigel-plugin --release";
+    "build:native".exec = withSpecsWorkaround (cargoScript "cargo xtask bundle rigel-plugin --release");
 
     # Platform-specific builds (work only on their respective platforms)
-    "build:macos".exec = cargoScript "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin";
-    "build:linux".exec = cargoScript "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu";
+    "build:macos".exec = withSpecsWorkaround (cargoScript "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin");
+    "build:linux".exec = withSpecsWorkaround (cargoScript "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu");
 
     # Windows cross-compilation (uses xwin for MSVC import libs)
     # The script populates a shared cache under target/ then wires the toolchain
@@ -179,14 +261,64 @@ in
 
     "build:clean".exec = "rm -rf target";
 
+    # SIMD-specific builds
+    # These enable SIMD features and fall back to scalar for remainder samples
+    "build:avx2".exec = withSpecsWorkaround ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      export RUSTFLAGS="-C target-feature=+avx2,+fma"
+      exec cargo xtask bundle rigel-plugin --release --features avx2 --target x86_64-unknown-linux-gnu
+    '';
+
+    "build:avx512".exec = withSpecsWorkaround ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      export RUSTFLAGS="-C target-feature=+avx512f,+avx512dq,+avx512cd,+avx512bw,+avx512vl"
+      exec cargo xtask bundle rigel-plugin --release --features avx512 --target x86_64-unknown-linux-gnu
+    '';
+
+    "build:neon".exec = withSpecsWorkaround ''
+      set -euo pipefail
+      export PATH="''${DEVENV_PROFILE}/bin:$PATH"
+
+      state_dir="''${DEVENV_STATE:-$PWD/.devenv/state}"
+      export DEVENV_STATE="$state_dir"
+      export CARGO_HOME="$state_dir/cargo"
+      export RUSTUP_HOME="$state_dir/rustup"
+      mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
+
+      os_type=$(uname -s)
+      if [ "$os_type" != "Darwin" ]; then
+        echo 'Error: build:neon is only available on macOS (aarch64-apple-darwin)'
+        exit 1
+      fi
+
+      export RUSTFLAGS="-C target-feature=+neon"
+      exec cargo xtask bundle rigel-plugin --release --features neon --target aarch64-apple-darwin
+    '';
+
     # Benchmarking and profiling
-    "bench:criterion".exec = cargoScript "cargo bench --bench criterion_benches";
-    "bench:iai".exec = cargoScript "cargo bench --bench iai_benches";
-    "bench:all".exec = cargoScript "cargo bench";
-    "bench:baseline".exec = cargoScript "cargo bench --bench criterion_benches -- --save-baseline main";
-    "bench:flamegraph".exec = cargoScript "cargo flamegraph --bench criterion_benches -- --bench";
+    "bench:criterion".exec = withSpecsWorkaround (cargoScript "cargo bench --bench criterion_benches");
+    "bench:iai".exec = withSpecsWorkaround (cargoScript "cargo bench --bench iai_benches");
+    "bench:all".exec = withSpecsWorkaround (cargoScript "cargo bench");
+    "bench:baseline".exec = withSpecsWorkaround (cargoScript "cargo bench --bench criterion_benches -- --save-baseline main");
+    "bench:flamegraph".exec = withSpecsWorkaround (cargoScript "cargo flamegraph --bench criterion_benches -- --bench");
     # macOS Instruments profiling (requires Xcode Command Line Tools)
-    "bench:instruments".exec = ''
+    "bench:instruments".exec = withSpecsWorkaround ''
       set -euo pipefail
       export PATH="''${DEVENV_PROFILE}/bin:$PATH"
 
@@ -258,6 +390,27 @@ in
 
   enterTest = ''
     set -euo pipefail
+
+    # Workaround for GCC specs directory conflict
+    if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+      REPO_ROOT="$(git rev-parse --show-toplevel)"
+    else
+      REPO_ROOT="$PWD"
+    fi
+
+    SPECS_RENAMED=0
+    if [ -d "$REPO_ROOT/specs" ]; then
+      mv "$REPO_ROOT/specs" "$REPO_ROOT/specs.bak"
+      SPECS_RENAMED=1
+    fi
+
+    cleanup() {
+      if [ $SPECS_RENAMED -eq 1 ] && [ -d "$REPO_ROOT/specs.bak" ]; then
+        mv "$REPO_ROOT/specs.bak" "$REPO_ROOT/specs"
+      fi
+    }
+    trap cleanup EXIT
+
     cargo fmt -- --check
     cargo clippy --all-targets -- -D warnings
     cargo test
@@ -267,6 +420,27 @@ in
     "ci:check".description = "Run formatting, linting, and tests (matches enterTest)";
     "ci:check".exec = ''
       set -euo pipefail
+
+      # Workaround for GCC specs directory conflict
+      if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+        REPO_ROOT="$(git rev-parse --show-toplevel)"
+      else
+        REPO_ROOT="$PWD"
+      fi
+
+      SPECS_RENAMED=0
+      if [ -d "$REPO_ROOT/specs" ]; then
+        mv "$REPO_ROOT/specs" "$REPO_ROOT/specs.bak"
+        SPECS_RENAMED=1
+      fi
+
+      cleanup() {
+        if [ $SPECS_RENAMED -eq 1 ] && [ -d "$REPO_ROOT/specs.bak" ]; then
+          mv "$REPO_ROOT/specs.bak" "$REPO_ROOT/specs"
+        fi
+      }
+      trap cleanup EXIT
+
       cargo fmt -- --check
       cargo clippy --all-targets -- -D warnings
       cargo test
