@@ -9,6 +9,13 @@
 //! - AVX2 CPU support (Intel Haswell 2013+, AMD Excavator 2015+)
 //! - Compiled with `avx2` feature flag
 //!
+//! # Implementation Strategy
+//!
+//! This backend uses the generic helpers in `super::helpers` to bridge slice-based
+//! operations to the optimized SIMD kernels in the `math` module. The kernels are
+//! implemented using `Avx2Vector` which provides 8-lane SIMD processing with
+//! optimized algorithms (Padé approximations, polynomial methods, etc.).
+//!
 //! # Safety
 //! All AVX2 intrinsics are marked unsafe, but we ensure safety by:
 //! - Only calling intrinsics when AVX2 feature is enabled
@@ -19,6 +26,9 @@
 #![allow(unused)]
 
 use super::backend::{ProcessParams, SimdBackend};
+use super::helpers::{process_binary, process_ternary, process_unary};
+use crate::math;
+use crate::Avx2Vector;
 use core::arch::x86_64::*;
 use core::f32::consts::TAU;
 
@@ -439,39 +449,28 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn exp(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for exp, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::expf(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::exp::exp, libm::expf);
     }
 
     #[inline]
     fn log(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for log, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::logf(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::log::log, libm::logf);
     }
 
     #[inline]
     fn log2(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for log2, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::log2f(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::log::log2, libm::log2f);
     }
 
     #[inline]
     fn log10(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for log10, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::log10f(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::log::log10, libm::log10f);
     }
 
     #[inline]
     fn pow(base: &[f32], exponent: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for pow, use scalar libm
+        // math::pow takes scalar exponent, not vector exponent
+        // So we can't use the helper here - just use libm::powf
         for i in 0..output.len() {
             output[i] = libm::powf(base[i], exponent[i]);
         }
@@ -483,23 +482,17 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn sin(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for sin, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::sinf(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::trig::sin, libm::sinf);
     }
 
     #[inline]
     fn cos(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for cos, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::cosf(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::trig::cos, libm::cosf);
     }
 
     #[inline]
     fn tan(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for tan, use scalar libm
+        // No dedicated tan kernel in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::tanf(input[i]);
         }
@@ -507,7 +500,7 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn asin(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for asin, use scalar libm
+        // No vectorized asin in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::asinf(input[i]);
         }
@@ -515,7 +508,7 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn acos(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for acos, use scalar libm
+        // No vectorized acos in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::acosf(input[i]);
         }
@@ -523,18 +516,12 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn atan(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for atan, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::atanf(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::atan::atan, libm::atanf);
     }
 
     #[inline]
     fn atan2(y: &[f32], x: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for atan2, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::atan2f(y[i], x[i]);
-        }
+        process_binary::<Avx2Vector, _>(y, x, output, math::atan::atan2, libm::atan2f);
     }
 
     // ========================================================================
@@ -543,7 +530,7 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn sinh(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for sinh, use scalar libm
+        // No vectorized sinh in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::sinhf(input[i]);
         }
@@ -551,7 +538,7 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn cosh(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for cosh, use scalar libm
+        // No vectorized cosh in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::coshf(input[i]);
         }
@@ -559,10 +546,7 @@ impl SimdBackend for Avx2Backend {
 
     #[inline]
     fn tanh(input: &[f32], output: &mut [f32]) {
-        // No native AVX2 intrinsic for tanh, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::tanhf(input[i]);
-        }
+        process_unary::<Avx2Vector, _>(input, output, math::tanh::tanh, libm::tanhf);
     }
 
     // ========================================================================

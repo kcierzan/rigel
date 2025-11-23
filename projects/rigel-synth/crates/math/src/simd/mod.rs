@@ -53,6 +53,7 @@
 pub mod backend;
 pub mod context;
 pub mod dispatcher;
+pub mod helpers;
 pub mod scalar;
 
 // Platform-specific backend modules

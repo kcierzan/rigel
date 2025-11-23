@@ -9,6 +9,13 @@
 //! - NEON support (always available on modern ARM64 CPUs)
 //! - Compiled with `neon` feature flag
 //!
+//! # Implementation Strategy
+//!
+//! This backend uses the generic helpers in `super::helpers` to bridge slice-based
+//! operations to the optimized SIMD kernels in the `math` module. The kernels are
+//! implemented using `NeonVector` which provides 4-lane SIMD processing with
+//! optimized algorithms (Padé approximations, polynomial methods, etc.).
+//!
 //! # Note
 //! On Apple Silicon (M1, M2, M3+), NEON is always available and this backend
 //! should be used via compile-time selection (no runtime detection needed).
@@ -17,6 +24,9 @@
 #![allow(unused)]
 
 use super::backend::{ProcessParams, SimdBackend};
+use super::helpers::{process_binary, process_ternary, process_unary};
+use crate::math;
+use crate::NeonVector;
 use core::arch::aarch64::*;
 use core::f32::consts::TAU;
 
@@ -434,39 +444,28 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn exp(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for exp, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::expf(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::exp::exp, libm::expf);
     }
 
     #[inline]
     fn log(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for log, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::logf(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::log::log, libm::logf);
     }
 
     #[inline]
     fn log2(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for log2, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::log2f(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::log::log2, libm::log2f);
     }
 
     #[inline]
     fn log10(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for log10, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::log10f(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::log::log10, libm::log10f);
     }
 
     #[inline]
     fn pow(base: &[f32], exponent: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for pow, use scalar libm
+        // math::pow takes scalar exponent, not vector exponent
+        // So we can't use the helper here - just use libm::powf
         for i in 0..output.len() {
             output[i] = libm::powf(base[i], exponent[i]);
         }
@@ -478,23 +477,17 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn sin(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for sin, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::sinf(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::trig::sin, libm::sinf);
     }
 
     #[inline]
     fn cos(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for cos, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::cosf(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::trig::cos, libm::cosf);
     }
 
     #[inline]
     fn tan(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for tan, use scalar libm
+        // No dedicated tan kernel in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::tanf(input[i]);
         }
@@ -502,7 +495,7 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn asin(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for asin, use scalar libm
+        // No vectorized asin in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::asinf(input[i]);
         }
@@ -510,7 +503,7 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn acos(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for acos, use scalar libm
+        // No vectorized acos in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::acosf(input[i]);
         }
@@ -518,18 +511,12 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn atan(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for atan, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::atanf(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::atan::atan, libm::atanf);
     }
 
     #[inline]
     fn atan2(y: &[f32], x: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for atan2, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::atan2f(y[i], x[i]);
-        }
+        process_binary::<NeonVector, _>(y, x, output, math::atan::atan2, libm::atan2f);
     }
 
     // ========================================================================
@@ -538,7 +525,7 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn sinh(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for sinh, use scalar libm
+        // No vectorized sinh in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::sinhf(input[i]);
         }
@@ -546,7 +533,7 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn cosh(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for cosh, use scalar libm
+        // No vectorized cosh in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::coshf(input[i]);
         }
@@ -554,10 +541,7 @@ impl SimdBackend for NeonBackend {
 
     #[inline]
     fn tanh(input: &[f32], output: &mut [f32]) {
-        // No NEON intrinsic for tanh, use scalar libm
-        for i in 0..output.len() {
-            output[i] = libm::tanhf(input[i]);
-        }
+        process_unary::<NeonVector, _>(input, output, math::tanh::tanh, libm::tanhf);
     }
 
     // ========================================================================
