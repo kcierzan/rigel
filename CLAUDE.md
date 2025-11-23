@@ -226,13 +226,13 @@ HYPOTHESIS_MAX_EXAMPLES=5000 uv run pytest tests/ -x -n auto --tb=short
 Runs on all PRs and pushes:
 
 1. **Parallel Pipelines**:
-   - `rigel-pipeline`: fmt, clippy, test
+   - `rigel-pipeline`: fmt, clippy, scalar tests, AVX2 tests
    - `wtgen-pipeline`: ruff lint, pytest
 
 2. **Plugin Builds**:
    - Linux: Native build on ubuntu-latest (`x86_64-unknown-linux-gnu`)
    - Windows: Cross-compiled on ubuntu-latest via xwin (`x86_64-pc-windows-msvc`)
-   - macOS: Native build on macos-14 runner (`aarch64-apple-darwin`)
+   - macOS: NEON tests + native build on macos-latest (`aarch64-apple-darwin`)
 
 All CI commands run through devenv shell for reproducibility.
 
@@ -377,6 +377,256 @@ The `build:win` command uses `ci/scripts/build-win.sh` which:
 
 This approach avoids needing a Windows VM or GitHub runner for local testing.
 
+## SIMD Backend Architecture
+
+Rigel uses a two-crate layered architecture for SIMD optimization:
+- **rigel-math**: Trait-based SIMD abstraction library (no_std, zero-allocation)
+- **rigel-dsp**: DSP core that uses rigel-math abstractions
+
+### Backend Selection Strategy
+
+**x86_64 (Linux/Windows)**: Runtime dispatch with CPU feature detection
+- Single binary contains scalar, AVX2, and AVX-512 backends
+- CPU features detected once at startup using `cpufeatures` crate
+- Optimal backend selected automatically (AVX-512 → AVX2 → scalar priority)
+- <1% dispatch overhead via function pointers
+
+**aarch64 (macOS)**: Compile-time NEON selection
+- NEON always available on Apple Silicon, no runtime detection needed
+- Zero-cost abstraction, compiles directly to NEON instructions
+- No dispatch overhead
+
+### rigel-math Library
+
+Provides trait-based SIMD abstractions enabling backend-agnostic DSP code:
+
+**Core Traits:**
+- `SimdVector`: Generic SIMD vector operations (load, store, arithmetic)
+- `SimdMask`: SIMD boolean masks for conditional operations
+- `SimdInt`: Integer SIMD operations
+
+**Backend Implementations:**
+- `ScalarVector<f32>`: Portable scalar fallback (1 lane, always available)
+- `Avx2Vector`: x86_64 AVX2 backend (8 f32 lanes)
+- `Avx512Vector`: x86_64 AVX-512 backend (16 f32 lanes)
+- `NeonVector`: aarch64 NEON backend (4 f32 lanes)
+
+**Modules:**
+- `ops`: Functional-style SIMD operations (add, mul, fma, min/max, etc.)
+- `math`: Fast math kernels (tanh, exp, log, sin/cos, sqrt, pow)
+- `block`: Fixed-size aligned buffers (`Block64`, `Block128`) for cache efficiency
+- `table`: Wavetable lookup with linear/cubic interpolation
+- `denormal`: FTZ/DAZ denormal protection for real-time stability
+
+**Example Usage:**
+```rust
+use rigel_math::{Block64, DefaultSimdVector, DenormalGuard, SimdVector};
+use rigel_math::ops::mul;
+
+fn apply_gain(input: &Block64, output: &mut Block64, gain: f32) {
+    let _guard = DenormalGuard::new();
+    let gain_vec = DefaultSimdVector::splat(gain);
+
+    for (in_chunk, mut out_chunk) in input.as_chunks::<DefaultSimdVector>()
+        .iter()
+        .zip(output.as_chunks_mut::<DefaultSimdVector>().iter_mut())
+    {
+        let value = in_chunk.load();
+        out_chunk.store(mul(value, gain_vec));
+    }
+}
+```
+
+### rigel-dsp Integration
+
+**Single Source of Truth:**
+
+All SIMD functionality is provided by rigel-math. rigel-dsp no longer has its own SIMD abstractions - DSP code imports directly from rigel-math.
+
+**Recommended API:**
+
+The `SimdContext` type provides a consistent high-level API with 30+ math operations:
+
+```rust
+use rigel_math::{Block64, DefaultSimdVector, ops};
+use rigel_math::simd::{SimdContext, ProcessParams};
+
+// Initialize once during engine startup
+let ctx = SimdContext::new();
+
+// Query selected backend (for logging/debugging)
+println!("Using SIMD backend: {}", ctx.backend_name());
+
+// Example 1: Using SimdContext high-level operations
+let mut input = Block64::new();
+let mut output = Block64::new();
+
+// Fill input with test data
+for i in 0..64 {
+    input[i] = i as f32;
+}
+
+// Apply gain using SimdContext
+ctx.apply_gain(input.as_slice(), output.as_slice_mut(), 0.5);
+
+// Example 2: Using process_block with ProcessParams
+let params = ProcessParams {
+    gain: 2.0,
+    frequency: 440.0,
+    sample_rate: 44100.0,
+};
+ctx.process_block(input.as_slice(), output.as_slice_mut(), &params);
+
+// Example 3: Direct rigel-math usage (for custom operations)
+for (in_vec, mut out_chunk) in input.as_chunks::<DefaultSimdVector>()
+    .iter()
+    .zip(output.as_chunks_mut::<DefaultSimdVector>().iter_mut())
+{
+    let result = ops::add(in_vec, DefaultSimdVector::splat(1.0));
+    out_chunk.store(result);
+}
+```
+
+**How it works:**
+- **x86_64 with `runtime-dispatch`**: `SimdContext` uses runtime CPU detection to select optimal backend
+- **aarch64 or forced backends**: `SimdContext` uses compile-time `DefaultSimdVector` (zero overhead)
+- **DSP code is identical**: No platform-specific `#[cfg]` directives needed
+
+**Low-Level API (Advanced):**
+
+For direct control, you can use the dispatcher explicitly:
+
+```rust
+use rigel_math::simd::dispatcher::{BackendDispatcher, BackendType, CpuFeatures};
+
+// Initialize once during engine startup
+let dispatcher = BackendDispatcher::init();
+
+// Query selected backend
+match dispatcher.backend_type() {
+    BackendType::Avx512 => println!("Using AVX-512"),
+    BackendType::Avx2 => println!("Using AVX2"),
+    BackendType::Scalar => println!("Using scalar fallback"),
+    BackendType::Neon => println!("Using NEON"),
+}
+```
+
+### Feature Flags
+
+**rigel-math features:**
+- `scalar`: Scalar backend (always available, default)
+- `avx2`: Enable AVX2 backend compilation
+- `avx512`: Enable AVX-512 backend compilation (experimental)
+- `neon`: Enable NEON backend compilation
+- `runtime-dispatch`: Allow multiple backends to coexist for runtime selection
+
+**rigel-dsp features:**
+- `runtime-dispatch`: Enable runtime CPU detection and backend selection (default)
+- `force-scalar`: Force scalar backend for deterministic CI testing
+- `force-avx2`: Force AVX2 backend for deterministic CI testing
+- `force-avx512`: Force AVX-512 backend for local experimental testing
+
+**Build Examples:**
+```bash
+# Default: Runtime dispatch with all backends
+cargo build --release
+
+# Force scalar (CI testing)
+cargo build --release --features force-scalar
+
+# Force AVX2 (CI testing)
+cargo build --release --features force-avx2
+
+# Test specific backend
+cargo test --features force-avx2
+```
+
+### CI Backend Testing
+
+The CI pipeline (`.github/workflows/ci.yml`) tests SIMD backends deterministically:
+
+**Backend test coverage**:
+- **Scalar**: Tested in `rigel-pipeline` job (ubuntu-latest, default features)
+- **AVX2**: Tested in `rigel-pipeline` job (ubuntu-latest, with `RUSTFLAGS="-C target-feature=+avx2,+fma"`)
+- **NEON**: Tested in `build-plugin-macos` job (macos-latest, Apple Silicon runners)
+- **AVX-512**: Not tested in CI (Rust intrinsics incomplete, runners lack support)
+
+Backend tests are integrated into existing jobs to minimize CI setup overhead. All backend tests must pass for CI to succeed.
+
+### Testing Locally
+
+**Test all available backends on your CPU:**
+```bash
+# Run all tests (uses default features, likely runtime-dispatch)
+cargo test
+
+# Force scalar backend
+cargo test --features force-scalar
+
+# Force AVX2 backend (requires AVX2 CPU)
+test:avx2
+
+# Force NEON backend (macOS only, requires Apple Silicon)
+test:neon
+```
+
+**Check your CPU features:**
+```bash
+# Linux
+lscpu | grep -E "avx2|avx512"
+
+# macOS
+sysctl -a | grep machdep.cpu.features
+```
+
+### Performance Validation
+
+**Benchmarking SIMD Performance:**
+```bash
+# Run all benchmarks with current backend configuration
+bench:all
+
+# Save performance baseline before changes
+bench:baseline
+
+# Compare current vs baseline
+bench:criterion
+```
+
+**Expected SIMD Speedups (vs scalar):**
+- AVX2 (8 lanes): ~2-4x faster for block processing
+- AVX-512 (16 lanes): ~4-8x faster for block processing
+- NEON (4 lanes): ~2-4x faster for block processing
+- Dispatch overhead: <1% of block processing time
+
+### no_std Compliance
+
+Both rigel-math and rigel-dsp maintain strict no_std compliance:
+- No heap allocations (no Vec, Box, String, or collections)
+- No blocking I/O (no file operations, network, or locks)
+- Stack-only data structures
+- Deterministic performance
+
+**Dependencies:**
+- `libm`: no_std math functions (exp, log, trig, etc.)
+- `cpufeatures`: no_std CPU feature detection (x86_64 CPUID)
+
+### Troubleshooting
+
+**"Illegal instruction" errors:**
+- Running AVX2/AVX-512 code on CPU without support
+- Solution: Use `force-scalar` feature or check CPU capabilities
+
+**Performance regressions:**
+- Verify SIMD backend is being used (check dispatcher output)
+- Ensure function pointers are inlined (`#[inline]`)
+- Profile with `bench:flamegraph` to identify bottlenecks
+
+**CI backend test failures:**
+- Verify feature flags are correct in `.github/workflows/ci.yml`
+- Check RUSTFLAGS match required CPU features
+- Ensure devenv shell is used for reproducible builds
+
 ## Coding Conventions
 
 ### Rust
@@ -466,6 +716,7 @@ bench:flamegraph   # Generate flamegraph for optimization
 ## Active Technologies
 - Rust 2021 edition (workspace toolchain from rust-toolchain.toml) (001-fast-dsp-math)
 - N/A (pure computational library, no persistence) (001-fast-dsp-math)
+- Rust 2021 edition (from rust-toolchain.toml) (001-runtime-simd-dispatch)
 
 ## Recent Changes
 - 001-fast-dsp-math: Added Rust 2021 edition (workspace toolchain from rust-toolchain.toml)

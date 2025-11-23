@@ -82,6 +82,9 @@ pub mod table;
 // Crossfade and parameter ramping
 pub mod crossfade;
 
+// Runtime SIMD dispatch
+pub mod simd;
+
 // Public re-exports for convenience
 pub use traits::{SimdInt, SimdMask, SimdVector};
 
@@ -113,30 +116,57 @@ pub use backends::neon::{NeonMask, NeonVector};
 /// - `avx2` feature: `Avx2Vector` (8 lanes, x86-64)
 /// - `avx512` feature: `Avx512Vector` (16 lanes, x86-64)
 /// - `neon` feature: `NeonVector` (4 lanes, ARM64)
-#[cfg(all(not(feature = "avx2"), not(feature = "avx512"), not(feature = "neon")))]
+///
+/// Note: When `runtime-dispatch` is enabled, multiple backends can coexist and
+/// DefaultSimdVector is set to ScalarVector as a safe fallback.
+#[cfg(all(
+    not(feature = "runtime-dispatch"),
+    not(feature = "avx2"),
+    not(feature = "avx512"),
+    not(feature = "neon")
+))]
 pub type DefaultSimdVector = ScalarVector<f32>;
 
 /// Default SIMD vector type (AVX2 backend for x86-64)
-#[cfg(all(feature = "avx2", target_arch = "x86_64"))]
+#[cfg(all(
+    not(feature = "runtime-dispatch"),
+    feature = "avx2",
+    target_arch = "x86_64"
+))]
 pub type DefaultSimdVector = Avx2Vector;
 
 /// Default SIMD vector type (AVX512 backend for x86-64)
-#[cfg(all(feature = "avx512", target_arch = "x86_64"))]
+#[cfg(all(
+    not(feature = "runtime-dispatch"),
+    feature = "avx512",
+    target_arch = "x86_64"
+))]
 pub type DefaultSimdVector = Avx512Vector;
 
 /// Default SIMD vector type (NEON backend for ARM64)
-#[cfg(all(feature = "neon", target_arch = "aarch64"))]
+#[cfg(all(
+    not(feature = "runtime-dispatch"),
+    feature = "neon",
+    target_arch = "aarch64"
+))]
 pub type DefaultSimdVector = NeonVector;
 
-// Compile-time checks to prevent conflicting backends for the target architecture
-// Note: AVX2/AVX512 are x86/x86_64 only, NEON is aarch64 only, so they don't conflict across architectures
+/// When runtime-dispatch is enabled, DefaultSimdVector defaults to scalar
+/// (users should use the dispatcher instead of DefaultSimdVector)
+#[cfg(feature = "runtime-dispatch")]
+pub type DefaultSimdVector = ScalarVector<f32>;
 
-// Prevent both AVX2 and AVX512 on x86/x86_64 (they conflict)
+// Compile-time checks to prevent conflicting backends for the target architecture
+// Note: These checks are disabled when runtime-dispatch is enabled, as multiple
+// backends need to coexist for runtime selection
+
+// Prevent both AVX2 and AVX512 on x86/x86_64 (they conflict) - UNLESS runtime-dispatch is enabled
 #[cfg(all(
+    not(feature = "runtime-dispatch"),
     feature = "avx2",
     feature = "avx512",
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
 compile_error!(
-    "Cannot enable both avx2 and avx512 features simultaneously on x86/x86_64. Choose one backend."
+    "Cannot enable both avx2 and avx512 features simultaneously on x86/x86_64. Choose one backend, or use runtime-dispatch feature."
 );

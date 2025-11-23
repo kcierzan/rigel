@@ -14,6 +14,23 @@ crate-type = ["lib"]
 
 [dependencies]
 libm = "0.2"
+cpufeatures = { version = "0.2", optional = true }
+rigel-math = { path = "../math", default-features = false }
+
+[features]
+default = []
+runtime-dispatch = ["cpufeatures", "rigel-math/runtime-dispatch", "rigel-math/scalar", "rigel-math/avx2", "rigel-math/avx512", "avx2", "avx512"]
+
+# SIMD backend compilation flags (enable corresponding rigel-math backends)
+avx2 = ["rigel-math/avx2"]
+avx512 = ["rigel-math/avx512"]
+neon = ["rigel-math/neon"]
+
+# Forced backend selection (deterministic testing)
+force-scalar = ["rigel-math/scalar"]
+force-avx2 = ["avx2"]
+force-avx512 = ["avx512"]
+force-neon = ["neon"]
 
 [dev-dependencies]
 # Statistical benchmarking with wall-clock time measurements

@@ -6,6 +6,7 @@
 //! Provides fast, deterministic audio processing components.
 
 use core::f32::consts::TAU;
+use rigel_math::simd::SimdContext;
 
 /// Sample rate type
 pub type SampleRate = f32;
@@ -261,7 +262,7 @@ impl Envelope {
 }
 
 /// Monophonic synthesis engine
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct SynthEngine {
     oscillator: SimpleOscillator,
     envelope: Envelope,
@@ -269,11 +270,25 @@ pub struct SynthEngine {
     current_note: Option<NoteNumber>,
     current_velocity: f32,
     master_volume: f32,
+    #[allow(dead_code)] // Will be used for future SIMD block processing
+    simd_ctx: SimdContext,
 }
 
 impl SynthEngine {
     /// Create new synthesis engine
     pub fn new(sample_rate: f32) -> Self {
+        // Initialize SIMD context (selects optimal backend for this CPU)
+        let simd_ctx = SimdContext::new();
+
+        // Debug logging for backend selection (only in debug builds)
+        #[cfg(debug_assertions)]
+        {
+            // Note: In no_std, we can't use println! or eprintln!
+            // This will be logged when the engine is used in std environments
+            // For now, we just initialize silently
+            let _backend_name = simd_ctx.backend_name();
+        }
+
         Self {
             oscillator: SimpleOscillator::new(),
             envelope: Envelope::new(sample_rate),
@@ -281,7 +296,13 @@ impl SynthEngine {
             current_note: None,
             current_velocity: 0.0,
             master_volume: 0.7,
+            simd_ctx,
         }
+    }
+
+    /// Get the SIMD backend name (for debugging/logging)
+    pub fn simd_backend(&self) -> &'static str {
+        self.simd_ctx.backend_name()
     }
 
     /// Start playing a note
