@@ -119,11 +119,17 @@ fn test_ops_module_functions() {
     quotient.to_slice(&mut quot_buf[..DefaultSimdVector::LANES]);
 
     // Verify results
-    for i in 0..DefaultSimdVector::LANES {
-        assert_eq!(sum_buf[i], 12.0, "add failed at lane {}", i);
-        assert_eq!(diff_buf[i], 8.0, "sub failed at lane {}", i);
-        assert_eq!(prod_buf[i], 20.0, "mul failed at lane {}", i);
-        assert_eq!(quot_buf[i], 5.0, "div failed at lane {}", i);
+    for (i, (((&sum_val, &diff_val), &prod_val), &quot_val)) in sum_buf[..DefaultSimdVector::LANES]
+        .iter()
+        .zip(&diff_buf[..DefaultSimdVector::LANES])
+        .zip(&prod_buf[..DefaultSimdVector::LANES])
+        .zip(&quot_buf[..DefaultSimdVector::LANES])
+        .enumerate()
+    {
+        assert_eq!(sum_val, 12.0, "add failed at lane {}", i);
+        assert_eq!(diff_val, 8.0, "sub failed at lane {}", i);
+        assert_eq!(prod_val, 20.0, "mul failed at lane {}", i);
+        assert_eq!(quot_val, 5.0, "div failed at lane {}", i);
     }
 
     // Test fma (fused multiply-add)
@@ -132,8 +138,8 @@ fn test_ops_module_functions() {
     let mut fma_buf = [0.0f32; 16];
     fma_result.to_slice(&mut fma_buf[..DefaultSimdVector::LANES]);
 
-    for i in 0..DefaultSimdVector::LANES {
-        assert_eq!(fma_buf[i], 21.0, "fma failed at lane {}", i);
+    for (i, &val) in fma_buf[..DefaultSimdVector::LANES].iter().enumerate() {
+        assert_eq!(val, 21.0, "fma failed at lane {}", i);
     }
 
     // Test min, max, abs
@@ -152,10 +158,15 @@ fn test_ops_module_functions() {
     max_result.to_slice(&mut max_buf[..DefaultSimdVector::LANES]);
     abs_result.to_slice(&mut abs_buf[..DefaultSimdVector::LANES]);
 
-    for i in 0..DefaultSimdVector::LANES {
-        assert_eq!(min_buf[i], -5.0, "min failed at lane {}", i);
-        assert_eq!(max_buf[i], 3.0, "max failed at lane {}", i);
-        assert_eq!(abs_buf[i], 5.0, "abs failed at lane {}", i);
+    for (i, ((&min_val, &max_val), &abs_val)) in min_buf[..DefaultSimdVector::LANES]
+        .iter()
+        .zip(&max_buf[..DefaultSimdVector::LANES])
+        .zip(&abs_buf[..DefaultSimdVector::LANES])
+        .enumerate()
+    {
+        assert_eq!(min_val, -5.0, "min failed at lane {}", i);
+        assert_eq!(max_val, 3.0, "max failed at lane {}", i);
+        assert_eq!(abs_val, 5.0, "abs failed at lane {}", i);
     }
 
     println!(
@@ -174,11 +185,11 @@ fn test_math_module_functions() {
     let mut sqrt_buf = [0.0f32; 16];
     sqrt_result.to_slice(&mut sqrt_buf[..DefaultSimdVector::LANES]);
 
-    for i in 0..DefaultSimdVector::LANES {
+    for (i, &val) in sqrt_buf[..DefaultSimdVector::LANES].iter().enumerate() {
         assert!(
-            (sqrt_buf[i] - 4.0).abs() < 0.2,
+            (val - 4.0).abs() < 0.2,
             "sqrt(16) should be ~4.0, got {} at lane {}",
-            sqrt_buf[i],
+            val,
             i
         );
     }
@@ -189,11 +200,11 @@ fn test_math_module_functions() {
     let mut tanh_buf = [0.0f32; 16];
     tanh_result.to_slice(&mut tanh_buf[..DefaultSimdVector::LANES]);
 
-    for i in 0..DefaultSimdVector::LANES {
+    for (i, &val) in tanh_buf[..DefaultSimdVector::LANES].iter().enumerate() {
         assert!(
-            tanh_buf[i] > 0.4 && tanh_buf[i] < 0.6,
+            val > 0.4 && val < 0.6,
             "tanh(0.5) should be ~0.46, got {} at lane {}",
-            tanh_buf[i],
+            val,
             i
         );
     }
@@ -204,11 +215,11 @@ fn test_math_module_functions() {
     let mut exp_buf = [0.0f32; 16];
     exp_result.to_slice(&mut exp_buf[..DefaultSimdVector::LANES]);
 
-    for i in 0..DefaultSimdVector::LANES {
+    for (i, &val) in exp_buf[..DefaultSimdVector::LANES].iter().enumerate() {
         assert!(
-            (exp_buf[i] - 1.0).abs() < 0.01,
+            (val - 1.0).abs() < 0.01,
             "exp(0) should be ~1.0, got {} at lane {}",
-            exp_buf[i],
+            val,
             i
         );
     }
@@ -249,11 +260,11 @@ fn test_table_module_interpolation() {
     let mut result_buf = [0.0f32; 16];
     result.to_slice(&mut result_buf[..DefaultSimdVector::LANES]);
 
-    for i in 0..DefaultSimdVector::LANES {
+    for (i, &val) in result_buf[..DefaultSimdVector::LANES].iter().enumerate() {
         assert!(
-            (result_buf[i] - 0.5).abs() < 0.02,
+            (val - 0.5).abs() < 0.02,
             "SIMD cubic lookup should be ~0.5, got {} at lane {}",
-            result_buf[i],
+            val,
             i
         );
     }

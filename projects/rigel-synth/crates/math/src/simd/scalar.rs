@@ -4,10 +4,22 @@
 //! It processes one sample at a time using standard Rust operations.
 //! This backend is always available and serves as the reference implementation
 //! for correctness testing of SIMD backends.
+//!
+//! # Implementation Strategy
+//!
+//! This backend uses the generic helpers in `super::helpers` to bridge slice-based
+//! operations to the optimized SIMD kernels in the `math` module. Even though this
+//! is the "scalar" backend, it still benefits from the optimized algorithms (e.g.,
+//! Padé approximations for exp, rational polynomials for tanh) implemented in the
+//! math module.
 
 #![allow(unused)]
 
 use super::backend::{ProcessParams, SimdBackend};
+use super::helpers::{process_binary, process_ternary, process_unary};
+use crate::math;
+use crate::ops;
+use crate::ScalarVector;
 use core::f32::consts::TAU;
 
 /// Scalar Backend (No SIMD)
@@ -157,41 +169,33 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn sqrt(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::sqrtf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::sqrt::sqrt, libm::sqrtf);
     }
 
     #[inline]
     fn exp(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::expf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::exp::exp, libm::expf);
     }
 
     #[inline]
     fn log(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::logf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::log::log, libm::logf);
     }
 
     #[inline]
     fn log2(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::log2f(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::log::log2, libm::log2f);
     }
 
     #[inline]
     fn log10(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::log10f(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::log::log10, libm::log10f);
     }
 
     #[inline]
     fn pow(base: &[f32], exponent: &[f32], output: &mut [f32]) {
+        // math::pow takes scalar exponent, not vector exponent
+        // So we can't use the helper here - just use libm::powf
         for i in 0..output.len() {
             output[i] = libm::powf(base[i], exponent[i]);
         }
@@ -203,20 +207,17 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn sin(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::sinf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::trig::sin, libm::sinf);
     }
 
     #[inline]
     fn cos(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::cosf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::trig::cos, libm::cosf);
     }
 
     #[inline]
     fn tan(input: &[f32], output: &mut [f32]) {
+        // Use sin/cos to compute tan (no dedicated tan kernel in math module)
         for i in 0..output.len() {
             output[i] = libm::tanf(input[i]);
         }
@@ -224,6 +225,7 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn asin(input: &[f32], output: &mut [f32]) {
+        // No vectorized asin in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::asinf(input[i]);
         }
@@ -231,6 +233,7 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn acos(input: &[f32], output: &mut [f32]) {
+        // No vectorized acos in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::acosf(input[i]);
         }
@@ -238,16 +241,12 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn atan(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::atanf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::atan::atan, libm::atanf);
     }
 
     #[inline]
     fn atan2(y: &[f32], x: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::atan2f(y[i], x[i]);
-        }
+        process_binary::<ScalarVector<f32>, _>(y, x, output, math::atan::atan2, libm::atan2f);
     }
 
     // ========================================================================
@@ -256,6 +255,7 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn sinh(input: &[f32], output: &mut [f32]) {
+        // No vectorized sinh in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::sinhf(input[i]);
         }
@@ -263,6 +263,7 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn cosh(input: &[f32], output: &mut [f32]) {
+        // No vectorized cosh in math module, use libm
         for i in 0..output.len() {
             output[i] = libm::coshf(input[i]);
         }
@@ -270,9 +271,7 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn tanh(input: &[f32], output: &mut [f32]) {
-        for i in 0..output.len() {
-            output[i] = libm::tanhf(input[i]);
-        }
+        process_unary::<ScalarVector<f32>, _>(input, output, math::tanh::tanh, libm::tanhf);
     }
 
     // ========================================================================
