@@ -251,8 +251,12 @@ in
     "build:native".exec = withSpecsWorkaround (cargoScript "cargo xtask bundle rigel-plugin --release");
 
     # Platform-specific builds (work only on their respective platforms)
-    "build:macos".exec = withSpecsWorkaround (cargoScript "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin");
-    "build:linux".exec = withSpecsWorkaround (cargoScript "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu");
+    "build:macos".exec = withSpecsWorkaround (
+      cargoScript "cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin"
+    );
+    "build:linux".exec = withSpecsWorkaround (
+      cargoScript "cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu"
+    );
 
     # Windows cross-compilation (uses xwin for MSVC import libs)
     # The script populates a shared cache under target/ then wires the toolchain
@@ -315,8 +319,12 @@ in
     "bench:criterion".exec = withSpecsWorkaround (cargoScript "cargo bench --bench criterion_benches");
     "bench:iai".exec = withSpecsWorkaround (cargoScript "cargo bench --bench iai_benches");
     "bench:all".exec = withSpecsWorkaround (cargoScript "cargo bench");
-    "bench:baseline".exec = withSpecsWorkaround (cargoScript "cargo bench --bench criterion_benches -- --save-baseline main");
-    "bench:flamegraph".exec = withSpecsWorkaround (cargoScript "cargo flamegraph --bench criterion_benches -- --bench");
+    "bench:baseline".exec = withSpecsWorkaround (
+      cargoScript "cargo bench --bench criterion_benches -- --save-baseline main"
+    );
+    "bench:flamegraph".exec = withSpecsWorkaround (
+      cargoScript "cargo flamegraph --bench criterion_benches -- --bench"
+    );
     # macOS Instruments profiling (requires Xcode Command Line Tools)
     "bench:instruments".exec = withSpecsWorkaround ''
       set -euo pipefail
