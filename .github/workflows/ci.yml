@@ -58,6 +58,12 @@ jobs:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: devenv shell cargo test
 
+      - name: Test AVX2 backend
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          RUSTFLAGS: "-C target-feature=+avx2,+fma"
+        run: devenv shell cargo test --features avx2
+
       - name: Restore specs directory
         if: always()
         run: test -d specs.bak && mv specs.bak specs || true
@@ -206,6 +212,11 @@ jobs:
           cache-on-failure: false
           shared-key: macos
 
+      - name: Test NEON backend
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell cargo test --features neon
+
       - name: Build plugin (macOS)
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -219,63 +230,11 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  backend-tests:
-    name: Backend Tests (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-    needs: [rigel-pipeline]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Scalar is tested in rigel-pipeline (default features)
-          - name: AVX2
-            os: ubuntu-latest
-            features: avx2
-            rustflags: "-C target-feature=+avx2,+fma"
-            command: test
-          # AVX512 disabled: Rust intrinsics incomplete, GitHub runners lack support
-          - name: NEON
-            os: macos-latest
-            features: neon
-            rustflags: ""
-            command: test
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cache-prefix: rigel
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "."
-          cache-on-failure: false
-          shared-key: backend-${{ matrix.features }}
-
-      - name: Workaround GCC specs directory conflict
-        if: matrix.os == 'ubuntu-latest'
-        run: test -d specs && mv specs specs.bak || true
-
-      - name: Test ${{ matrix.features }} backend
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          RUSTFLAGS: ${{ matrix.rustflags }}
-        run: devenv shell -- cargo ${{ matrix.command }} --features ${{ matrix.features }}
-
-      - name: Restore specs directory
-        if: always() && matrix.os == 'ubuntu-latest'
-        run: test -d specs.bak && mv specs.bak specs || true
-
   # Aggregates all CI results into a single required status check
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [rigel-pipeline, wtgen-pipeline, build-plugin-linux, build-plugin-macos, backend-tests]
+    needs: [rigel-pipeline, wtgen-pipeline, build-plugin-linux, build-plugin-macos]
     if: always()
     steps:
       - name: Check all jobs succeeded
