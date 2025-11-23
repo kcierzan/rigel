@@ -396,6 +396,20 @@ Rigel uses a two-crate layered architecture for SIMD optimization:
 - Zero-cost abstraction, compiles directly to NEON instructions
 - No dispatch overhead
 
+### Performance Characteristics
+
+**SIMD Math Operations** (AVX2, 8 f32 lanes):
+- **3-6x speedup** per value vs scalar libm reference
+- **Apples-to-apples**: SIMD processing 8 values is 3-6x faster than 8 scalar calls
+- See `specs/001-runtime-simd-dispatch/benchmark-analysis.md` for detailed metrics
+
+**Real-World DSP Performance**:
+- Single voice: **0.15% CPU** at 44.1kHz (~33.6 ns/sample)
+- 16-voice polyphonic: **2.23% CPU** (perfect linear scaling)
+- Buffer processing: **~30 Melem/s** consistent across 64-2048 sample buffers
+
+**Note on Benchmarks**: Early benchmark results appeared to show scalar faster than SIMD, but this was comparing 8 SIMD operations vs 1 scalar operation. Fair comparisons (8 vs 8) show SIMD is 3-6x faster per value.
+
 ### rigel-math Library
 
 Provides trait-based SIMD abstractions enabling backend-agnostic DSP code:
