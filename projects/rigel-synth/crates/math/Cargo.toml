@@ -22,9 +22,17 @@ scalar = []
 avx2 = []
 avx512 = []
 neon = []
+runtime-dispatch = []  # Allow multiple backends to coexist for runtime selection
+
+# Forced backend selection (deterministic testing) - mutually exclusive
+force-scalar = []
+force-avx2 = ["avx2"]
+force-avx512 = ["avx512"]
+force-neon = ["neon"]
 
 [dependencies]
 libm = "0.2"
+cpufeatures = "0.2"
 
 [dev-dependencies]
 proptest = "1.5"
