@@ -226,13 +226,13 @@ HYPOTHESIS_MAX_EXAMPLES=5000 uv run pytest tests/ -x -n auto --tb=short
 Runs on all PRs and pushes:
 
 1. **Parallel Pipelines**:
-   - `rigel-pipeline`: fmt, clippy, test
+   - `rigel-pipeline`: fmt, clippy, scalar tests, AVX2 tests
    - `wtgen-pipeline`: ruff lint, pytest
 
 2. **Plugin Builds**:
    - Linux: Native build on ubuntu-latest (`x86_64-unknown-linux-gnu`)
    - Windows: Cross-compiled on ubuntu-latest via xwin (`x86_64-pc-windows-msvc`)
-   - macOS: Native build on macos-14 runner (`aarch64-apple-darwin`)
+   - macOS: NEON tests + native build on macos-latest (`aarch64-apple-darwin`)
 
 All CI commands run through devenv shell for reproducibility.
 
@@ -545,13 +545,13 @@ cargo test --features force-avx2
 
 The CI pipeline (`.github/workflows/ci.yml`) tests SIMD backends deterministically:
 
-**`backend-tests` job**:
-- **Scalar**: Tested in main `rigel-pipeline` job (default features)
-- **AVX2**: ubuntu-latest with `RUSTFLAGS="-C target-feature=+avx2,+fma"`
-- **NEON**: macos-latest (Apple Silicon runners)
+**Backend test coverage**:
+- **Scalar**: Tested in `rigel-pipeline` job (ubuntu-latest, default features)
+- **AVX2**: Tested in `rigel-pipeline` job (ubuntu-latest, with `RUSTFLAGS="-C target-feature=+avx2,+fma"`)
+- **NEON**: Tested in `build-plugin-macos` job (macos-latest, Apple Silicon runners)
 - **AVX-512**: Not tested in CI (Rust intrinsics incomplete, runners lack support)
 
-All backend tests must pass for CI to succeed.
+Backend tests are integrated into existing jobs to minimize CI setup overhead. All backend tests must pass for CI to succeed.
 
 ### Testing Locally
 
