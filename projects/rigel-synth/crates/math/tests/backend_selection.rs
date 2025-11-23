@@ -175,7 +175,6 @@ mod backend_selection_tests {
                     }
                     BackendType::Scalar => {
                         // Scalar is always valid as fallback
-                        assert!(true);
                     }
                     BackendType::Neon => {
                         panic!("NEON backend should not be selected on x86_64");
@@ -193,7 +192,6 @@ mod backend_selection_tests {
                     }
                     BackendType::Scalar => {
                         // Scalar is always valid as fallback
-                        assert!(true);
                     }
                     BackendType::Avx2 | BackendType::Avx512 => {
                         panic!("x86 backend should not be selected on aarch64");

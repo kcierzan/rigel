@@ -16,9 +16,11 @@ mod backend_equivalence_tests {
     use proptest::prelude::*;
 
     /// Tolerance for floating-point comparisons (1e-6 as per contract)
+    #[allow(dead_code)] // Used in conditional compilation blocks
     const EPSILON: f32 = 1e-6;
 
     /// Helper to compare two f32 slices with tolerance
+    #[allow(dead_code)] // Used in conditional compilation blocks
     fn assert_slices_approx_eq(a: &[f32], b: &[f32], epsilon: f32, context: &str) {
         assert_eq!(
             a.len(),
@@ -110,12 +112,13 @@ mod backend_equivalence_tests {
         /// Verifies that phase advancement (with wrapping) produces identical results.
         #[test]
         fn test_advance_phase_equivalence(
-            initial_phases in prop::collection::vec(0.0f32..6.28f32, 1..256),
+            initial_phases in prop::collection::vec(0.0f32..std::f32::consts::TAU, 1..256),
             increments in prop::collection::vec(0.0f32..1.0f32, 1..256),
         ) {
             let count = initial_phases.len().min(increments.len());
             let mut scalar_phases = initial_phases.clone();
-            let mut phases_copy = initial_phases.clone();
+            #[allow(unused_variables)] // Used in conditional compilation blocks
+            let phases_copy = initial_phases.clone();
 
             // Scalar backend (reference)
             ScalarBackend::advance_phase_vectorized(&mut scalar_phases, &increments, count);
