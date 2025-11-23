@@ -521,37 +521,37 @@ fn bench_math_simd_vs_scalar(c: &mut Criterion) {
 
     group.bench_function("exp_rigel_scalar", |bencher| {
         use rigel_math::backends::scalar::ScalarVector;
-        let x = ScalarVector::splat(exp_val);
+        let x = ScalarVector::<f32>::splat(exp_val);
         bencher.iter(|| black_box(exp(black_box(x))))
     });
 
     group.bench_function("log_rigel_scalar", |bencher| {
         use rigel_math::backends::scalar::ScalarVector;
-        let x = ScalarVector::splat(log_val);
+        let x = ScalarVector::<f32>::splat(log_val);
         bencher.iter(|| black_box(log(black_box(x))))
     });
 
     group.bench_function("log2_rigel_scalar", |bencher| {
         use rigel_math::backends::scalar::ScalarVector;
-        let x = ScalarVector::splat(log_val);
+        let x = ScalarVector::<f32>::splat(log_val);
         bencher.iter(|| black_box(log2(black_box(x))))
     });
 
     group.bench_function("sin_rigel_scalar", |bencher| {
         use rigel_math::backends::scalar::ScalarVector;
-        let x = ScalarVector::splat(trig_val);
+        let x = ScalarVector::<f32>::splat(trig_val);
         bencher.iter(|| black_box(sin(black_box(x))))
     });
 
     group.bench_function("cos_rigel_scalar", |bencher| {
         use rigel_math::backends::scalar::ScalarVector;
-        let x = ScalarVector::splat(trig_val);
+        let x = ScalarVector::<f32>::splat(trig_val);
         bencher.iter(|| black_box(cos(black_box(x))))
     });
 
     group.bench_function("tanh_rigel_scalar", |bencher| {
         use rigel_math::backends::scalar::ScalarVector;
-        let x = ScalarVector::splat(tanh_val);
+        let x = ScalarVector::<f32>::splat(tanh_val);
         bencher.iter(|| black_box(tanh(black_box(x))))
     });
 
