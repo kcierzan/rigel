@@ -405,6 +405,156 @@ fn bench_math_simd_vs_scalar(c: &mut Criterion) {
         bencher.iter(|| black_box(libm::exp2f(black_box(log_val))))
     });
 
+    // ========================================================================
+    // FAIR COMPARISONS: Scalar 8x vs SIMD (apples-to-apples)
+    // ========================================================================
+    // NOTE: The benchmarks above compare SIMD (processing 8 f32 values) against
+    // scalar (processing 1 f32 value). The benchmarks below provide fair
+    // comparisons by running scalar operations 8 times to match SIMD vector width.
+    //
+    // To calculate per-value performance:
+    // - SIMD per-value = simd_time / 8
+    // - Scalar per-value = scalar_8x_time / 8
+    // - Speedup = scalar_8x_time / simd_time
+
+    group.bench_function("exp_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::expf(black_box(exp_val)));
+            }
+        })
+    });
+
+    group.bench_function("log_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::logf(black_box(log_val)));
+            }
+        })
+    });
+
+    group.bench_function("log2_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::log2f(black_box(log_val)));
+            }
+        })
+    });
+
+    group.bench_function("log10_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::log10f(black_box(log_val)));
+            }
+        })
+    });
+
+    group.bench_function("sin_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::sinf(black_box(trig_val)));
+            }
+        })
+    });
+
+    group.bench_function("cos_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::cosf(black_box(trig_val)));
+            }
+        })
+    });
+
+    group.bench_function("sincos_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                let s = libm::sinf(trig_val);
+                let c = libm::cosf(trig_val);
+                black_box((s, c));
+            }
+        })
+    });
+
+    group.bench_function("atan_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::atanf(black_box(atan_val)));
+            }
+        })
+    });
+
+    group.bench_function("atan2_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::atan2f(black_box(atan_val), black_box(1.0)));
+            }
+        })
+    });
+
+    group.bench_function("tanh_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::tanhf(black_box(tanh_val)));
+            }
+        })
+    });
+
+    group.bench_function("pow_scalar_8x", |bencher| {
+        bencher.iter(|| {
+            for _ in 0..8 {
+                black_box(libm::powf(black_box(pow_base), black_box(pow_exp)));
+            }
+        })
+    });
+
+    // ========================================================================
+    // SIMD vs OUR SCALAR APPROXIMATIONS (pure vectorization benefit)
+    // ========================================================================
+    // NOTE: These benchmarks compare our SIMD approximations vs our scalar
+    // approximations (both using the same polynomial approximations).
+    // This isolates the benefit of vectorization from approximation quality.
+    //
+    // Comparison methodology:
+    // 1. SIMD approximation (8 values) vs libm reference (8 calls) = accuracy trade-off
+    // 2. SIMD approximation (8 values) vs scalar approximation (8 values) = pure vectorization
+    // 3. Scalar approximation (1 value) vs libm reference (1 value) = approximation quality
+
+    group.bench_function("exp_rigel_scalar", |bencher| {
+        use rigel_math::backends::scalar::ScalarVector;
+        let x = ScalarVector::splat(exp_val);
+        bencher.iter(|| black_box(exp(black_box(x))))
+    });
+
+    group.bench_function("log_rigel_scalar", |bencher| {
+        use rigel_math::backends::scalar::ScalarVector;
+        let x = ScalarVector::splat(log_val);
+        bencher.iter(|| black_box(log(black_box(x))))
+    });
+
+    group.bench_function("log2_rigel_scalar", |bencher| {
+        use rigel_math::backends::scalar::ScalarVector;
+        let x = ScalarVector::splat(log_val);
+        bencher.iter(|| black_box(log2(black_box(x))))
+    });
+
+    group.bench_function("sin_rigel_scalar", |bencher| {
+        use rigel_math::backends::scalar::ScalarVector;
+        let x = ScalarVector::splat(trig_val);
+        bencher.iter(|| black_box(sin(black_box(x))))
+    });
+
+    group.bench_function("cos_rigel_scalar", |bencher| {
+        use rigel_math::backends::scalar::ScalarVector;
+        let x = ScalarVector::splat(trig_val);
+        bencher.iter(|| black_box(cos(black_box(x))))
+    });
+
+    group.bench_function("tanh_rigel_scalar", |bencher| {
+        use rigel_math::backends::scalar::ScalarVector;
+        let x = ScalarVector::splat(tanh_val);
+        bencher.iter(|| black_box(tanh(black_box(x))))
+    });
+
     group.finish();
 }
 
