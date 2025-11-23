@@ -107,11 +107,11 @@ fn test_ops_module_functions() {
     let product = ops::mul(a, b);
     let quotient = ops::div(a, b);
 
-    // Extract values for verification
-    let mut sum_buf = [0.0f32; 8];
-    let mut diff_buf = [0.0f32; 8];
-    let mut prod_buf = [0.0f32; 8];
-    let mut quot_buf = [0.0f32; 8];
+    // Extract values for verification (size 16 for AVX-512 compatibility)
+    let mut sum_buf = [0.0f32; 16];
+    let mut diff_buf = [0.0f32; 16];
+    let mut prod_buf = [0.0f32; 16];
+    let mut quot_buf = [0.0f32; 16];
 
     sum.to_slice(&mut sum_buf[..DefaultSimdVector::LANES]);
     diff.to_slice(&mut diff_buf[..DefaultSimdVector::LANES]);
@@ -129,7 +129,7 @@ fn test_ops_module_functions() {
     // Test fma (fused multiply-add)
     let c = DefaultSimdVector::splat(1.0);
     let fma_result = ops::fma(a, b, c); // a * b + c = 10 * 2 + 1 = 21
-    let mut fma_buf = [0.0f32; 8];
+    let mut fma_buf = [0.0f32; 16];
     fma_result.to_slice(&mut fma_buf[..DefaultSimdVector::LANES]);
 
     for i in 0..DefaultSimdVector::LANES {
@@ -144,9 +144,9 @@ fn test_ops_module_functions() {
     let max_result = ops::max(neg, pos);
     let abs_result = ops::abs(neg);
 
-    let mut min_buf = [0.0f32; 8];
-    let mut max_buf = [0.0f32; 8];
-    let mut abs_buf = [0.0f32; 8];
+    let mut min_buf = [0.0f32; 16];
+    let mut max_buf = [0.0f32; 16];
+    let mut abs_buf = [0.0f32; 16];
 
     min_result.to_slice(&mut min_buf[..DefaultSimdVector::LANES]);
     max_result.to_slice(&mut max_buf[..DefaultSimdVector::LANES]);
@@ -171,7 +171,7 @@ fn test_math_module_functions() {
     // Test sqrt (allow tolerance for fast approximation)
     let x = DefaultSimdVector::splat(16.0);
     let sqrt_result = math::sqrt(x);
-    let mut sqrt_buf = [0.0f32; 8];
+    let mut sqrt_buf = [0.0f32; 16];
     sqrt_result.to_slice(&mut sqrt_buf[..DefaultSimdVector::LANES]);
 
     for i in 0..DefaultSimdVector::LANES {
@@ -186,7 +186,7 @@ fn test_math_module_functions() {
     // Test tanh (soft clipping) - should be in range [-1, 1]
     let values = DefaultSimdVector::splat(0.5);
     let tanh_result = math::tanh(values);
-    let mut tanh_buf = [0.0f32; 8];
+    let mut tanh_buf = [0.0f32; 16];
     tanh_result.to_slice(&mut tanh_buf[..DefaultSimdVector::LANES]);
 
     for i in 0..DefaultSimdVector::LANES {
@@ -201,7 +201,7 @@ fn test_math_module_functions() {
     // Test exp
     let zero = DefaultSimdVector::splat(0.0);
     let exp_result = math::exp(zero);
-    let mut exp_buf = [0.0f32; 8];
+    let mut exp_buf = [0.0f32; 16];
     exp_result.to_slice(&mut exp_buf[..DefaultSimdVector::LANES]);
 
     for i in 0..DefaultSimdVector::LANES {
