@@ -7,9 +7,9 @@
 //! # Safe Input Range
 //!
 //! **IMPORTANT**: To avoid overflow across all SIMD backends:
-//! - **Safe range**: `x ∈ [-87.0, 85.0]`
+//! - **Safe range**: `x ∈ [-87.0, 83.0]`
 //! - Values outside this range are automatically clamped
-//! - The limit of 85.0 (not 88.0) prevents intermediate overflow during calculations
+//! - The limit of 83.0 prevents intermediate overflow during the 5 squaring operations
 //!
 //! # Error Bounds
 //!
@@ -37,7 +37,7 @@
 //!
 //! // Large values are safely clamped
 //! let large_value = DefaultSimdVector::splat(100.0);
-//! let clamped = exp(large_value); // Automatically clamped to exp(85)
+//! let clamped = exp(large_value); // Automatically clamped to exp(83)
 //! ```
 
 use crate::traits::SimdVector;
@@ -50,9 +50,9 @@ use crate::traits::SimdVector;
 /// # Safe Range
 ///
 /// **IMPORTANT**: To avoid overflow during intermediate calculations across all SIMD backends:
-/// - **Safe input range**: `x ∈ [-87.0, 85.0]`
+/// - **Safe input range**: `x ∈ [-87.0, 83.0]`
 /// - Values outside this range are clamped automatically
-/// - Overflow protection: Returns f32::MAX for x > 85
+/// - Overflow protection: Clamped to exp(83) ≈ 6.3e35 for x > 83
 /// - Underflow protection: Returns 0.0 for x < -87
 ///
 /// # Accuracy
@@ -63,9 +63,9 @@ use crate::traits::SimdVector;
 /// # Implementation Notes
 ///
 /// The function uses 5 repeated squarings after Padé approximation:
-/// - For x=85: after 5 halvings → x_reduced ≈ 2.65, then squared 5 times
-/// - For x≥86: intermediate squaring operations may overflow to infinity on some backends
-/// - This is a limitation of the algorithm, not a bug in any specific backend
+/// - For x=83: after 5 halvings → x_reduced ≈ 2.59, then squared 5 times
+/// - Conservative clamping prevents intermediate overflow to infinity on all backends
+/// - The limit of 83.0 ensures the final result stays below f32::MAX
 ///
 /// # Example
 ///
@@ -80,7 +80,7 @@ use crate::traits::SimdVector;
 ///
 /// // Large values are safely clamped
 /// let large_x = DefaultSimdVector::splat(100.0);
-/// let result = exp(large_x); // Clamped to exp(85) ≈ 1.55e37
+/// let result = exp(large_x); // Clamped to exp(83) ≈ 6.3e35
 /// ```
 #[inline(always)]
 pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
@@ -93,11 +93,15 @@ pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
     let half = V::splat(0.5);
 
     // Overflow/underflow protection
-    // SAFETY: Max is 85.0 (not 88.0) to prevent intermediate overflow during squaring
-    // operations across all SIMD backends. Values >= 86 can overflow to infinity
-    // during the 5 repeated squarings even though the theoretical limit is ~88.72.
-    // Values outside [-87, 85] are automatically clamped.
-    let max_x = V::splat(85.0);
+    // SAFETY: Max is 83.0 to prevent intermediate overflow during squaring operations
+    // across all SIMD backends. The 5 repeated squarings amplify the result significantly:
+    // - For x=83: after 5 halvings → x_reduced ≈ 2.59
+    // - exp(2.59) ≈ 13.33
+    // - After 5 squarings: 13.33² = 177.7, 177.7² = 31577, etc.
+    // - We need the final result < f32::MAX (3.4e38)
+    // - sqrt⁵(3.4e38) ≈ 80.7, so 83.0 provides safe margin
+    // Values outside [-87, 83] are automatically clamped.
+    let max_x = V::splat(83.0);
     let min_x = V::splat(-87.0);
     let x_clamped = x.max(min_x).min(max_x);
 
@@ -287,15 +291,10 @@ mod tests {
         assert!(value > 0.0, "exp(-10) should be positive");
     }
 
-    // TODO: SIMD backends (AVX2, AVX-512, NEON) can produce infinity for exp(100) due to
-    // intermediate overflow during the 5 repeated squaring operations in the Padé approximation.
-    // Input clamping to 85.0 works correctly, but the squaring operations can still overflow
-    // to infinity on some backends. This is an edge case - normal audio DSP usage stays well
-    // below this limit (typical range is [-10, 10] for envelope generation).
     #[test]
-    #[cfg(not(any(feature = "avx2", feature = "avx512", feature = "neon")))]
     fn test_exp_overflow_protection() {
-        // Should not overflow for large positive values (clamped to 85)
+        // Should not overflow for large positive values (clamped to 83)
+        // Conservative clamping prevents intermediate overflow during squaring operations
         let x = DefaultSimdVector::splat(100.0);
         let result = exp(x);
         let value = result.horizontal_sum() / DefaultSimdVector::LANES as f32;

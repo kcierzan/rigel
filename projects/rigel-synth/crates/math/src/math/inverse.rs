@@ -34,7 +34,13 @@ use crate::traits::SimdVector;
 ///
 /// # Performance
 ///
-/// 5-10x faster than scalar division on SIMD backends
+/// Uses hardware RCP estimate instructions where available:
+/// - AVX2: `_mm256_rcp_ps` + 1 NR iteration (~7 cycles)
+/// - AVX-512: `_mm512_rcp14_ps` + 1 NR iteration (~7 cycles)
+/// - NEON: `vrecpeq_f32` + 1 NR iteration (~7 cycles)
+/// - Scalar: Division (no estimate benefit)
+///
+/// Approximately 3-5x faster than scalar division on SIMD backends.
 ///
 /// # Example
 ///
@@ -51,15 +57,12 @@ pub fn recip<V: SimdVector<Scalar = f32>>(x: V) -> V {
     // Newton-Raphson iteration for 1/x:
     // r_{n+1} = r_n * (2 - x * r_n)
     //
-    // Start with initial estimate (crude 1/x approximation)
-    // and refine once for good accuracy
+    // Start with hardware RCP estimate and refine once for full precision
 
-    let one = V::splat(1.0);
     let two = V::splat(2.0);
 
-    // Initial estimate: Use simple division as baseline
-    // On SIMD platforms with RCP instructions, this would use the hardware estimate
-    let r0 = one.div(x);
+    // Initial estimate: Use hardware RCP instruction
+    let r0 = x.rcp_estimate();
 
     // One Newton-Raphson iteration for refinement
     // r1 = r0 * (2 - x * r0)
@@ -73,8 +76,16 @@ pub fn recip<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// # Error Bounds
 ///
-/// - Maximum relative error: <0.1%
+/// - AVX2/AVX-512: ~0.006% max relative error (14-bit precision)
+/// - NEON: ~0.4% max relative error (8-bit precision)
 /// - Approximately 2x faster than `recip`
+///
+/// # Performance
+///
+/// Uses hardware RCP estimate instructions:
+/// - AVX2: `_mm256_rcp_ps` (~3 cycles)
+/// - AVX-512: `_mm512_rcp14_ps` (~3 cycles)
+/// - NEON: `vrecpeq_f32` (~3 cycles)
 ///
 /// # Example
 ///
@@ -88,9 +99,8 @@ pub fn recip<V: SimdVector<Scalar = f32>>(x: V) -> V {
 /// ```
 #[inline(always)]
 pub fn recip_rough<V: SimdVector<Scalar = f32>>(x: V) -> V {
-    // Just use the hardware estimate (or simple division)
-    let one = V::splat(1.0);
-    one.div(x)
+    // Use hardware RCP estimate directly without refinement
+    x.rcp_estimate()
 }
 
 #[cfg(test)]
