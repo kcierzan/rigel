@@ -269,6 +269,16 @@ impl SimdVector for Avx512Vector {
     }
 
     #[inline(always)]
+    fn sqrt(self) -> Self {
+        unsafe { Avx512Vector(_mm512_sqrt_ps(self.0)) }
+    }
+
+    #[inline(always)]
+    fn rcp_estimate(self) -> Self {
+        unsafe { Avx512Vector(_mm512_rcp14_ps(self.0)) }
+    }
+
+    #[inline(always)]
     fn to_bits(self) -> Self::IntBits {
         unsafe { Avx512Int(_mm512_castps_si512(self.0)) }
     }

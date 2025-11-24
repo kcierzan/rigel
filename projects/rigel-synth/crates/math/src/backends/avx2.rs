@@ -298,6 +298,16 @@ impl SimdVector for Avx2Vector {
     }
 
     #[inline(always)]
+    fn sqrt(self) -> Self {
+        unsafe { Avx2Vector(_mm256_sqrt_ps(self.0)) }
+    }
+
+    #[inline(always)]
+    fn rcp_estimate(self) -> Self {
+        unsafe { Avx2Vector(_mm256_rcp_ps(self.0)) }
+    }
+
+    #[inline(always)]
     fn to_bits(self) -> Self::IntBits {
         unsafe { Avx2Int(_mm256_castps_si256(self.0)) }
     }

@@ -270,6 +270,16 @@ impl SimdVector for NeonVector {
     }
 
     #[inline(always)]
+    fn sqrt(self) -> Self {
+        unsafe { NeonVector(vsqrtq_f32(self.0)) }
+    }
+
+    #[inline(always)]
+    fn rcp_estimate(self) -> Self {
+        unsafe { NeonVector(vrecpeq_f32(self.0)) }
+    }
+
+    #[inline(always)]
     fn to_bits(self) -> Self::IntBits {
         unsafe { NeonInt(vreinterpretq_u32_f32(self.0)) }
     }

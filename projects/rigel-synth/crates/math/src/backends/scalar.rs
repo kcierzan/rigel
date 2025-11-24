@@ -210,6 +210,17 @@ impl SimdVector for ScalarVector<f32> {
     }
 
     #[inline(always)]
+    fn sqrt(self) -> Self {
+        ScalarVector(libm::sqrtf(self.0))
+    }
+
+    #[inline(always)]
+    fn rcp_estimate(self) -> Self {
+        // Scalar has no benefit from estimate - use full precision division
+        ScalarVector(1.0 / self.0)
+    }
+
+    #[inline(always)]
     fn to_bits(self) -> Self::IntBits {
         ScalarInt(self.0.to_bits())
     }
@@ -495,6 +506,17 @@ impl SimdVector for ScalarVector<f64> {
     #[inline(always)]
     fn to_int_bits_i32(self) -> Self::IntBits {
         ScalarInt64(self.0 as i64 as u64)
+    }
+
+    #[inline(always)]
+    fn sqrt(self) -> Self {
+        ScalarVector(libm::sqrt(self.0))
+    }
+
+    #[inline(always)]
+    fn rcp_estimate(self) -> Self {
+        // Scalar has no benefit from estimate - use full precision division
+        ScalarVector(1.0 / self.0)
     }
 
     #[inline(always)]
