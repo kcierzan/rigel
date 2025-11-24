@@ -217,8 +217,8 @@ Compute sine and cosine simultaneously (faster than separate calls).
 - Same as `sin()` and `cos()`
 
 **Performance:**
-- **Scalar:** ~4.0 ns/operation (1.6x faster than 2 separate calls)
-- **AVX2:** ~6.5 ns/operation (1.6x faster than 2 separate calls)
+- **Scalar:** 6.1 ns/operation (libm: 2.9 ns, 2.1x slower than libm)
+- **AVX2:** 5.6 ns for 8 values (0.70 ns/value, 3.9x faster than scalar libm)
 
 **When to use:**
 - Complex number operations
