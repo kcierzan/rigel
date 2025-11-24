@@ -59,11 +59,14 @@ let result = x.exp_libm();  // Direct libm::expf call
 - `atan_libm`, `atan2_libm`, `tanh_libm`
 - `pow_libm`, `sqrt_libm`
 
-**Performance vs polynomial implementations:**
+**Performance vs polynomial implementations (scalar):**
 - exp: **1.9x faster** (3.85ns vs 7.30ns)
 - log: **1.7x faster** (2.79ns vs 4.68ns)
-- sin/cos: **1.6x faster** (~2.5ns vs ~4.0ns)
+- sin/cos: **2.3x faster** (2.6ns vs 6.1ns, Cody-Waite implementation)
 - atan: **1.5x faster** (2.96ns vs 4.30ns)
+
+**Note:** For scalar workloads, libm is fastest. However, SIMD backends provide
+significant speedups when processing multiple values (see benchmarks below).
 
 ### SIMD Backends: Polynomial Approximations
 
@@ -80,12 +83,12 @@ let result = exp(x);  // Padé[5/5] approximation, all lanes in parallel
 **Why not libm for SIMD?**
 - libm provides scalar functions only
 - Vectorizing libm calls loses parallelism benefits
-- Custom polynomials achieve **4-16x speedup** vs scalar libm
+- Custom polynomials achieve **2.8-5.4x speedup** vs scalar libm (AVX2 measured)
 
 **Accuracy guarantees:**
 - exp: <0.12% error for audio ranges
 - log: <1.1% relative error
-- sin/cos: <0.016% error
+- sin/cos: <0.1% error, <-100dB THD (Cody-Waite + 7th-order minimax)
 - atan: <1.5° (0.026 radians)
 
 All errors are **perceptually imperceptible** in audio applications.
@@ -135,14 +138,16 @@ Run benchmarks with different backends to compare performance:
 cargo bench --bench criterion_benches --features scalar
 
 # AVX2 backend (x86-64 with AVX2)
-cargo bench --bench criterion_benches --features avx2
+RUSTFLAGS="-C target-feature=+avx2,+fma" cargo bench --bench criterion_benches --features avx2
 
 # AVX512 backend (x86-64 with AVX-512)
-cargo bench --bench criterion_benches --features avx512
+RUSTFLAGS="-C target-feature=+avx512f" cargo bench --bench criterion_benches --features avx512
 
 # NEON backend (ARM64 with NEON)
 cargo bench --bench criterion_benches --features neon
 ```
+
+**Important**: AVX2/AVX512 backends require `RUSTFLAGS` to enable CPU features at compile time for optimal performance.
 
 ### Saving and Comparing Baselines
 

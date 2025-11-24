@@ -183,6 +183,48 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// This is used for IEEE 754 exponent manipulation in exp2.
     fn to_int_bits_i32(self) -> Self::IntBits;
 
+    // Math operations
+
+    /// Compute square root: √x
+    ///
+    /// Uses hardware SIMD square root instructions where available for optimal performance.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// let x = DefaultSimdVector::splat(4.0);
+    /// let result = x.sqrt();
+    /// // result contains 2.0 in all lanes
+    /// ```
+    fn sqrt(self) -> Self;
+
+    /// Fast reciprocal estimate: ≈1/x
+    ///
+    /// Provides a hardware-accelerated estimate of 1/x with reduced precision (~14 bits).
+    /// Use with Newton-Raphson refinement for full precision: `r1 = r0 * (2 - x * r0)`
+    ///
+    /// # Accuracy
+    ///
+    /// - AVX2/AVX-512: ~14-bit precision (max relative error ~0.006%)
+    /// - NEON: ~8-bit precision (max relative error ~0.4%)
+    /// - Scalar: Full precision via division (no estimate)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// let x = DefaultSimdVector::splat(2.0);
+    /// let estimate = x.rcp_estimate();
+    /// // estimate ≈ 0.5 (with reduced precision)
+    ///
+    /// // Refine with one Newton-Raphson iteration
+    /// let two = DefaultSimdVector::splat(2.0);
+    /// let refined = estimate.mul(two.sub(x.mul(estimate)));
+    /// // refined ≈ 0.5 (with full precision)
+    /// ```
+    fn rcp_estimate(self) -> Self;
+
     // Bit manipulation (for IEEE 754 logarithm extraction)
 
     /// Reinterpret float bits as integer bits
