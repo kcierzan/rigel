@@ -537,17 +537,17 @@ Before starting implementation:
 
 Before considering implementation complete:
 
-- [ ] All scalar backend tests pass
-- [ ] AVX2 backend produces identical results to scalar (property-based tests)
-- [ ] Dispatcher correctly selects backend based on CPU features
-- [ ] SimdContext API provides 32 production-ready operations (2 advanced methods deferred for future iteration: select, cubic interpolation)
-- [ ] Forced backend flags work in CI
+- [X] All scalar backend tests pass
+- [X] AVX2 backend produces identical results to scalar (property-based tests)
+- [X] Dispatcher correctly selects backend based on CPU features
+- [X] SimdContext API provides 32 production-ready operations (2 advanced methods deferred for future iteration: select, cubic interpolation)
+- [X] Forced backend flags work in CI
 - [ ] Dispatch overhead <1% (benchmark validation)
 - [ ] no_std compliance maintained (compilation check)
-- [ ] All architecture-specific tests pass (NEON on aarch64, AVX2 on x86_64)
+- [X] All architecture-specific tests pass (NEON on aarch64, AVX2 on x86_64)
 - [ ] Build times within 10% of baseline
 - [ ] Binary size increase <20%
-- [ ] CI pipeline tests all backends deterministically
+- [X] CI pipeline tests all backends deterministically
 - [ ] Performance baseline comparison shows no regressions
 
 ---
