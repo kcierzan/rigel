@@ -26,3 +26,14 @@ atomic_float = "0.1"
 
 [features]
 default = []
+
+# SIMD backend features (forwarded to rigel-dsp)
+avx2 = ["rigel-dsp/avx2"]
+avx512 = ["rigel-dsp/avx512"]
+neon = ["rigel-dsp/neon"]
+
+# Forced backend selection features (forwarded to rigel-dsp)
+force-scalar = ["rigel-dsp/force-scalar"]
+force-avx2 = ["rigel-dsp/force-avx2"]
+force-avx512 = ["rigel-dsp/force-avx512"]
+force-neon = ["rigel-dsp/force-neon"]
