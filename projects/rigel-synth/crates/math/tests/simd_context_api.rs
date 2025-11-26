@@ -122,8 +122,46 @@ mod simd_context_api_tests {
 
     #[test]
     fn test_simd_context_backend_selection_on_x86_64() {
-        // On x86_64 with runtime dispatch, SimdContext should contain a dispatcher
+        // Test backend selection on x86_64 (both compile-time and runtime-dispatch modes)
 
+        // Compile-time AVX2 selection (CI runs: cargo test --features avx2)
+        #[cfg(all(
+            target_arch = "x86_64",
+            feature = "avx2",
+            not(feature = "avx512"),
+            not(feature = "runtime-dispatch")
+        ))]
+        {
+            use rigel_math::simd::SimdContext;
+            let ctx = SimdContext::new();
+            let backend_name = ctx.backend_name();
+
+            assert_eq!(
+                backend_name, "avx2",
+                "Expected avx2 backend with --features avx2, got: {}",
+                backend_name
+            );
+        }
+
+        // Compile-time AVX-512 selection
+        #[cfg(all(
+            target_arch = "x86_64",
+            feature = "avx512",
+            not(feature = "runtime-dispatch")
+        ))]
+        {
+            use rigel_math::simd::SimdContext;
+            let ctx = SimdContext::new();
+            let backend_name = ctx.backend_name();
+
+            assert_eq!(
+                backend_name, "avx512",
+                "Expected avx512 backend with --features avx512, got: {}",
+                backend_name
+            );
+        }
+
+        // Runtime dispatch mode (CPU feature detection)
         #[cfg(all(target_arch = "x86_64", feature = "runtime-dispatch"))]
         {
             use rigel_math::simd::SimdContext;
@@ -134,6 +172,62 @@ mod simd_context_api_tests {
             assert!(
                 backend_name == "avx512" || backend_name == "avx2" || backend_name == "scalar",
                 "Unexpected backend: {}",
+                backend_name
+            );
+        }
+
+        // Scalar fallback (no SIMD features on x86_64)
+        #[cfg(all(
+            target_arch = "x86_64",
+            not(feature = "avx2"),
+            not(feature = "avx512"),
+            not(feature = "runtime-dispatch")
+        ))]
+        {
+            use rigel_math::simd::SimdContext;
+            let ctx = SimdContext::new();
+            let backend_name = ctx.backend_name();
+
+            assert_eq!(
+                backend_name, "scalar",
+                "Expected scalar backend without SIMD features, got: {}",
+                backend_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_simd_context_backend_selection_on_aarch64() {
+        // Test backend selection on aarch64
+
+        // Compile-time NEON selection (CI runs: cargo test --features neon)
+        #[cfg(all(
+            target_arch = "aarch64",
+            feature = "neon",
+            not(feature = "force-scalar")
+        ))]
+        {
+            use rigel_math::simd::SimdContext;
+            let ctx = SimdContext::new();
+            let backend_name = ctx.backend_name();
+
+            assert_eq!(
+                backend_name, "neon",
+                "Expected neon backend on aarch64, got: {}",
+                backend_name
+            );
+        }
+
+        // Scalar fallback on aarch64 (no neon feature)
+        #[cfg(all(target_arch = "aarch64", not(feature = "neon")))]
+        {
+            use rigel_math::simd::SimdContext;
+            let ctx = SimdContext::new();
+            let backend_name = ctx.backend_name();
+
+            assert_eq!(
+                backend_name, "scalar",
+                "Expected scalar backend without neon feature, got: {}",
                 backend_name
             );
         }
