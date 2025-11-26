@@ -137,8 +137,14 @@ impl SimdContext {
     }
 
     /// Get compile-time backend name (when runtime-dispatch disabled)
+    ///
+    /// Priority order:
+    /// 1. force-* features (explicit override for testing)
+    /// 2. Regular SIMD features (avx512 > avx2 > neon)
+    /// 3. Scalar fallback
     #[cfg(not(feature = "runtime-dispatch"))]
     fn compile_time_backend_name() -> &'static str {
+        // Force-* features take highest priority (for deterministic testing)
         #[cfg(feature = "force-scalar")]
         {
             "scalar"
@@ -159,6 +165,7 @@ impl SimdContext {
             "neon"
         }
 
+        // Regular features for compile-time backend selection
         #[cfg(not(any(
             feature = "force-scalar",
             feature = "force-avx2",
@@ -166,13 +173,34 @@ impl SimdContext {
             feature = "force-neon"
         )))]
         {
-            // Default to compile-time backend based on architecture
+            // AVX-512 has highest priority on x86/x86_64
+            #[cfg(all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")))]
+            {
+                "avx512"
+            }
+
+            // AVX2 on x86/x86_64 (when avx512 not enabled)
+            #[cfg(all(
+                feature = "avx2",
+                any(target_arch = "x86", target_arch = "x86_64"),
+                not(feature = "avx512")
+            ))]
+            {
+                "avx2"
+            }
+
+            // NEON on aarch64
             #[cfg(all(feature = "neon", target_arch = "aarch64"))]
             {
                 "neon"
             }
 
-            #[cfg(not(all(feature = "neon", target_arch = "aarch64")))]
+            // Scalar fallback for all other cases
+            #[cfg(not(any(
+                all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")),
+                all(feature = "avx2", any(target_arch = "x86", target_arch = "x86_64")),
+                all(feature = "neon", target_arch = "aarch64")
+            )))]
             {
                 "scalar"
             }
