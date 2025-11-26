@@ -75,7 +75,11 @@ fn test_runtime_backend_selection() {
     }
 
     // On aarch64 with NEON feature, should be NEON
-    #[cfg(all(target_arch = "aarch64", feature = "neon", not(feature = "force-scalar")))]
+    #[cfg(all(
+        target_arch = "aarch64",
+        feature = "neon",
+        not(feature = "force-scalar")
+    ))]
     {
         assert_eq!(
             backend_name, "neon",

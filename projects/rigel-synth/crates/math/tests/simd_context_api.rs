@@ -201,7 +201,11 @@ mod simd_context_api_tests {
         // Test backend selection on aarch64
 
         // Compile-time NEON selection (CI runs: cargo test --features neon)
-        #[cfg(all(target_arch = "aarch64", feature = "neon", not(feature = "force-scalar")))]
+        #[cfg(all(
+            target_arch = "aarch64",
+            feature = "neon",
+            not(feature = "force-scalar")
+        ))]
         {
             use rigel_math::simd::SimdContext;
             let ctx = SimdContext::new();
