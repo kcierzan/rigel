@@ -1,7 +1,7 @@
-//! Comprehensive integration test for runtime SIMD dispatch
+//! Comprehensive integration test for SIMD backend selection and dispatch
 //!
 //! This test verifies that:
-//! 1. Runtime backend selection works on x86_64
+//! 1. Backend selection works correctly (compile-time and runtime)
 //! 2. SimdContext provides a unified API regardless of backend
 //! 3. ops module functions work through the abstraction
 //! 4. math module functions work through the abstraction
@@ -19,12 +19,54 @@ fn test_runtime_backend_selection() {
 
     // Verify backend name is not empty
     assert!(!backend_name.is_empty());
+    println!("Backend selected: {}", backend_name);
+    println!("DefaultSimdVector::LANES: {}", DefaultSimdVector::LANES);
 
-    // On x86_64 with runtime-dispatch, should select AVX2 or scalar
-    // (depending on CPU capabilities)
+    // Compile-time AVX2 selection (CI runs: cargo test --features avx2)
+    #[cfg(all(
+        target_arch = "x86_64",
+        feature = "avx2",
+        not(feature = "avx512"),
+        not(feature = "runtime-dispatch")
+    ))]
+    {
+        assert_eq!(
+            backend_name, "avx2",
+            "Expected avx2 backend with --features avx2, got: {}",
+            backend_name
+        );
+        assert_eq!(
+            DefaultSimdVector::LANES,
+            8,
+            "AVX2 should have 8 lanes, got: {}",
+            DefaultSimdVector::LANES
+        );
+    }
+
+    // Compile-time AVX-512 selection
+    #[cfg(all(
+        target_arch = "x86_64",
+        feature = "avx512",
+        not(feature = "runtime-dispatch")
+    ))]
+    {
+        assert_eq!(
+            backend_name, "avx512",
+            "Expected avx512 backend with --features avx512, got: {}",
+            backend_name
+        );
+        assert_eq!(
+            DefaultSimdVector::LANES,
+            16,
+            "AVX-512 should have 16 lanes, got: {}",
+            DefaultSimdVector::LANES
+        );
+    }
+
+    // Runtime dispatch on x86_64 (when runtime-dispatch feature is enabled)
     #[cfg(all(target_arch = "x86_64", feature = "runtime-dispatch"))]
     {
-        println!("Runtime backend selected: {}", backend_name);
+        println!("Runtime dispatch selected: {}", backend_name);
         assert!(
             backend_name == "scalar" || backend_name == "avx2" || backend_name == "avx512",
             "Expected scalar, avx2, or avx512, got: {}",
@@ -32,10 +74,45 @@ fn test_runtime_backend_selection() {
         );
     }
 
-    // On aarch64, should be NEON
-    #[cfg(all(target_arch = "aarch64", not(feature = "force-scalar")))]
+    // On aarch64 with NEON feature, should be NEON
+    #[cfg(all(
+        target_arch = "aarch64",
+        feature = "neon",
+        not(feature = "force-scalar")
+    ))]
     {
-        assert_eq!(backend_name, "neon");
+        assert_eq!(
+            backend_name, "neon",
+            "Expected neon backend on aarch64, got: {}",
+            backend_name
+        );
+        assert_eq!(
+            DefaultSimdVector::LANES,
+            4,
+            "NEON should have 4 lanes, got: {}",
+            DefaultSimdVector::LANES
+        );
+    }
+
+    // Scalar fallback (no SIMD features enabled)
+    #[cfg(all(
+        not(feature = "avx2"),
+        not(feature = "avx512"),
+        not(feature = "neon"),
+        not(feature = "runtime-dispatch")
+    ))]
+    {
+        assert_eq!(
+            backend_name, "scalar",
+            "Expected scalar backend without SIMD features, got: {}",
+            backend_name
+        );
+        assert_eq!(
+            DefaultSimdVector::LANES,
+            1,
+            "Scalar should have 1 lane, got: {}",
+            DefaultSimdVector::LANES
+        );
     }
 }
 
