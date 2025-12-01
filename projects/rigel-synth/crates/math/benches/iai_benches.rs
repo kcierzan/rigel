@@ -378,7 +378,8 @@ fn bench_dsp_cubic_hermite() -> DefaultSimdVector {
 #[library_benchmark]
 fn bench_dsp_polyblep() -> DefaultSimdVector {
     let phase = black_box(DefaultSimdVector::splat(0.01));
-    black_box(polyblep(phase))
+    let dt = black_box(DefaultSimdVector::splat(0.01)); // typical dt for 440Hz at 44.1kHz
+    black_box(polyblep(phase, dt))
 }
 
 #[library_benchmark]
