@@ -7,6 +7,7 @@
 
 use core::f32::consts::TAU;
 use rigel_math::simd::SimdContext;
+use rigel_math::DenormalGuard;
 
 /// Sample rate type
 pub type SampleRate = f32;
@@ -142,6 +143,8 @@ pub struct Envelope {
     current_value: f32,
     samples_in_stage: u32,
     sample_rate: f32,
+    /// Value captured at release start for smooth release from any level
+    release_start_value: f32,
 }
 
 impl Envelope {
@@ -152,6 +155,7 @@ impl Envelope {
             current_value: 0.0,
             samples_in_stage: 0,
             sample_rate,
+            release_start_value: 0.0,
         }
     }
 
@@ -164,6 +168,8 @@ impl Envelope {
     /// Trigger note off
     pub fn note_off(&mut self) {
         if self.stage != EnvelopeStage::Idle {
+            // Capture current value for smooth release from any level
+            self.release_start_value = self.current_value;
             self.stage = EnvelopeStage::Release;
             self.samples_in_stage = 0;
         }
@@ -218,13 +224,8 @@ impl Envelope {
                 let release_samples = (params.env_release * self.sample_rate) as u32;
                 if release_samples > 0 {
                     let progress = self.samples_in_stage as f32 / release_samples as f32;
-                    let sustain_at_release_start = if self.samples_in_stage == 0 {
-                        self.current_value // Capture the value when release started
-                    } else {
-                        params.env_sustain // Fallback if we missed it somehow
-                    };
-
-                    self.current_value = lerp(sustain_at_release_start, 0.0, progress.min(1.0));
+                    // Use the captured release_start_value for smooth release from any level
+                    self.current_value = lerp(self.release_start_value, 0.0, progress.min(1.0));
 
                     if self.samples_in_stage >= release_samples || self.current_value <= 0.001 {
                         self.stage = EnvelopeStage::Idle;
@@ -248,6 +249,7 @@ impl Envelope {
         self.stage = EnvelopeStage::Idle;
         self.current_value = 0.0;
         self.samples_in_stage = 0;
+        self.release_start_value = 0.0;
     }
 
     /// Get current stage
@@ -272,6 +274,12 @@ pub struct SynthEngine {
     master_volume: f32,
     #[allow(dead_code)] // Will be used for future SIMD block processing
     simd_ctx: SimdContext,
+    /// Cached base frequency (from MIDI note) to avoid repeated powf calls
+    cached_base_freq: f32,
+    /// Last pitch offset used for frequency calculation
+    last_pitch_offset: f32,
+    /// Cached final frequency (base_freq * pitch_factor)
+    cached_frequency: f32,
 }
 
 impl SynthEngine {
@@ -297,6 +305,9 @@ impl SynthEngine {
             current_velocity: 0.0,
             master_volume: 0.7,
             simd_ctx,
+            cached_base_freq: 440.0,
+            last_pitch_offset: 0.0,
+            cached_frequency: 440.0,
         }
     }
 
@@ -310,8 +321,13 @@ impl SynthEngine {
         self.current_note = Some(note);
         self.current_velocity = velocity;
 
-        let frequency = midi_to_freq(note);
-        self.oscillator.set_frequency(frequency, self.sample_rate);
+        // Cache base frequency (only calculated on note-on, not every sample)
+        self.cached_base_freq = midi_to_freq(note);
+        self.cached_frequency = self.cached_base_freq;
+        self.last_pitch_offset = 0.0;
+
+        self.oscillator
+            .set_frequency(self.cached_frequency, self.sample_rate);
         self.envelope.note_on();
     }
 
@@ -325,12 +341,13 @@ impl SynthEngine {
 
     /// Process one sample
     pub fn process_sample(&mut self, params: &SynthParams) -> f32 {
-        // Update pitch if we have a current note
-        if let Some(note) = self.current_note {
-            let base_freq = midi_to_freq(note);
+        // Only recalculate frequency when pitch_offset changes (avoids powf every sample)
+        if self.current_note.is_some() && params.pitch_offset != self.last_pitch_offset {
+            self.last_pitch_offset = params.pitch_offset;
             let pitch_factor = libm::powf(2.0, params.pitch_offset / 12.0);
+            self.cached_frequency = self.cached_base_freq * pitch_factor;
             self.oscillator
-                .set_frequency(base_freq * pitch_factor, self.sample_rate);
+                .set_frequency(self.cached_frequency, self.sample_rate);
         }
 
         // Generate audio
@@ -359,6 +376,9 @@ impl SynthEngine {
         self.envelope.reset();
         self.current_note = None;
         self.current_velocity = 0.0;
+        self.cached_base_freq = 440.0;
+        self.last_pitch_offset = 0.0;
+        self.cached_frequency = 440.0;
     }
 
     /// Check if any note is currently playing
@@ -384,6 +404,28 @@ impl SynthEngine {
     /// Get sample rate
     pub fn sample_rate(&self) -> f32 {
         self.sample_rate
+    }
+
+    /// Process a block of samples with denormal protection
+    ///
+    /// This is the recommended method for audio processing as it:
+    /// 1. Enables FTZ/DAZ flags to prevent denormal slowdowns
+    /// 2. Processes samples efficiently in a batch
+    ///
+    /// # Arguments
+    ///
+    /// * `output` - Buffer to fill with audio samples
+    /// * `params` - Synthesis parameters for this block
+    ///
+    /// # Performance
+    ///
+    /// Denormal protection prevents 10-100x slowdowns during silence/release.
+    #[inline]
+    pub fn process_block(&mut self, output: &mut [f32], params: &SynthParams) {
+        let _guard = DenormalGuard::new();
+        for sample in output.iter_mut() {
+            *sample = self.process_sample(params);
+        }
     }
 }
 

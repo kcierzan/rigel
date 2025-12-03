@@ -124,12 +124,10 @@ pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
     x_reduced = V::select(squaring_mask_5, x_reduced.mul(half), x_reduced);
 
     // Now |x_reduced| < 1, use Padé [5/5] approximation
-    let x2 = x_reduced.mul(x_reduced);
-    let x3 = x2.mul(x_reduced);
-    let x4 = x2.mul(x2);
-    let x5 = x4.mul(x_reduced);
+    // Using Horner's method with FMA for better accuracy and performance
 
     // Numerator: 1 + x/2 + 3x²/28 + x³/84 + x⁴/1680 + x⁵/15120
+    // = p0 + x*(p1 + x*(p2 + x*(p3 + x*(p4 + x*p5))))
     let p0 = V::splat(1.0);
     let p1 = V::splat(0.5);
     let p2 = V::splat(0.10714285714);
@@ -137,14 +135,15 @@ pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
     let p4 = V::splat(0.00059523810);
     let p5 = V::splat(0.00006613756);
 
-    let numerator = p0
-        .add(x_reduced.mul(p1))
-        .add(x2.mul(p2))
-        .add(x3.mul(p3))
-        .add(x4.mul(p4))
-        .add(x5.mul(p5));
+    let numerator = p5
+        .fma(x_reduced, p4)
+        .fma(x_reduced, p3)
+        .fma(x_reduced, p2)
+        .fma(x_reduced, p1)
+        .fma(x_reduced, p0);
 
     // Denominator: 1 - x/2 + 3x²/28 - x³/84 + x⁴/1680 - x⁵/15120
+    // = q0 + x*(q1 + x*(q2 + x*(q3 + x*(q4 + x*q5))))
     let q0 = V::splat(1.0);
     let q1 = V::splat(-0.5);
     let q2 = V::splat(0.10714285714);
@@ -152,12 +151,12 @@ pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
     let q4 = V::splat(0.00059523810);
     let q5 = V::splat(-0.00006613756);
 
-    let denominator = q0
-        .add(x_reduced.mul(q1))
-        .add(x2.mul(q2))
-        .add(x3.mul(q3))
-        .add(x4.mul(q4))
-        .add(x5.mul(q5));
+    let denominator = q5
+        .fma(x_reduced, q4)
+        .fma(x_reduced, q3)
+        .fma(x_reduced, q2)
+        .fma(x_reduced, q1)
+        .fma(x_reduced, q0);
 
     let mut result = numerator.div(denominator);
 

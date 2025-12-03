@@ -789,8 +789,9 @@ fn bench_dsp_utilities(c: &mut Criterion) {
 
     // T115: PolyBLEP
     let phase = DefaultSimdVector::splat(0.01);
+    let dt = DefaultSimdVector::splat(0.01); // typical dt for 440Hz at 44.1kHz
     group.bench_function("polyblep", |bencher| {
-        bencher.iter(|| black_box(polyblep(black_box(phase))))
+        bencher.iter(|| black_box(polyblep(black_box(phase), black_box(dt))))
     });
 
     // T116: White noise
