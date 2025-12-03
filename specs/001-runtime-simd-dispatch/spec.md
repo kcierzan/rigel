@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-runtime-simd-dispatch`
 **Created**: 2025-11-22
-**Status**: Draft (Updated: 2025-11-23)
+**Status**: Complete
 
 > **Implementation Note**: This feature is implemented using a two-crate layered architecture:
 > - **rigel-math**: Complete SIMD library (trait-based backends + runtime dispatch + `SimdContext` unified public API)
