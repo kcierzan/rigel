@@ -178,7 +178,7 @@ in
       xorg.xcbutilkeysyms
       # Linux-specific profiling tools
       valgrind # Required for iai-callgrind benchmarks
-      linuxPackages.perf # Hardware performance counters
+      perf # Hardware performance counters
     ]
     ++ lib.optionals isDarwin [
       # macOS-specific dependencies
