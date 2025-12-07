@@ -371,7 +371,7 @@ mod tests {
             let result = polyblep_sawtooth(phase, phase_inc);
             let value = result.horizontal_sum() / DefaultSimdVector::LANES as f32;
             assert!(
-                value >= -1.5 && value <= 1.5,
+                (-1.5..=1.5).contains(&value),
                 "sawtooth at phase={} should be in [-1.5, 1.5], got {}",
                 phase_val,
                 value
