@@ -394,9 +394,7 @@ pub fn polyblamp_triangle<V: SimdVector<Scalar = f32>>(phase: V, phase_increment
     // At phase=0.5: Δslope = -8, so we subtract 8 * blamp_half
     let eight = V::splat(8.0);
 
-    naive
-        .add(eight.mul(blamp_0))
-        .sub(eight.mul(blamp_half))
+    naive.add(eight.mul(blamp_0)).sub(eight.mul(blamp_half))
 }
 
 #[cfg(test)]
@@ -538,7 +536,7 @@ mod tests {
         let value = result.horizontal_sum() / DefaultSimdVector::LANES as f32;
         // Should be positive and bounded
         assert!(
-            value >= 0.0 && value < 0.1,
+            (0.0..0.1).contains(&value),
             "polyblamp near start should be positive and small, got {}",
             value
         );
