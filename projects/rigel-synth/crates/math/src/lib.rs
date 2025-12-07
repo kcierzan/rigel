@@ -70,8 +70,8 @@ pub mod sigmoid;
 // Interpolation
 pub mod interpolate;
 
-// Anti-aliasing
-pub mod polyblep;
+// Anti-aliasing (PolyBLEP for steps, PolyBLAMP for corners)
+pub mod antialias;
 
 // Noise generation
 pub mod noise;
