@@ -737,7 +737,7 @@ fn bench_scalar_libm_vs_polynomial(c: &mut Criterion) {
 fn bench_dsp_utilities(c: &mut Criterion) {
     use rigel_math::interpolate::{cubic_hermite, lerp};
     use rigel_math::noise::{white_noise, NoiseState};
-    use rigel_math::polyblep::polyblep;
+    use rigel_math::antialias::polyblep;
     use rigel_math::saturate::{hard_clip, soft_clip};
     use rigel_math::sigmoid::{smootherstep, smoothstep};
 

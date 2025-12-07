@@ -329,7 +329,7 @@ library_benchmark_group!(
 
 use rigel_math::interpolate::{cubic_hermite, lerp};
 use rigel_math::noise::{white_noise, NoiseState};
-use rigel_math::polyblep::polyblep;
+use rigel_math::antialias::polyblep;
 use rigel_math::saturate::{hard_clip, soft_clip};
 use rigel_math::sigmoid::{smootherstep, smoothstep};
 
