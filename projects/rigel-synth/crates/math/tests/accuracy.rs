@@ -658,13 +658,17 @@ fn test_polyblep_alias_reduction() {
     use rigel_math::polyblep::polyblep;
 
     // Test polyBLEP correction near discontinuities
-    // Test at phase positions near discontinuity (phase = 0.0)
-    let test_phases = vec![-0.01, -0.001, 0.0, 0.001, 0.01];
+    // Test at phase positions near discontinuity (phase = 0.0 and phase = 1.0)
+    // dt = phase increment (e.g., ~440 Hz at 44.1kHz ≈ 0.01)
+    let dt = DefaultSimdVector::splat(0.01);
+
+    // Phases near phase=0 (just after wrap) and near phase=1 (just before wrap)
+    let test_phases = vec![0.001, 0.005, 0.009, 0.5, 0.991, 0.995, 0.999];
 
     for &phase in &test_phases {
         let vec_phase = DefaultSimdVector::splat(phase);
 
-        let correction = polyblep(vec_phase);
+        let correction = polyblep(vec_phase, dt);
         let correction_val = correction.horizontal_sum() / DefaultSimdVector::LANES as f32;
 
         // PolyBLEP correction should be finite and bounded
@@ -674,11 +678,23 @@ fn test_polyblep_alias_reduction() {
             phase
         );
 
-        // Correction should be small for phases far from discontinuity
-        if phase.abs() > 0.01 {
+        // Correction should be zero far from discontinuities (phase ≈ 0.5)
+        if phase > 0.1 && phase < 0.9 {
             assert!(
-                correction_val.abs() < 0.1,
-                "polyblep correction should be small far from discontinuity: {}",
+                correction_val.abs() < 0.001,
+                "polyblep correction should be ~0 far from discontinuity at phase={}: got {}",
+                phase,
+                correction_val
+            );
+        }
+
+        // Correction should be non-trivial near discontinuities
+        if !(0.01..=0.99).contains(&phase) {
+            // Just verify it's bounded (PolyBLEP produces values in [-1, 1] range typically)
+            assert!(
+                correction_val.abs() <= 2.0,
+                "polyblep correction at phase={} should be bounded: got {}",
+                phase,
                 correction_val
             );
         }
