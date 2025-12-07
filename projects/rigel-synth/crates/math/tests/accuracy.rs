@@ -689,7 +689,7 @@ fn test_polyblep_alias_reduction() {
         }
 
         // Correction should be non-trivial near discontinuities
-        if phase < 0.01 || phase > 0.99 {
+        if !(0.01..=0.99).contains(&phase) {
             // Just verify it's bounded (PolyBLEP produces values in [-1, 1] range typically)
             assert!(
                 correction_val.abs() <= 2.0,
