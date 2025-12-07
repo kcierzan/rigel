@@ -655,7 +655,7 @@ fn test_cubic_hermite_phase_continuity() {
 // T107: PolyBLEP alias-free output (qualitative test)
 #[test]
 fn test_polyblep_alias_reduction() {
-    use rigel_math::polyblep::polyblep;
+    use rigel_math::antialias::polyblep;
 
     // Test polyBLEP correction near discontinuities
     // Test at phase positions near discontinuity (phase = 0.0 and phase = 1.0)
