@@ -1,16 +1,15 @@
 <!--
 Sync Impact Report:
-Version: 1.0.0 → 1.0.1 (Architecture-specific testing clarification)
+Version: 1.0.1 → 1.1.0 (MINOR: Material expansion of Principle IV)
 Modified Principles:
-  - Principle III (Test-Driven Validation): Added explicit requirement for architecture-specific tests (NEON on aarch64, AVX2/512 on x86_64)
-Added Sections: None
+  - Principle IV (Performance Accountability): Added rigel-math mandate for optimized math operations
+Added Sections:
+  - "Math Operation Requirements" subsection in Principle IV
 Removed Sections: None
 Templates Requiring Updates:
   ✅ .specify/templates/plan-template.md - Reviewed, no updates needed (generic constitution check)
   ✅ .specify/templates/spec-template.md - Reviewed, no updates needed (generic requirements)
   ✅ .specify/templates/tasks-template.md - Reviewed, no updates needed (generic task structure)
-  ✅ .claude/commands/speckit.plan.md - Reviewed, references constitution.md correctly
-  ✅ .claude/commands/speckit.tasks.md - Reviewed, no agent-specific references
 Follow-up TODOs: None
 -->
 
@@ -61,17 +60,26 @@ All DSP changes MUST be validated through both automated tests and audible verif
 
 ### IV. Performance Accountability
 
-All performance claims MUST be validated through comprehensive benchmarking, and regressions MUST be detected before merging.
+All performance claims MUST be validated through comprehensive benchmarking, and regressions MUST be detected before merging. Mathematical operations MUST use optimized implementations.
 
-**Requirements**:
+**CPU Targets**:
 - Single voice CPU usage: ~0.1% at 44.1kHz
 - Full polyphonic target: <1% CPU usage
+
+**Benchmarking Requirements**:
 - Benchmark suite: Criterion (wall-clock) + iai-callgrind (instruction counts)
 - Location: `projects/rigel-synth/crates/dsp/benches/`
 - Save baseline before changes: `bench:baseline`
 - Validate performance: `bench:all`
 
-**Rationale**: Performance degradation in audio plugins compounds with polyphony and accumulates with other plugins in a DAW session. Deterministic benchmarking catches regressions early, and baseline comparisons prevent performance debt from accumulating.
+**Math Operation Requirements**:
+- All mathematical operations MUST prefer `rigel-math` optimized approximations over libm or stdlib math functions
+- Precision-critical operations MAY use standard math functions ONLY when approximation error is unacceptable AND this is explicitly documented with justification
+- Operations inside loops MUST use vectorized fast math operations from `rigel-math`
+- When a required math operation is not available in `rigel-math`, developers MUST implement a performant approximation in `rigel-math` and use that implementation rather than falling back to slow standard library calls
+- New `rigel-math` additions MUST include accuracy benchmarks comparing against reference implementations
+
+**Rationale**: Performance degradation in audio plugins compounds with polyphony and accumulates with other plugins in a DAW session. Deterministic benchmarking catches regressions early, and baseline comparisons prevent performance debt from accumulating. Standard math library functions (libm, stdlib) prioritize precision over speed and are not vectorized, making them unsuitable for real-time audio where thousands of operations occur per audio buffer. The `rigel-math` library provides SIMD-optimized approximations that are 3-6x faster while maintaining sufficient accuracy for audio applications.
 
 ### V. Reproducible Environments
 
@@ -181,4 +189,4 @@ Development guidance for AI agents (Claude Code) is maintained in `CLAUDE.md`. T
 - CI/CD pipeline information
 - Performance targets and benchmarking procedures
 
-**Version**: 1.0.1 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-11-22
+**Version**: 1.1.0 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-12-07
