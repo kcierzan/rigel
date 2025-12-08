@@ -16,6 +16,7 @@ crate-type = ["lib"]
 libm = "0.2"
 cpufeatures = { version = "0.2", optional = true }
 rigel-math = { path = "../math", default-features = false }
+rigel-timing = { path = "../timing" }
 
 [features]
 default = []

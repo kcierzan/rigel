@@ -1,0 +1,18 @@
+[package]
+name = "rigel-timing"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "No-std timing and parameter smoothing infrastructure for audio DSP"
+keywords = ["audio", "dsp", "timing", "synthesizer", "real-time"]
+categories = ["multimedia::audio", "no-std", "algorithms"]
+
+[lib]
+name = "rigel_timing"
+path = "src/lib.rs"
+
+[dependencies]
+libm = { workspace = true }
+rigel-math = { path = "../math", default-features = false }
