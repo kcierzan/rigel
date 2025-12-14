@@ -169,21 +169,41 @@ pub fn fast_logf(x: f32) -> f32 {
 
     // Horner's method: evaluate from innermost term outward
     // Coefficients: 1, -1/2, 1/3, -1/4, 1/5, -1/6, 1/7, -1/8, 1/9, -1/10, 1/11, -1/12, 1/13, -1/14, 1/15
-    let ln_m = t * (1.0
-        + t * (-0.5
-            + t * (0.333_333_333
-                + t * (-0.25
-                    + t * (0.2
-                        + t * (-0.166_666_667
-                            + t * (0.142_857_143
-                                + t * (-0.125
-                                    + t * (0.111_111_111
-                                        + t * (-0.1
-                                            + t * (0.090_909_091
-                                                + t * (-0.083_333_333
-                                                    + t * (0.076_923_077
-                                                        + t * (-0.071_428_571
-                                                            + t * 0.066_666_667))))))))))))));
+    // Refactored to avoid deeply nested expression that causes rustfmt to hang
+    let c15 = 0.066_666_667; // 1/15
+    let c14 = -0.071_428_571; // -1/14
+    let c13 = 0.076_923_077; // 1/13
+    let c12 = -0.083_333_333; // -1/12
+    let c11 = 0.090_909_091; // 1/11
+    let c10 = -0.1; // -1/10
+    let c9 = 0.111_111_111; // 1/9
+    let c8 = -0.125; // -1/8
+    let c7 = 0.142_857_143; // 1/7
+    let c6 = -0.166_666_667; // -1/6
+    let c5 = 0.2; // 1/5
+    let c4 = -0.25; // -1/4
+    let c3 = 0.333_333_333; // 1/3
+    let c2 = -0.5; // -1/2
+    let c1 = 1.0; // 1/1
+
+    // Evaluate Horner's method iteratively
+    let mut result = c15;
+    result = c14 + t * result;
+    result = c13 + t * result;
+    result = c12 + t * result;
+    result = c11 + t * result;
+    result = c10 + t * result;
+    result = c9 + t * result;
+    result = c8 + t * result;
+    result = c7 + t * result;
+    result = c6 + t * result;
+    result = c5 + t * result;
+    result = c4 + t * result;
+    result = c3 + t * result;
+    result = c2 + t * result;
+    result = c1 + t * result;
+    let ln_m = t * result;
+
     // Combine: log(x) = exponent × ln(2) + ln(mantissa)
     exp * core::f32::consts::LN_2 + ln_m
 }
@@ -266,7 +286,10 @@ mod tests {
 
         // Should not underflow to zero
         let result = fast_expf(-100.0);
-        assert!(result > 0.0, "exp(-100) should be clamped to positive value");
+        assert!(
+            result > 0.0,
+            "exp(-100) should be clamped to positive value"
+        );
     }
 
     #[test]
@@ -345,8 +368,7 @@ mod tests {
     #[test]
     fn test_accuracy_across_range() {
         // Test accuracy across the typical audio DSP range
-        let test_values: [f32; 11] =
-            [-10.0, -5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0, 10.0];
+        let test_values: [f32; 11] = [-10.0, -5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0, 10.0];
 
         for &x in &test_values {
             let result = fast_expf(x);

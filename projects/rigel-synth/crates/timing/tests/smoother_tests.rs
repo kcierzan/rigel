@@ -93,7 +93,11 @@ fn test_linear_smoothing_reaches_target_in_exact_time() {
 
         // Value should increase linearly
         if i < expected_samples - 1 {
-            assert!(smoother.is_active(), "Should still be active at sample {}", i);
+            assert!(
+                smoother.is_active(),
+                "Should still be active at sample {}",
+                i
+            );
         }
 
         // Value should be between 0 and 1
@@ -393,7 +397,10 @@ fn test_process_block() {
 
     // Buffer should contain increasing values
     for i in 1..buffer.len() {
-        assert!(buffer[i] >= buffer[i - 1], "Values should be non-decreasing");
+        assert!(
+            buffer[i] >= buffer[i - 1],
+            "Values should be non-decreasing"
+        );
     }
 
     // First value should be non-zero (we started from 0, targeting 1)

@@ -364,9 +364,7 @@ impl Smoother {
         self.coefficient = Self::calculate_coefficient(self.smoothing_time_ms, sample_rate);
 
         // Recalculate linear increment if active
-        if self.is_active
-            && self.mode == SmoothingMode::Linear
-            && self.linear_samples_remaining > 0
+        if self.is_active && self.mode == SmoothingMode::Linear && self.linear_samples_remaining > 0
         {
             let remaining_distance = self.target - self.current;
             let new_samples = ((self.smoothing_time_ms / 1000.0) * sample_rate) as u32;
