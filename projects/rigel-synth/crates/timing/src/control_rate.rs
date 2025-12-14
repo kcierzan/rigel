@@ -130,7 +130,8 @@ impl Iterator for ControlRateUpdates {
         if self.next_offset >= self.block_size {
             (0, Some(0))
         } else {
-            let remaining = (self.block_size - self.next_offset + self.interval - 1) / self.interval;
+            let remaining =
+                (self.block_size - self.next_offset + self.interval - 1) / self.interval;
             (remaining as usize, Some(remaining as usize))
         }
     }

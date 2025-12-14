@@ -1,7 +1,7 @@
 use iai_callgrind::{library_benchmark, library_benchmark_group, main};
 use rigel_dsp::{
-    midi_to_freq, soft_clip, ControlRateClock, Envelope, SimpleOscillator, Smoother,
-    SmoothingMode, SynthEngine, SynthParams, Timebase,
+    midi_to_freq, soft_clip, ControlRateClock, Envelope, SimpleOscillator, Smoother, SmoothingMode,
+    SynthEngine, SynthParams, Timebase,
 };
 use std::hint::black_box;
 

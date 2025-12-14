@@ -644,19 +644,15 @@ fn bench_smoother_block(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
 
         // Linear mode block processing
-        group.bench_with_input(
-            BenchmarkId::new("linear_active", size),
-            size,
-            |b, &size| {
-                let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, sample_rate);
-                smoother.set_target(1.0);
-                let mut buffer = vec![0.0f32; size];
+        group.bench_with_input(BenchmarkId::new("linear_active", size), size, |b, &size| {
+            let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, sample_rate);
+            smoother.set_target(1.0);
+            let mut buffer = vec![0.0f32; size];
 
-                b.iter(|| {
-                    smoother.process_block(black_box(&mut buffer));
-                });
-            },
-        );
+            b.iter(|| {
+                smoother.process_block(black_box(&mut buffer));
+            });
+        });
 
         // Exponential mode block processing
         group.bench_with_input(
