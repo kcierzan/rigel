@@ -67,13 +67,7 @@ pub fn fast_expf(x: f32) -> f32 {
     // Clamp to prevent overflow/underflow
     // exp(-87) ≈ 1.2e-38 (near f32 min)
     // exp(87) ≈ 6.1e37 (near f32 max, with headroom for squaring)
-    let x = if x < -87.0 {
-        -87.0
-    } else if x > 87.0 {
-        87.0
-    } else {
-        x
-    };
+    let x = x.clamp(-87.0, 87.0);
 
     // Range reduction: find how many times we need to halve x
     // to get |x_reduced| < 1
@@ -94,11 +88,11 @@ pub fn fast_expf(x: f32) -> f32 {
     let x4 = x2 * x2;
     let x5 = x4 * x_reduced;
 
-    // Coefficients from math/exp.rs
+    // Coefficients from math/exp.rs (truncated to f32 precision)
     let p1 = 0.5;
-    let p2 = 0.107_142_857_14; // 3/28
-    let p3 = 0.011_904_761_90; // 1/84
-    let p4 = 0.000_595_238_10; // 1/1680
+    let p2 = 0.107_142_86; // 3/28
+    let p3 = 0.011_904_762; // 1/84
+    let p4 = 0.000_595_238_1; // 1/1680
     let p5 = 0.000_066_137_56; // 1/15120
 
     let num = 1.0 + p1 * x_reduced + p2 * x2 + p3 * x3 + p4 * x4 + p5 * x5;
@@ -170,19 +164,20 @@ pub fn fast_logf(x: f32) -> f32 {
     // Horner's method: evaluate from innermost term outward
     // Coefficients: 1, -1/2, 1/3, -1/4, 1/5, -1/6, 1/7, -1/8, 1/9, -1/10, 1/11, -1/12, 1/13, -1/14, 1/15
     // Refactored to avoid deeply nested expression that causes rustfmt to hang
-    let c15 = 0.066_666_667; // 1/15
-    let c14 = -0.071_428_571; // -1/14
-    let c13 = 0.076_923_077; // 1/13
-    let c12 = -0.083_333_333; // -1/12
-    let c11 = 0.090_909_091; // 1/11
+    // Truncated to f32 precision to satisfy clippy::excessive_precision
+    let c15 = 0.066_666_67; // 1/15
+    let c14 = -0.071_428_57; // -1/14
+    let c13 = 0.076_923_08; // 1/13
+    let c12 = -0.083_333_336; // -1/12
+    let c11 = 0.090_909_09; // 1/11
     let c10 = -0.1; // -1/10
-    let c9 = 0.111_111_111; // 1/9
+    let c9 = 0.111_111_11; // 1/9
     let c8 = -0.125; // -1/8
-    let c7 = 0.142_857_143; // 1/7
-    let c6 = -0.166_666_667; // -1/6
+    let c7 = 0.142_857_14; // 1/7
+    let c6 = -0.166_666_67; // -1/6
     let c5 = 0.2; // 1/5
     let c4 = -0.25; // -1/4
-    let c3 = 0.333_333_333; // 1/3
+    let c3 = 0.333_333_34; // 1/3
     let c2 = -0.5; // -1/2
     let c1 = 1.0; // 1/1
 
