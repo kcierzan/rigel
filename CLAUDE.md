@@ -15,20 +15,28 @@ Rigel is an advanced wavetable synthesizer built in Rust with a focus on perform
 
 ### Layered Design (rigel-synth)
 
-1. **rigel-dsp**: No-std DSP core with zero allocations
+1. **rigel-timing**: No-std timing and parameter smoothing infrastructure
+   - Sample-accurate `Timebase` for synchronized DSP modules
+   - `Smoother` with Linear, Exponential, Logarithmic curves
+   - `ControlRateClock` for control-rate update scheduling
+   - `ModulationSource` trait for LFOs, envelopes, sequencers
+   - Located at: `projects/rigel-synth/crates/timing/`
+
+2. **rigel-dsp**: No-std DSP core with zero allocations
    - Real-time safe, deterministic, portable to embedded systems
-   - Single `lib.rs` containing `SynthEngine`, `SimpleOscillator`, `Envelope`
+   - Contains `SynthEngine`, `SimpleOscillator`, `Envelope`
+   - Re-exports rigel-timing types for backward compatibility
    - Located at: `projects/rigel-synth/crates/dsp/src/lib.rs`
 
-2. **rigel-cli**: Command-line tool wrapping DSP core
+3. **rigel-cli**: Command-line tool wrapping DSP core
    - Test harness for DSP functionality
    - Generates WAV files for validation
 
-3. **rigel-plugin**: NIH-plug integration for DAW use
+4. **rigel-plugin**: NIH-plug integration for DAW use
    - VST3/CLAP plugin wrapper
    - iced-based GUI
 
-4. **rigel-xtask**: Custom cargo tasks for bundling
+5. **rigel-xtask**: Custom cargo tasks for bundling
 
 ### wtgen Architecture
 
@@ -686,6 +694,7 @@ Both rigel-math and rigel-dsp maintain strict no_std compliance:
 - `AGENTS.md` - Contributor guidelines
 
 ### Source Code
+- `projects/rigel-synth/crates/timing/src/` - Timing and smoothing infrastructure
 - `projects/rigel-synth/crates/dsp/src/lib.rs` - Core DSP implementation
 - `projects/rigel-synth/crates/cli/src/main.rs` - CLI tool
 - `projects/rigel-synth/crates/plugin/src/lib.rs` - Plugin entry point
@@ -731,6 +740,8 @@ bench:flamegraph   # Generate flamegraph for optimization
 - Rust 2021 edition (workspace toolchain from rust-toolchain.toml) (001-fast-dsp-math)
 - N/A (pure computational library, no persistence) (001-fast-dsp-math)
 - Rust 2021 edition (from rust-toolchain.toml) (001-runtime-simd-dispatch)
+- Rust 2021 edition (workspace toolchain from rust-toolchain.toml) + rigel-timing (Timebase, Smoother, ControlRateClock), libm (portable no_std math) (003-timebase-modulation)
 
 ## Recent Changes
+- 003-timebase-modulation: Extracted timing infrastructure to rigel-timing crate for reusability
 - 001-fast-dsp-math: Added Rust 2021 edition (workspace toolchain from rust-toolchain.toml)

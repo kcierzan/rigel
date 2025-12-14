@@ -82,6 +82,9 @@ pub mod table;
 // Crossfade and parameter ramping
 pub mod crossfade;
 
+// Scalar fast-math for control-rate operations
+pub mod scalar_fast;
+
 // Runtime SIMD dispatch
 pub mod simd;
 
@@ -93,6 +96,9 @@ pub use block::{AudioBlock, Block128, Block64};
 
 // Re-export denormal protection
 pub use denormal::DenormalGuard;
+
+// Re-export scalar fast-math functions
+pub use scalar_fast::{fast_expf, fast_logf};
 
 // Re-export backend types
 pub use backends::scalar::{ScalarInt, ScalarInt64, ScalarMask, ScalarVector};
