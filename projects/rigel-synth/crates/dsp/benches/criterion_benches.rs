@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rigel_dsp::{
-    clamp, lerp, midi_to_freq, soft_clip, Envelope, NoteNumber, SimpleOscillator, SynthEngine,
-    SynthParams,
+    clamp, lerp, midi_to_freq, soft_clip, ControlRateClock, Envelope, NoteNumber, SimpleOscillator,
+    Smoother, SmoothingMode, SynthEngine, SynthParams, Timebase,
 };
 use std::time::Duration;
 
@@ -517,6 +517,246 @@ fn bench_synth_engine_buffers(c: &mut Criterion) {
 }
 
 // ==============================================================================
+// Timebase Benchmarks
+// ==============================================================================
+
+fn bench_timebase(c: &mut Criterion) {
+    let mut group = c.benchmark_group("timebase");
+
+    // Single advance_block call
+    group.throughput(Throughput::Elements(1));
+    group.bench_function("advance_block_64", |b| {
+        let mut timebase = Timebase::new(44100.0);
+        b.iter(|| {
+            timebase.advance_block(black_box(64));
+        })
+    });
+
+    group.bench_function("advance_block_128", |b| {
+        let mut timebase = Timebase::new(44100.0);
+        b.iter(|| {
+            timebase.advance_block(black_box(128));
+        })
+    });
+
+    group.bench_function("advance_block_256", |b| {
+        let mut timebase = Timebase::new(44100.0);
+        b.iter(|| {
+            timebase.advance_block(black_box(256));
+        })
+    });
+
+    // Time conversions
+    group.bench_function("samples_to_seconds", |b| {
+        let timebase = Timebase::new(44100.0);
+        b.iter(|| black_box(timebase.samples_to_seconds(black_box(44100))))
+    });
+
+    group.bench_function("seconds_to_samples", |b| {
+        let timebase = Timebase::new(44100.0);
+        b.iter(|| black_box(timebase.seconds_to_samples(black_box(1.0))))
+    });
+
+    group.bench_function("ms_to_samples", |b| {
+        let timebase = Timebase::new(44100.0);
+        b.iter(|| black_box(timebase.ms_to_samples(black_box(10.0))))
+    });
+
+    group.finish();
+}
+
+// ==============================================================================
+// Smoother Benchmarks
+// ==============================================================================
+
+fn bench_smoother_single(c: &mut Criterion) {
+    let mut group = c.benchmark_group("smoother_single");
+    let sample_rate = 44100.0;
+
+    // Single sample processing for each mode
+    group.throughput(Throughput::Elements(1));
+
+    // Linear mode
+    group.bench_function("linear_active", |b| {
+        let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, sample_rate);
+        smoother.set_target(1.0);
+        b.iter(|| black_box(smoother.process_sample()))
+    });
+
+    group.bench_function("linear_inactive", |b| {
+        let smoother = Smoother::new(0.5, SmoothingMode::Linear, 10.0, sample_rate);
+        let mut s = smoother;
+        b.iter(|| black_box(s.process_sample()))
+    });
+
+    // Exponential mode
+    group.bench_function("exponential_active", |b| {
+        let mut smoother = Smoother::new(0.0, SmoothingMode::Exponential, 10.0, sample_rate);
+        smoother.set_target(1.0);
+        b.iter(|| black_box(smoother.process_sample()))
+    });
+
+    group.bench_function("exponential_inactive", |b| {
+        let smoother = Smoother::new(0.5, SmoothingMode::Exponential, 10.0, sample_rate);
+        let mut s = smoother;
+        b.iter(|| black_box(s.process_sample()))
+    });
+
+    // Logarithmic mode
+    group.bench_function("logarithmic_active", |b| {
+        let mut smoother = Smoother::new(100.0, SmoothingMode::Logarithmic, 10.0, sample_rate);
+        smoother.set_target(1000.0);
+        b.iter(|| black_box(smoother.process_sample()))
+    });
+
+    group.bench_function("logarithmic_inactive", |b| {
+        let smoother = Smoother::new(500.0, SmoothingMode::Logarithmic, 10.0, sample_rate);
+        let mut s = smoother;
+        b.iter(|| black_box(s.process_sample()))
+    });
+
+    // Instant mode (should be fastest)
+    group.bench_function("instant", |b| {
+        let mut smoother = Smoother::new(0.0, SmoothingMode::Instant, 10.0, sample_rate);
+        smoother.set_target(1.0);
+        b.iter(|| black_box(smoother.process_sample()))
+    });
+
+    // set_target overhead
+    group.bench_function("set_target_linear", |b| {
+        let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, sample_rate);
+        let mut target = 0.0;
+        b.iter(|| {
+            target = 1.0 - target;
+            smoother.set_target(black_box(target));
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_smoother_block(c: &mut Criterion) {
+    let mut group = c.benchmark_group("smoother_block");
+    let sample_rate = 44100.0;
+    let buffer_sizes = [64, 128, 256];
+
+    for size in buffer_sizes.iter() {
+        group.throughput(Throughput::Elements(*size as u64));
+
+        // Linear mode block processing
+        group.bench_with_input(BenchmarkId::new("linear_active", size), size, |b, &size| {
+            let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, sample_rate);
+            smoother.set_target(1.0);
+            let mut buffer = vec![0.0f32; size];
+
+            b.iter(|| {
+                smoother.process_block(black_box(&mut buffer));
+            });
+        });
+
+        // Exponential mode block processing
+        group.bench_with_input(
+            BenchmarkId::new("exponential_active", size),
+            size,
+            |b, &size| {
+                let mut smoother =
+                    Smoother::new(0.0, SmoothingMode::Exponential, 10.0, sample_rate);
+                smoother.set_target(1.0);
+                let mut buffer = vec![0.0f32; size];
+
+                b.iter(|| {
+                    smoother.process_block(black_box(&mut buffer));
+                });
+            },
+        );
+
+        // Inactive smoother (should be very fast - just fills buffer)
+        group.bench_with_input(BenchmarkId::new("inactive", size), size, |b, &size| {
+            let smoother = Smoother::new(0.5, SmoothingMode::Linear, 10.0, sample_rate);
+            let mut s = smoother;
+            let mut buffer = vec![0.0f32; size];
+
+            b.iter(|| {
+                s.process_block(black_box(&mut buffer));
+            });
+        });
+    }
+
+    group.finish();
+}
+
+// ==============================================================================
+// ControlRateClock Benchmarks
+// ==============================================================================
+
+fn bench_control_rate_clock(c: &mut Criterion) {
+    let mut group = c.benchmark_group("control_rate_clock");
+
+    // Single advance call
+    group.throughput(Throughput::Elements(1));
+
+    // Different intervals
+    let intervals = [32, 64, 128];
+
+    for interval in intervals.iter() {
+        group.bench_with_input(
+            BenchmarkId::new("advance_64_samples", interval),
+            interval,
+            |b, &interval| {
+                let mut clock = ControlRateClock::new(interval);
+                b.iter(|| {
+                    for _ in clock.advance(black_box(64)) {
+                        black_box(());
+                    }
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("advance_128_samples", interval),
+            interval,
+            |b, &interval| {
+                let mut clock = ControlRateClock::new(interval);
+                b.iter(|| {
+                    for _ in clock.advance(black_box(128)) {
+                        black_box(());
+                    }
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("advance_256_samples", interval),
+            interval,
+            |b, &interval| {
+                let mut clock = ControlRateClock::new(interval);
+                b.iter(|| {
+                    for _ in clock.advance(black_box(256)) {
+                        black_box(());
+                    }
+                });
+            },
+        );
+    }
+
+    // Iterator overhead (count vs explicit loop)
+    group.bench_function("iterator_count_64_interval", |b| {
+        let mut clock = ControlRateClock::new(64);
+        b.iter(|| black_box(clock.advance(black_box(128)).count()));
+    });
+
+    group.bench_function("iterator_collect_64_interval", |b| {
+        let mut clock = ControlRateClock::new(64);
+        b.iter(|| {
+            let offsets: Vec<u32> = clock.advance(black_box(128)).collect();
+            black_box(offsets);
+        });
+    });
+
+    group.finish();
+}
+
+// ==============================================================================
 // Throughput and CPU Usage Validation
 // ==============================================================================
 
@@ -603,6 +843,10 @@ criterion_group! {
               bench_envelope,
               bench_synth_engine_single,
               bench_synth_engine_buffers,
+              bench_timebase,
+              bench_smoother_single,
+              bench_smoother_block,
+              bench_control_rate_clock,
               bench_throughput,
               bench_cpu_usage_validation
 }

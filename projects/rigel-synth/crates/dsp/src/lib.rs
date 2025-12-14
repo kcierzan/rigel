@@ -6,8 +6,15 @@
 //! Provides fast, deterministic audio processing components.
 
 use core::f32::consts::TAU;
+use rigel_math::fast_expf;
 use rigel_math::simd::SimdContext;
 use rigel_math::DenormalGuard;
+
+// Re-export timing infrastructure from rigel-timing for backward compatibility
+pub use rigel_timing::{
+    ControlRateClock, ControlRateUpdates, ModulationSource, Smoother, SmoothingMode, Timebase,
+    DEFAULT_SAMPLE_RATE, DEFAULT_SMOOTHING_TIME_MS,
+};
 
 /// Sample rate type
 pub type SampleRate = f32;
@@ -73,9 +80,9 @@ pub fn clamp(value: f32, min: f32, max: f32) -> f32 {
 #[inline]
 pub fn soft_clip(sample: f32) -> f32 {
     if sample > 1.0 {
-        1.0 - libm::expf(-(sample - 1.0))
+        1.0 - fast_expf(-(sample - 1.0))
     } else if sample < -1.0 {
-        -1.0 + libm::expf(sample + 1.0)
+        -1.0 + fast_expf(sample + 1.0)
     } else {
         sample
     }
@@ -280,6 +287,8 @@ pub struct SynthEngine {
     last_pitch_offset: f32,
     /// Cached final frequency (base_freq * pitch_factor)
     cached_frequency: f32,
+    /// Sample-accurate timing infrastructure
+    timebase: Timebase,
 }
 
 impl SynthEngine {
@@ -308,6 +317,7 @@ impl SynthEngine {
             cached_base_freq: 440.0,
             last_pitch_offset: 0.0,
             cached_frequency: 440.0,
+            timebase: Timebase::new(sample_rate),
         }
     }
 
@@ -379,6 +389,7 @@ impl SynthEngine {
         self.cached_base_freq = 440.0;
         self.last_pitch_offset = 0.0;
         self.cached_frequency = 440.0;
+        self.timebase.reset();
     }
 
     /// Check if any note is currently playing
@@ -411,6 +422,7 @@ impl SynthEngine {
     /// This is the recommended method for audio processing as it:
     /// 1. Enables FTZ/DAZ flags to prevent denormal slowdowns
     /// 2. Processes samples efficiently in a batch
+    /// 3. Advances the timebase for sample-accurate timing
     ///
     /// # Arguments
     ///
@@ -423,9 +435,27 @@ impl SynthEngine {
     #[inline]
     pub fn process_block(&mut self, output: &mut [f32], params: &SynthParams) {
         let _guard = DenormalGuard::new();
+
+        // Advance timebase for this block (enables sample-accurate timing)
+        self.timebase.advance_block(output.len() as u32);
+
         for sample in output.iter_mut() {
             *sample = self.process_sample(params);
         }
+    }
+
+    /// Get a reference to the timebase
+    ///
+    /// The timebase provides sample-accurate timing information for DSP modules.
+    pub fn timebase(&self) -> &Timebase {
+        &self.timebase
+    }
+
+    /// Get a mutable reference to the timebase
+    ///
+    /// Allows direct modification of timebase (e.g., for reset or sample rate changes).
+    pub fn timebase_mut(&mut self) -> &mut Timebase {
+        &mut self.timebase
     }
 }
 

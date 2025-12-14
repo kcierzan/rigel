@@ -1,5 +1,8 @@
 use iai_callgrind::{library_benchmark, library_benchmark_group, main};
-use rigel_dsp::{midi_to_freq, soft_clip, Envelope, SimpleOscillator, SynthEngine, SynthParams};
+use rigel_dsp::{
+    midi_to_freq, soft_clip, ControlRateClock, Envelope, SimpleOscillator, Smoother, SmoothingMode,
+    SynthEngine, SynthParams, Timebase,
+};
 use std::hint::black_box;
 
 // ==============================================================================
@@ -287,6 +290,107 @@ fn iai_polyphonic_voices(voice_count: usize) -> f32 {
 }
 
 // ==============================================================================
+// Timebase
+// ==============================================================================
+
+#[library_benchmark]
+fn iai_timebase_advance_block() -> u64 {
+    let mut timebase = Timebase::new(44100.0);
+    timebase.advance_block(64);
+    black_box(timebase.sample_position())
+}
+
+#[library_benchmark]
+fn iai_timebase_samples_to_seconds() -> f64 {
+    let timebase = Timebase::new(44100.0);
+    black_box(timebase.samples_to_seconds(44100))
+}
+
+#[library_benchmark]
+fn iai_timebase_ms_to_samples() -> u32 {
+    let timebase = Timebase::new(44100.0);
+    black_box(timebase.ms_to_samples(10.0))
+}
+
+// ==============================================================================
+// Smoother
+// ==============================================================================
+
+#[library_benchmark]
+fn iai_smoother_linear_single() -> f32 {
+    let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, 44100.0);
+    smoother.set_target(1.0);
+    black_box(smoother.process_sample())
+}
+
+#[library_benchmark]
+fn iai_smoother_exponential_single() -> f32 {
+    let mut smoother = Smoother::new(0.0, SmoothingMode::Exponential, 10.0, 44100.0);
+    smoother.set_target(1.0);
+    black_box(smoother.process_sample())
+}
+
+#[library_benchmark]
+fn iai_smoother_logarithmic_single() -> f32 {
+    let mut smoother = Smoother::new(100.0, SmoothingMode::Logarithmic, 10.0, 44100.0);
+    smoother.set_target(1000.0);
+    black_box(smoother.process_sample())
+}
+
+#[library_benchmark]
+fn iai_smoother_instant_single() -> f32 {
+    let mut smoother = Smoother::new(0.0, SmoothingMode::Instant, 10.0, 44100.0);
+    smoother.set_target(1.0);
+    black_box(smoother.process_sample())
+}
+
+#[library_benchmark]
+fn iai_smoother_inactive_single() -> f32 {
+    let mut smoother = Smoother::new(0.5, SmoothingMode::Linear, 10.0, 44100.0);
+    black_box(smoother.process_sample())
+}
+
+#[library_benchmark]
+#[benches::with_setup(args = [64, 128, 256])]
+fn iai_smoother_linear_block(buffer_size: usize) -> f32 {
+    let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, 44100.0);
+    smoother.set_target(1.0);
+    let mut buffer = vec![0.0f32; buffer_size];
+    smoother.process_block(&mut buffer);
+    black_box(buffer[buffer_size - 1])
+}
+
+#[library_benchmark]
+fn iai_smoother_set_target() -> f32 {
+    let mut smoother = Smoother::new(0.0, SmoothingMode::Linear, 10.0, 44100.0);
+    smoother.set_target(black_box(1.0));
+    black_box(smoother.current())
+}
+
+// ==============================================================================
+// ControlRateClock
+// ==============================================================================
+
+#[library_benchmark]
+fn iai_control_rate_clock_advance_64() -> usize {
+    let mut clock = ControlRateClock::new(64);
+    black_box(clock.advance(128).count())
+}
+
+#[library_benchmark]
+fn iai_control_rate_clock_advance_32() -> usize {
+    let mut clock = ControlRateClock::new(32);
+    black_box(clock.advance(128).count())
+}
+
+#[library_benchmark]
+#[benches::with_setup(args = [64, 128, 256])]
+fn iai_control_rate_clock_block(block_size: u32) -> usize {
+    let mut clock = ControlRateClock::new(64);
+    black_box(clock.advance(block_size).count())
+}
+
+// ==============================================================================
 // Benchmark Groups and Main Configuration
 // ==============================================================================
 
@@ -331,11 +435,36 @@ library_benchmark_group!(
     benchmarks = iai_polyphonic_voices
 );
 
+library_benchmark_group!(
+    name = timebase_benches;
+    benchmarks = iai_timebase_advance_block, iai_timebase_samples_to_seconds, iai_timebase_ms_to_samples
+);
+
+library_benchmark_group!(
+    name = smoother_benches;
+    benchmarks =
+        iai_smoother_linear_single,
+        iai_smoother_exponential_single,
+        iai_smoother_logarithmic_single,
+        iai_smoother_instant_single,
+        iai_smoother_inactive_single,
+        iai_smoother_linear_block,
+        iai_smoother_set_target
+);
+
+library_benchmark_group!(
+    name = control_rate_clock_benches;
+    benchmarks = iai_control_rate_clock_advance_64, iai_control_rate_clock_advance_32, iai_control_rate_clock_block
+);
+
 main!(
     library_benchmark_groups = utility_benches,
     clamp_benches,
     oscillator_benches,
     envelope_benches,
     synth_engine_benches,
-    polyphonic_benches
+    polyphonic_benches,
+    timebase_benches,
+    smoother_benches,
+    control_rate_clock_benches
 );
