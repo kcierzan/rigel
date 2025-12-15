@@ -13,7 +13,9 @@
 //! | 64 LFOs 1-second simulation | < 50 ms | < 5% CPU at 44.1kHz |
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use rigel_modulation::{InterpolationStrategy, Lfo, LfoRateMode, LfoWaveshape, ModulationSource, SimdXorshift128};
+use rigel_modulation::{
+    InterpolationStrategy, Lfo, LfoRateMode, LfoWaveshape, ModulationSource, SimdXorshift128,
+};
 use rigel_timing::Timebase;
 
 // =============================================================================
@@ -117,16 +119,12 @@ fn bench_generate_block_interpolation(c: &mut Criterion) {
             let mut output = vec![0.0f32; size];
 
             group.throughput(Throughput::Elements(size as u64));
-            group.bench_with_input(
-                BenchmarkId::new(interp_name, size),
-                &size,
-                |b, _| {
-                    b.iter(|| {
-                        lfo.generate_block(black_box(&mut output));
-                        black_box(&output);
-                    })
-                },
-            );
+            group.bench_with_input(BenchmarkId::new(interp_name, size), &size, |b, _| {
+                b.iter(|| {
+                    lfo.generate_block(black_box(&mut output));
+                    black_box(&output);
+                })
+            });
         }
     }
 
@@ -191,9 +189,7 @@ fn bench_sample_access(c: &mut Criterion) {
         // Prime the cache
         let _ = lfo.sample();
 
-        group.bench_function("cache_hit_single", |b| {
-            b.iter(|| black_box(lfo.sample()))
-        });
+        group.bench_function("cache_hit_single", |b| b.iter(|| black_box(lfo.sample())));
     }
 
     // 64 consecutive samples (full cache usage)
@@ -390,9 +386,7 @@ fn bench_simd_rng(c: &mut Criterion) {
     let mut rng = SimdXorshift128::new(12345);
 
     // Single f32 value
-    group.bench_function("next_f32_single", |b| {
-        b.iter(|| black_box(rng.next_f32()))
-    });
+    group.bench_function("next_f32_single", |b| b.iter(|| black_box(rng.next_f32())));
 
     // Full lane (SIMD width)
     group.bench_function("next_lane_f32", |b| {
@@ -405,16 +399,12 @@ fn bench_simd_rng(c: &mut Criterion) {
         let mut buffer = vec![0.0f32; size];
 
         group.throughput(Throughput::Elements(size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("fill_buffer", size),
-            &size,
-            |b, _| {
-                b.iter(|| {
-                    rng.fill_buffer(black_box(&mut buffer));
-                    black_box(&buffer);
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("fill_buffer", size), &size, |b, _| {
+            b.iter(|| {
+                rng.fill_buffer(black_box(&mut buffer));
+                black_box(&buffer);
+            })
+        });
     }
 
     group.finish();
