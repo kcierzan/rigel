@@ -800,3 +800,504 @@ fn test_modulation_source_trait_value_before_update() {
         "value() should return finite number before update"
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New API Tests: Interpolation Strategy
+// ─────────────────────────────────────────────────────────────────────────────
+
+use rigel_modulation::{InterpolationStrategy, SimdAwareComponent};
+
+#[test]
+fn test_interpolation_strategy_default() {
+    let lfo = Lfo::new();
+    assert_eq!(lfo.interpolation(), InterpolationStrategy::Linear);
+}
+
+#[test]
+fn test_interpolation_strategy_setter() {
+    let mut lfo = Lfo::new();
+
+    lfo.set_interpolation(InterpolationStrategy::CubicHermite);
+    assert_eq!(lfo.interpolation(), InterpolationStrategy::CubicHermite);
+
+    lfo.set_interpolation(InterpolationStrategy::Linear);
+    assert_eq!(lfo.interpolation(), InterpolationStrategy::Linear);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New API Tests: Block Generation
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_generate_block_fills_buffer() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(10.0));
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    let mut output = [0.0f32; 64];
+    lfo.generate_block(&mut output);
+
+    // All values should be valid and in range
+    for (i, &value) in output.iter().enumerate() {
+        assert!(
+            value.is_finite(),
+            "generate_block value at {} should be finite",
+            i
+        );
+        assert!(
+            value >= -1.01 && value <= 1.01,
+            "generate_block value {} at {} out of bipolar range",
+            value,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_generate_block_linear_interpolation() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Saw);
+    lfo.set_rate(LfoRateMode::Hz(100.0)); // Faster LFO for visible interpolation
+    lfo.set_interpolation(InterpolationStrategy::Linear);
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    // First block
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    let mut output = [0.0f32; 64];
+    lfo.generate_block(&mut output);
+
+    // Linear interpolation should produce smoothly changing values
+    // Values should be smoothly changing (not stepping)
+    let mut num_changes = 0;
+    for i in 1..64 {
+        if (output[i] - output[i - 1]).abs() > 0.0001 {
+            num_changes += 1;
+        }
+    }
+
+    // At 100Hz with 64 samples, phase advances by ~0.145, giving significant interpolation
+    // Should have gradual changes across the block
+    assert!(
+        num_changes > 30,
+        "Linear interpolation should produce smooth transitions, got {} changes",
+        num_changes
+    );
+
+    // All values should be in valid range
+    for (i, &value) in output.iter().enumerate() {
+        assert!(
+            value >= -1.01 && value <= 1.01,
+            "Value {} at {} out of range",
+            value,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_generate_block_hermite_interpolation() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(1.0));
+    lfo.set_interpolation(InterpolationStrategy::CubicHermite);
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    let mut output = [0.0f32; 64];
+    lfo.generate_block(&mut output);
+
+    // Hermite should also produce smooth transitions
+    for (i, &value) in output.iter().enumerate() {
+        assert!(value.is_finite(), "Hermite value at {} should be finite", i);
+        assert!(
+            value >= -1.1 && value <= 1.1,
+            "Hermite value {} at {} out of range",
+            value,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_generate_block_unipolar() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(10.0));
+    lfo.set_polarity(LfoPolarity::Unipolar);
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    let mut output = [0.0f32; 64];
+    lfo.generate_block(&mut output);
+
+    // All values should be in unipolar range [0, 1]
+    for (i, &value) in output.iter().enumerate() {
+        assert!(
+            value >= -0.01 && value <= 1.01,
+            "Unipolar generate_block value {} at {} out of range",
+            value,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_generate_block_noise() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Noise);
+    lfo.set_rate(LfoRateMode::Hz(1.0));
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    let mut output = [0.0f32; 64];
+    lfo.generate_block_mut(&mut output);
+
+    // Noise should produce varied values within range
+    let mut unique_count = 1;
+    for i in 1..64 {
+        if (output[i] - output[i - 1]).abs() > 0.001 {
+            unique_count += 1;
+        }
+    }
+
+    assert!(
+        unique_count > 50,
+        "Noise generate_block should produce varied values, got {} unique",
+        unique_count
+    );
+
+    for (i, &value) in output.iter().enumerate() {
+        assert!(
+            value >= -1.01 && value <= 1.01,
+            "Noise value {} at {} out of range",
+            value,
+            i
+        );
+    }
+}
+
+#[test]
+fn test_generate_block_sample_and_hold() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::SampleAndHold);
+    lfo.set_rate(LfoRateMode::Hz(0.5)); // Slow rate - constant within block
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    let mut output = [0.0f32; 64];
+    lfo.generate_block(&mut output);
+
+    // S&H should produce constant values within the block
+    let first = output[0];
+    for (i, &value) in output.iter().enumerate() {
+        assert!(
+            (value - first).abs() < 0.001,
+            "S&H block should be constant, but value {} at {} differs from first {}",
+            value,
+            i,
+            first
+        );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New API Tests: Single Sample Access
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_sample_returns_values() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(10.0));
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    // Get samples
+    for i in 0..64 {
+        let value = lfo.sample();
+        assert!(
+            value.is_finite(),
+            "sample() {} should return finite value",
+            i
+        );
+        assert!(
+            value >= -1.01 && value <= 1.01,
+            "sample() {} value {} out of range",
+            i,
+            value
+        );
+    }
+}
+
+#[test]
+fn test_sample_matches_generate_block() {
+    let mut lfo1 = Lfo::new();
+    lfo1.set_waveshape(LfoWaveshape::Sine);
+    lfo1.set_rate(LfoRateMode::Hz(5.0));
+    lfo1.set_interpolation(InterpolationStrategy::Linear);
+
+    let mut lfo2 = Lfo::new();
+    lfo2.set_waveshape(LfoWaveshape::Sine);
+    lfo2.set_rate(LfoRateMode::Hz(5.0));
+    lfo2.set_interpolation(InterpolationStrategy::Linear);
+
+    let mut timebase1 = Timebase::new(44100.0);
+    let mut timebase2 = Timebase::new(44100.0);
+
+    lfo1.reset(&mut timebase1);
+    lfo2.reset(&mut timebase2);
+
+    timebase1.advance_block(64);
+    timebase2.advance_block(64);
+    lfo1.update(&timebase1);
+    lfo2.update(&timebase2);
+
+    // Generate block
+    let mut block_output = [0.0f32; 64];
+    lfo1.generate_block(&mut block_output);
+
+    // Get samples
+    let mut sample_output = [0.0f32; 64];
+    for i in 0..64 {
+        sample_output[i] = lfo2.sample();
+    }
+
+    // Both should match
+    for i in 0..64 {
+        assert!(
+            (block_output[i] - sample_output[i]).abs() < 0.001,
+            "sample() and generate_block() should match at {}: {} vs {}",
+            i,
+            sample_output[i],
+            block_output[i]
+        );
+    }
+}
+
+#[test]
+fn test_sample_cache_refresh() {
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(1.0));
+
+    let mut timebase = Timebase::new(44100.0);
+    lfo.reset(&mut timebase);
+
+    timebase.advance_block(64);
+    lfo.update(&timebase);
+
+    // Read more than cache size (64 samples)
+    let mut values = Vec::new();
+    for _ in 0..128 {
+        values.push(lfo.sample());
+    }
+
+    // All values should be valid
+    for (i, &value) in values.iter().enumerate() {
+        assert!(
+            value.is_finite() && value >= -1.01 && value <= 1.01,
+            "sample() {} value {} invalid",
+            i,
+            value
+        );
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New API Tests: SimdAwareComponent Trait
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_simd_aware_component_lanes() {
+    // LFO implements SimdAwareComponent
+    let lanes = Lfo::lanes();
+
+    // Lanes should be at least 1 (scalar) and at most 16 (AVX-512)
+    assert!(
+        lanes >= 1 && lanes <= 16,
+        "SIMD lanes {} should be in [1, 16]",
+        lanes
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accuracy Validation Tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_sine_accuracy_linear() {
+    // Test that interpolated sine is reasonably close to ideal
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(1.0));
+    lfo.set_interpolation(InterpolationStrategy::Linear);
+
+    let sample_rate = 44100.0;
+    let mut timebase = Timebase::new(sample_rate);
+    lfo.reset(&mut timebase);
+
+    let mut max_error = 0.0f32;
+    let num_blocks = 689; // ~1 second at 64 samples per block
+
+    for block_idx in 0..num_blocks {
+        timebase.advance_block(64);
+        lfo.update(&timebase);
+
+        let mut output = [0.0f32; 64];
+        lfo.generate_block(&mut output);
+
+        // Compare to ideal sine at each sample position
+        for (i, &sample) in output.iter().enumerate() {
+            let global_sample = block_idx * 64 + i;
+            let t = global_sample as f32 / sample_rate;
+            let ideal = (core::f32::consts::TAU * t).sin();
+            let error = (sample - ideal).abs();
+            max_error = max_error.max(error);
+        }
+    }
+
+    // Linear interpolation should be within 10% of ideal for 64-sample blocks
+    assert!(
+        max_error < 0.10,
+        "Linear sine max error {} exceeds 10%",
+        max_error
+    );
+}
+
+#[test]
+fn test_sine_accuracy_hermite() {
+    // Test that Hermite interpolated sine is closer to ideal than linear
+    let mut lfo = Lfo::new();
+    lfo.set_waveshape(LfoWaveshape::Sine);
+    lfo.set_rate(LfoRateMode::Hz(1.0));
+    lfo.set_interpolation(InterpolationStrategy::CubicHermite);
+
+    let sample_rate = 44100.0;
+    let mut timebase = Timebase::new(sample_rate);
+    lfo.reset(&mut timebase);
+
+    let mut max_error = 0.0f32;
+    let num_blocks = 689; // ~1 second at 64 samples per block
+
+    for block_idx in 0..num_blocks {
+        timebase.advance_block(64);
+        lfo.update(&timebase);
+
+        let mut output = [0.0f32; 64];
+        lfo.generate_block(&mut output);
+
+        // Compare to ideal sine at each sample position
+        for (i, &sample) in output.iter().enumerate() {
+            let global_sample = block_idx * 64 + i;
+            let t = global_sample as f32 / sample_rate;
+            let ideal = (core::f32::consts::TAU * t).sin();
+            let error = (sample - ideal).abs();
+            max_error = max_error.max(error);
+        }
+    }
+
+    // Hermite interpolation should be within 5% of ideal
+    assert!(
+        max_error < 0.05,
+        "Hermite sine max error {} exceeds 5%",
+        max_error
+    );
+}
+
+#[test]
+fn test_waveshape_derivative_sine() {
+    // Test that sine derivative is correct
+    let phase = 0.25; // At peak, derivative should be 0
+    let derivative = LfoWaveshape::Sine.derivative(phase, 0.5);
+
+    // d/dφ sin(2πφ) at φ=0.25 should be 2π·cos(π/2) = 0
+    assert!(
+        derivative.abs() < 0.1,
+        "Sine derivative at phase 0.25 should be near 0, got {}",
+        derivative
+    );
+
+    // At phase 0, derivative should be 2π
+    let derivative_at_0 = LfoWaveshape::Sine.derivative(0.0, 0.5);
+    let expected = core::f32::consts::TAU;
+    assert!(
+        (derivative_at_0 - expected).abs() < 0.1,
+        "Sine derivative at phase 0 should be ~{}, got {}",
+        expected,
+        derivative_at_0
+    );
+}
+
+#[test]
+fn test_waveshape_derivative_triangle() {
+    // Triangle should have constant slopes
+    let d1 = LfoWaveshape::Triangle.derivative(0.1, 0.5); // Rising phase
+    let d2 = LfoWaveshape::Triangle.derivative(0.5, 0.5); // Falling phase
+    let d3 = LfoWaveshape::Triangle.derivative(0.9, 0.5); // Rising phase again
+
+    assert!(
+        (d1 - 4.0).abs() < 0.01,
+        "Triangle rising slope should be 4, got {}",
+        d1
+    );
+    assert!(
+        (d2 + 4.0).abs() < 0.01,
+        "Triangle falling slope should be -4, got {}",
+        d2
+    );
+    assert!(
+        (d3 - 4.0).abs() < 0.01,
+        "Triangle rising slope at end should be 4, got {}",
+        d3
+    );
+}
+
+#[test]
+fn test_waveshape_derivative_saw() {
+    // Saw should have constant slope of 2
+    let d1 = LfoWaveshape::Saw.derivative(0.0, 0.5);
+    let d2 = LfoWaveshape::Saw.derivative(0.5, 0.5);
+    let d3 = LfoWaveshape::Saw.derivative(0.99, 0.5);
+
+    assert!((d1 - 2.0).abs() < 0.01, "Saw slope should be 2, got {}", d1);
+    assert!((d2 - 2.0).abs() < 0.01, "Saw slope should be 2, got {}", d2);
+    assert!((d3 - 2.0).abs() < 0.01, "Saw slope should be 2, got {}", d3);
+}
+
+#[test]
+fn test_waveshape_derivative_step_functions() {
+    // Square, Pulse, S&H should have zero derivative
+    assert_eq!(LfoWaveshape::Square.derivative(0.25, 0.5), 0.0);
+    assert_eq!(LfoWaveshape::Pulse.derivative(0.25, 0.5), 0.0);
+    assert_eq!(LfoWaveshape::SampleAndHold.derivative(0.25, 0.5), 0.0);
+    assert_eq!(LfoWaveshape::Noise.derivative(0.25, 0.5), 0.0);
+}

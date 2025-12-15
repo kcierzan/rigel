@@ -1,8 +1,10 @@
-//! Trait interface for modulation sources.
+//! Trait interfaces for modulation sources.
 //!
-//! This module defines the `ModulationSource` trait - the common interface
-//! for all modulation sources (LFOs, envelopes, sequencers, etc.).
+//! This module defines:
+//! - [`ModulationSource`] - Common interface for all modulation sources (LFOs, envelopes, etc.)
+//! - [`SimdAwareComponent`] - Trait for DSP components that use SIMD-accelerated processing
 
+use rigel_math::SimdVector;
 use rigel_timing::Timebase;
 
 /// Interface for modulation sources (LFOs, envelopes, sequencers, etc.)
@@ -56,4 +58,42 @@ pub trait ModulationSource {
     /// # Returns
     /// Current modulation value within the configured range.
     fn value(&self) -> f32;
+}
+
+/// Trait for DSP components that use SIMD-accelerated processing.
+///
+/// Components expose their SIMD vector type as an associated type.
+/// All backend properties (lanes, name, etc.) can be derived from it.
+///
+/// This trait enables:
+/// - Reporting which SIMD backend is in use
+/// - Querying the number of SIMD lanes available
+/// - Generic code that operates on any SIMD-aware component
+///
+/// # Example
+///
+/// ```ignore
+/// use rigel_modulation::SimdAwareComponent;
+///
+/// fn describe_component<T: SimdAwareComponent>(_c: &T) {
+///     println!("Using {} lanes", T::Vector::LANES);
+/// }
+/// ```
+pub trait SimdAwareComponent {
+    /// The SIMD vector type used by this component.
+    ///
+    /// Typically `DefaultSimdVector` which resolves to the best
+    /// available backend at compile time:
+    /// - AVX-512: 16 lanes (x86_64)
+    /// - AVX2: 8 lanes (x86_64)
+    /// - NEON: 4 lanes (aarch64)
+    /// - Scalar: 1 lane (fallback)
+    type Vector: SimdVector<Scalar = f32>;
+
+    /// Get the number of SIMD lanes available.
+    ///
+    /// This is a convenience method that returns `Self::Vector::LANES`.
+    fn lanes() -> usize {
+        Self::Vector::LANES
+    }
 }
