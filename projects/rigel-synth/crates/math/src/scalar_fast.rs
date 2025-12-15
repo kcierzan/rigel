@@ -486,11 +486,7 @@ mod tests {
     #[test]
     fn test_fast_sinf_zero() {
         let result = fast_sinf(0.0);
-        assert!(
-            result.abs() < 0.001,
-            "sin(0) = {}, expected 0.0",
-            result
-        );
+        assert!(result.abs() < 0.001, "sin(0) = {}, expected 0.0", result);
     }
 
     #[test]
@@ -508,11 +504,7 @@ mod tests {
     #[test]
     fn test_fast_sinf_pi() {
         let result = fast_sinf(core::f32::consts::PI);
-        assert!(
-            result.abs() < 0.01,
-            "sin(π) = {}, expected 0.0",
-            result
-        );
+        assert!(result.abs() < 0.01, "sin(π) = {}, expected 0.0", result);
     }
 
     #[test]
@@ -589,11 +581,7 @@ mod tests {
     #[test]
     fn test_fast_cosf_pi_over_2() {
         let result = fast_cosf(core::f32::consts::FRAC_PI_2);
-        assert!(
-            result.abs() < 0.01,
-            "cos(π/2) = {}, expected 0.0",
-            result
-        );
+        assert!(result.abs() < 0.01, "cos(π/2) = {}, expected 0.0", result);
     }
 
     #[test]
