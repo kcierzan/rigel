@@ -98,7 +98,7 @@ pub use block::{AudioBlock, Block128, Block64};
 pub use denormal::DenormalGuard;
 
 // Re-export scalar fast-math functions
-pub use scalar_fast::{fast_expf, fast_logf};
+pub use scalar_fast::{fast_cosf, fast_expf, fast_logf, fast_sinf};
 
 // Re-export backend types
 pub use backends::scalar::{ScalarInt, ScalarInt64, ScalarMask, ScalarVector};
