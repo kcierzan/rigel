@@ -1,0 +1,26 @@
+[package]
+name = "rigel-modulation"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "No-std modulation sources (LFO, envelopes) for audio DSP"
+keywords = ["audio", "dsp", "lfo", "synthesizer", "real-time"]
+categories = ["multimedia::audio", "no-std", "algorithms"]
+
+[lib]
+name = "rigel_modulation"
+path = "src/lib.rs"
+
+[dependencies]
+rigel-timing = { path = "../timing" }
+rigel-math = { path = "../math", default-features = false }
+libm = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "lfo_bench"
+harness = false
