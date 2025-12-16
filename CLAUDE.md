@@ -741,6 +741,8 @@ bench:flamegraph   # Generate flamegraph for optimization
 - N/A (pure computational library, no persistence) (001-fast-dsp-math)
 - Rust 2021 edition (from rust-toolchain.toml) (001-runtime-simd-dispatch)
 - Rust 2021 edition (workspace toolchain from rust-toolchain.toml) + rigel-timing (Timebase, Smoother, ControlRateClock), libm (portable no_std math) (003-timebase-modulation)
+- Rust 2021 edition (from workspace rust-toolchain.toml) + `rigel-timing` (for Timebase), `libm` (for sin/cos), `rigel-math` (for fast math approximations) (004-lfo-modulation-source)
+- Rust 2021 edition (from workspace rust-toolchain.toml) + `rigel-timing` (for Timebase, ControlRateClock), `rigel-math` (for fast sin approximation per constitution) (004-lfo-modulation-source)
 
 ## Recent Changes
 - 003-timebase-modulation: Extracted timing infrastructure to rigel-timing crate for reusability

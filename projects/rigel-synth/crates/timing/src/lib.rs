@@ -9,7 +9,6 @@
 //! - [`Timebase`] - Sample-accurate global timing context
 //! - [`Smoother`] - Parameter smoothing with multiple curve types
 //! - [`ControlRateClock`] - Scheduling for control-rate updates
-//! - [`ModulationSource`] - Trait interface for modulation sources
 //!
 //! All types are `Copy`/`Clone`, zero-allocation, and suitable for real-time use.
 //!
@@ -31,13 +30,11 @@
 //! ```
 
 mod control_rate;
-mod modulation;
 mod smoother;
 mod timebase;
 
 // Re-export all public types
 pub use control_rate::{ControlRateClock, ControlRateUpdates};
-pub use modulation::ModulationSource;
 pub use smoother::{Smoother, SmoothingMode};
 pub use timebase::Timebase;
 
