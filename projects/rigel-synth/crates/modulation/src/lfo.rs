@@ -4,7 +4,7 @@ use crate::rate::LfoRateMode;
 use crate::simd_rng::SimdXorshift128;
 use crate::traits::{ModulationSource, SimdAwareComponent};
 use crate::waveshape::LfoWaveshape;
-use rigel_math::interpolate::{cubic_hermite, lerp};
+use rigel_math::interpolate::{cubic_hermite, hermite_scalar, lerp};
 use rigel_math::{DefaultSimdVector, SimdVector};
 use rigel_timing::Timebase;
 
@@ -758,23 +758,4 @@ impl ModulationSource for Lfo {
 
 impl SimdAwareComponent for Lfo {
     type Vector = DefaultSimdVector;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Scalar cubic Hermite interpolation for remainder samples.
-#[inline]
-fn hermite_scalar(a: f32, b: f32, tangent_a: f32, tangent_b: f32, t: f32) -> f32 {
-    let t2 = t * t;
-    let t3 = t2 * t;
-
-    // Hermite basis functions
-    let h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
-    let h10 = t3 - 2.0 * t2 + t;
-    let h01 = 3.0 * t2 - 2.0 * t3;
-    let h11 = t3 - t2;
-
-    h00 * a + h10 * tangent_a + h01 * b + h11 * tangent_b
 }
