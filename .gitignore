@@ -15,7 +15,6 @@ Cargo.lock
 *.dylib
 
 # Audio Files
-*.wav
 *.aiff
 *.mp3
 *.flac
