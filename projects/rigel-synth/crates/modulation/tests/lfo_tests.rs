@@ -805,7 +805,8 @@ fn test_modulation_source_trait_value_before_update() {
 // New API Tests: Interpolation Strategy
 // ─────────────────────────────────────────────────────────────────────────────
 
-use rigel_modulation::{InterpolationStrategy, SimdAwareComponent};
+use rigel_math::simd::SimdContext;
+use rigel_modulation::InterpolationStrategy;
 
 #[test]
 fn test_interpolation_strategy_default() {
@@ -830,6 +831,7 @@ fn test_interpolation_strategy_setter() {
 
 #[test]
 fn test_generate_block_fills_buffer() {
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Sine);
     lfo.set_rate(LfoRateMode::Hz(10.0));
@@ -840,7 +842,7 @@ fn test_generate_block_fills_buffer() {
     lfo.update(&timebase);
 
     let mut output = [0.0f32; 64];
-    lfo.generate_block(&mut output);
+    lfo.generate_block(&mut output, &simd_ctx);
 
     // All values should be valid and in range
     for (i, &value) in output.iter().enumerate() {
@@ -860,6 +862,7 @@ fn test_generate_block_fills_buffer() {
 
 #[test]
 fn test_generate_block_linear_interpolation() {
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Saw);
     lfo.set_rate(LfoRateMode::Hz(100.0)); // Faster LFO for visible interpolation
@@ -873,7 +876,7 @@ fn test_generate_block_linear_interpolation() {
     lfo.update(&timebase);
 
     let mut output = [0.0f32; 64];
-    lfo.generate_block(&mut output);
+    lfo.generate_block(&mut output, &simd_ctx);
 
     // Linear interpolation should produce smoothly changing values
     // Values should be smoothly changing (not stepping)
@@ -905,6 +908,7 @@ fn test_generate_block_linear_interpolation() {
 
 #[test]
 fn test_generate_block_hermite_interpolation() {
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Sine);
     lfo.set_rate(LfoRateMode::Hz(1.0));
@@ -917,7 +921,7 @@ fn test_generate_block_hermite_interpolation() {
     lfo.update(&timebase);
 
     let mut output = [0.0f32; 64];
-    lfo.generate_block(&mut output);
+    lfo.generate_block(&mut output, &simd_ctx);
 
     // Hermite should also produce smooth transitions
     for (i, &value) in output.iter().enumerate() {
@@ -933,6 +937,7 @@ fn test_generate_block_hermite_interpolation() {
 
 #[test]
 fn test_generate_block_unipolar() {
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Sine);
     lfo.set_rate(LfoRateMode::Hz(10.0));
@@ -945,7 +950,7 @@ fn test_generate_block_unipolar() {
     lfo.update(&timebase);
 
     let mut output = [0.0f32; 64];
-    lfo.generate_block(&mut output);
+    lfo.generate_block(&mut output, &simd_ctx);
 
     // All values should be in unipolar range [0, 1]
     for (i, &value) in output.iter().enumerate() {
@@ -960,6 +965,7 @@ fn test_generate_block_unipolar() {
 
 #[test]
 fn test_generate_block_noise() {
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Noise);
     lfo.set_rate(LfoRateMode::Hz(1.0));
@@ -971,7 +977,7 @@ fn test_generate_block_noise() {
     lfo.update(&timebase);
 
     let mut output = [0.0f32; 64];
-    lfo.generate_block_mut(&mut output);
+    lfo.generate_block_mut(&mut output, &simd_ctx);
 
     // Noise should produce varied values within range
     let mut unique_count = 1;
@@ -999,6 +1005,7 @@ fn test_generate_block_noise() {
 
 #[test]
 fn test_generate_block_sample_and_hold() {
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::SampleAndHold);
     lfo.set_rate(LfoRateMode::Hz(0.5)); // Slow rate - constant within block
@@ -1010,7 +1017,7 @@ fn test_generate_block_sample_and_hold() {
     lfo.update(&timebase);
 
     let mut output = [0.0f32; 64];
-    lfo.generate_block(&mut output);
+    lfo.generate_block(&mut output, &simd_ctx);
 
     // S&H should produce constant values within the block
     let first = output[0];
@@ -1060,6 +1067,7 @@ fn test_sample_returns_values() {
 
 #[test]
 fn test_sample_matches_generate_block() {
+    let simd_ctx = SimdContext::new();
     let mut lfo1 = Lfo::new();
     lfo1.set_waveshape(LfoWaveshape::Sine);
     lfo1.set_rate(LfoRateMode::Hz(5.0));
@@ -1083,7 +1091,7 @@ fn test_sample_matches_generate_block() {
 
     // Generate block
     let mut block_output = [0.0f32; 64];
-    lfo1.generate_block(&mut block_output);
+    lfo1.generate_block(&mut block_output, &simd_ctx);
 
     // Get samples
     let mut sample_output = [0.0f32; 64];
@@ -1133,29 +1141,13 @@ fn test_sample_cache_refresh() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// New API Tests: SimdAwareComponent Trait
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[test]
-fn test_simd_aware_component_lanes() {
-    // LFO implements SimdAwareComponent
-    let lanes = Lfo::lanes();
-
-    // Lanes should be at least 1 (scalar) and at most 16 (AVX-512)
-    assert!(
-        (1..=16).contains(&lanes),
-        "SIMD lanes {} should be in [1, 16]",
-        lanes
-    );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Accuracy Validation Tests
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_sine_accuracy_linear() {
     // Test that interpolated sine is reasonably close to ideal
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Sine);
     lfo.set_rate(LfoRateMode::Hz(1.0));
@@ -1173,7 +1165,7 @@ fn test_sine_accuracy_linear() {
         lfo.update(&timebase);
 
         let mut output = [0.0f32; 64];
-        lfo.generate_block(&mut output);
+        lfo.generate_block(&mut output, &simd_ctx);
 
         // Compare to ideal sine at each sample position
         for (i, &sample) in output.iter().enumerate() {
@@ -1196,6 +1188,7 @@ fn test_sine_accuracy_linear() {
 #[test]
 fn test_sine_accuracy_hermite() {
     // Test that Hermite interpolated sine is closer to ideal than linear
+    let simd_ctx = SimdContext::new();
     let mut lfo = Lfo::new();
     lfo.set_waveshape(LfoWaveshape::Sine);
     lfo.set_rate(LfoRateMode::Hz(1.0));
@@ -1213,7 +1206,7 @@ fn test_sine_accuracy_hermite() {
         lfo.update(&timebase);
 
         let mut output = [0.0f32; 64];
-        lfo.generate_block(&mut output);
+        lfo.generate_block(&mut output, &simd_ctx);
 
         // Compare to ideal sine at each sample position
         for (i, &sample) in output.iter().enumerate() {

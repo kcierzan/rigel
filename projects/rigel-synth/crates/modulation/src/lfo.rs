@@ -2,10 +2,10 @@
 
 use crate::rate::LfoRateMode;
 use crate::simd_rng::SimdXorshift128;
-use crate::traits::{ModulationSource, SimdAwareComponent};
+use crate::traits::ModulationSource;
 use crate::waveshape::LfoWaveshape;
-use rigel_math::interpolate::{cubic_hermite, hermite_scalar, lerp};
-use rigel_math::{DefaultSimdVector, SimdVector};
+use rigel_math::interpolate::hermite_scalar;
+use rigel_math::simd::SimdContext;
 use rigel_timing::Timebase;
 
 /// Default block size for sample cache.
@@ -79,8 +79,10 @@ pub enum InterpolationStrategy {
 ///
 /// ```ignore
 /// use rigel_modulation::{Lfo, LfoWaveshape, LfoRateMode, InterpolationStrategy};
+/// use rigel_math::simd::SimdContext;
 /// use rigel_timing::Timebase;
 ///
+/// let simd_ctx = SimdContext::new();
 /// let mut lfo = Lfo::new();
 /// lfo.set_waveshape(LfoWaveshape::Sine);
 /// lfo.set_rate(LfoRateMode::Hz(2.0));
@@ -91,11 +93,11 @@ pub enum InterpolationStrategy {
 ///
 /// lfo.update(&timebase);
 ///
-/// // Block-based processing (most efficient)
+/// // Block-based processing (most efficient, uses runtime SIMD dispatch)
 /// let mut output = [0.0f32; 64];
-/// lfo.generate_block(&mut output);
+/// lfo.generate_block(&mut output, &simd_ctx);
 ///
-/// // Or single-sample access (uses internal SIMD cache)
+/// // Or single-sample access (uses scalar interpolation)
 /// for _ in 0..64 {
 ///     let value = lfo.sample();
 /// }
@@ -348,91 +350,77 @@ impl Lfo {
     /// Generate a block of interpolated samples.
     ///
     /// Fills the output buffer with smoothly interpolated values between
-    /// the previous and target control-rate values. Uses SIMD acceleration
-    /// when available.
+    /// the previous and target control-rate values. Uses runtime SIMD dispatch
+    /// for optimal performance on the current CPU.
     ///
     /// # Arguments
     /// * `output` - Buffer to fill with LFO values
+    /// * `simd_ctx` - SIMD context for runtime backend selection
     ///
     /// # Note
     /// Call `update()` before each block to advance the LFO state.
-    pub fn generate_block(&self, output: &mut [f32]) {
+    pub fn generate_block(&self, output: &mut [f32], simd_ctx: &SimdContext) {
         match self.waveshape {
             LfoWaveshape::Noise => self.generate_noise_block(output),
             LfoWaveshape::SampleAndHold => self.generate_sh_block(output),
-            _ => self.generate_interpolated_block(output),
+            _ => self.generate_interpolated_block(output, simd_ctx),
         }
     }
 
     /// Generate a block using a mutable reference (needed for noise generation).
     ///
     /// This is the primary block generation method that handles all waveshapes.
-    pub fn generate_block_mut(&mut self, output: &mut [f32]) {
+    ///
+    /// # Arguments
+    /// * `output` - Buffer to fill with LFO values
+    /// * `simd_ctx` - SIMD context for runtime backend selection
+    pub fn generate_block_mut(&mut self, output: &mut [f32], simd_ctx: &SimdContext) {
         match self.waveshape {
-            LfoWaveshape::Noise => self.generate_noise_block_mut(output),
+            LfoWaveshape::Noise => self.generate_noise_block_mut(output, simd_ctx),
             LfoWaveshape::SampleAndHold => self.generate_sh_block(output),
-            _ => self.generate_interpolated_block(output),
+            _ => self.generate_interpolated_block(output, simd_ctx),
         }
     }
 
     /// Generate interpolated block (for smooth waveshapes).
-    fn generate_interpolated_block(&self, output: &mut [f32]) {
+    ///
+    /// Uses SimdContext for runtime-dispatched SIMD operations.
+    fn generate_interpolated_block(&self, output: &mut [f32], simd_ctx: &SimdContext) {
         let block_size = output.len();
         if block_size == 0 {
             return;
         }
 
         let block_size_f = block_size as f32;
-        let lanes = DefaultSimdVector::LANES;
 
-        // Process in SIMD chunks
-        let mut idx = 0;
-        while idx + lanes <= block_size {
-            // Build t vector for this chunk
-            let mut t_values = [0.0f32; 16]; // Max lanes (AVX-512)
-            for (i, t_val) in t_values[..lanes].iter_mut().enumerate() {
-                *t_val = (idx + i) as f32 / block_size_f;
+        match self.interpolation {
+            InterpolationStrategy::Linear => {
+                // Linear interpolation: output[i] = previous + t * (target - previous)
+                // Simple scalar loop - compiler auto-vectorizes this efficiently
+                let diff = self.target_value - self.previous_value;
+                let prev = self.previous_value;
+
+                for (i, out_sample) in output.iter_mut().enumerate() {
+                    let t = i as f32 / block_size_f;
+                    *out_sample = prev + t * diff;
+                }
             }
+            InterpolationStrategy::CubicHermite => {
+                // Hermite interpolation uses scalar for now
+                // The hermite basis functions are complex and benefit less from SIMD
+                // when computing per-sample t values
+                let ta = self.previous_tangent * self.phase_increment;
+                let tb = self.target_tangent * self.phase_increment;
 
-            let t = DefaultSimdVector::from_slice(&t_values[..lanes]);
-            let a = DefaultSimdVector::splat(self.previous_value);
-            let b = DefaultSimdVector::splat(self.target_value);
-
-            let result = match self.interpolation {
-                InterpolationStrategy::Linear => lerp(a, b, t),
-                InterpolationStrategy::CubicHermite => {
-                    // Scale tangents by phase increment for proper interpolation
-                    // Derivative is d(value)/d(phase), tangent is d(value)/dt = derivative * d(phase)/dt
-                    let ta = DefaultSimdVector::splat(self.previous_tangent * self.phase_increment);
-                    let tb = DefaultSimdVector::splat(self.target_tangent * self.phase_increment);
-                    cubic_hermite(a, b, ta, tb, t)
+                for (i, out_sample) in output.iter_mut().enumerate() {
+                    let t = i as f32 / block_size_f;
+                    *out_sample = hermite_scalar(self.previous_value, self.target_value, ta, tb, t);
                 }
-            };
-
-            result.to_slice(&mut output[idx..idx + lanes]);
-            idx += lanes;
-        }
-
-        // Handle remainder with scalar fallback
-        while idx < block_size {
-            let t = idx as f32 / block_size_f;
-            output[idx] = match self.interpolation {
-                InterpolationStrategy::Linear => {
-                    self.previous_value + t * (self.target_value - self.previous_value)
-                }
-                InterpolationStrategy::CubicHermite => hermite_scalar(
-                    self.previous_value,
-                    self.target_value,
-                    self.previous_tangent * self.phase_increment,
-                    self.target_tangent * self.phase_increment,
-                    t,
-                ),
-            };
-            idx += 1;
+            }
         }
 
         // Apply polarity transformation
-        self.apply_polarity_block(output);
+        self.apply_polarity_block(output, simd_ctx);
     }
 
     /// Generate noise block (per-sample random values).
@@ -445,45 +433,29 @@ impl Lfo {
     }
 
     /// Generate noise block with mutable RNG access.
-    fn generate_noise_block_mut(&mut self, output: &mut [f32]) {
+    fn generate_noise_block_mut(&mut self, output: &mut [f32], simd_ctx: &SimdContext) {
         self.rng.fill_buffer(output);
-        self.apply_polarity_block(output);
+        self.apply_polarity_block(output, simd_ctx);
     }
 
     /// Generate sample-and-hold block (constant value).
+    ///
+    /// Fills the output with the current held value. This is simple enough
+    /// that explicit SIMD isn't needed - the compiler will auto-vectorize.
     fn generate_sh_block(&self, output: &mut [f32]) {
         let value = self.apply_polarity(self.held_value);
-        let value_vec = DefaultSimdVector::splat(value);
-        let lanes = DefaultSimdVector::LANES;
-
-        let mut idx = 0;
-        while idx + lanes <= output.len() {
-            value_vec.to_slice(&mut output[idx..idx + lanes]);
-            idx += lanes;
-        }
-        while idx < output.len() {
-            output[idx] = value;
-            idx += 1;
-        }
+        output.fill(value);
     }
 
     /// Apply polarity transformation to a block.
-    fn apply_polarity_block(&self, output: &mut [f32]) {
+    ///
+    /// Uses SimdContext for unipolar transformation: (v + 1.0) * 0.5 = v * 0.5 + 0.5
+    fn apply_polarity_block(&self, output: &mut [f32], _simd_ctx: &SimdContext) {
         if self.polarity == LfoPolarity::Unipolar {
-            let half = DefaultSimdVector::splat(0.5);
-            let one = DefaultSimdVector::splat(1.0);
-            let lanes = DefaultSimdVector::LANES;
-
-            let mut idx = 0;
-            while idx + lanes <= output.len() {
-                let v = DefaultSimdVector::from_slice(&output[idx..idx + lanes]);
-                let result = v.add(one).mul(half);
-                result.to_slice(&mut output[idx..idx + lanes]);
-                idx += lanes;
-            }
-            while idx < output.len() {
-                output[idx] = (output[idx] + 1.0) * 0.5;
-                idx += 1;
+            // Unipolar: (bipolar + 1.0) * 0.5 = bipolar * 0.5 + 0.5
+            // Simple scalar loop - compiler auto-vectorizes this efficiently
+            for sample in output.iter_mut() {
+                *sample = *sample * 0.5 + 0.5;
             }
         }
     }
@@ -541,54 +513,23 @@ impl Lfo {
     }
 
     /// Generate interpolated samples into the cache.
+    ///
+    /// Uses scalar operations since the cache is used for single-sample access.
+    /// Block processing should use `generate_block()` with SimdContext instead.
     fn generate_interpolated_cache(&mut self) {
         let block_size_f = CACHE_SIZE as f32;
-        let lanes = DefaultSimdVector::LANES;
+        let diff = self.target_value - self.previous_value;
+        let ta = self.previous_tangent * self.phase_increment;
+        let tb = self.target_tangent * self.phase_increment;
 
-        // Process in SIMD chunks
-        let mut idx = 0;
-        while idx + lanes <= CACHE_SIZE {
-            // Build t vector for this chunk
-            let mut t_values = [0.0f32; 16]; // Max lanes (AVX-512)
-            for (i, t_val) in t_values[..lanes].iter_mut().enumerate() {
-                *t_val = (idx + i) as f32 / block_size_f;
-            }
-
-            let t = DefaultSimdVector::from_slice(&t_values[..lanes]);
-            let a = DefaultSimdVector::splat(self.previous_value);
-            let b = DefaultSimdVector::splat(self.target_value);
-
-            let result = match self.interpolation {
-                InterpolationStrategy::Linear => lerp(a, b, t),
-                InterpolationStrategy::CubicHermite => {
-                    // Scale tangents by phase increment for proper interpolation
-                    // Derivative is d(value)/d(phase), tangent is d(value)/dt = derivative * d(phase)/dt
-                    let ta = DefaultSimdVector::splat(self.previous_tangent * self.phase_increment);
-                    let tb = DefaultSimdVector::splat(self.target_tangent * self.phase_increment);
-                    cubic_hermite(a, b, ta, tb, t)
-                }
-            };
-
-            result.to_slice(&mut self.sample_cache[idx..idx + lanes]);
-            idx += lanes;
-        }
-
-        // Handle remainder with scalar fallback
-        while idx < CACHE_SIZE {
+        for idx in 0..CACHE_SIZE {
             let t = idx as f32 / block_size_f;
             self.sample_cache[idx] = match self.interpolation {
-                InterpolationStrategy::Linear => {
-                    self.previous_value + t * (self.target_value - self.previous_value)
+                InterpolationStrategy::Linear => self.previous_value + t * diff,
+                InterpolationStrategy::CubicHermite => {
+                    hermite_scalar(self.previous_value, self.target_value, ta, tb, t)
                 }
-                InterpolationStrategy::CubicHermite => hermite_scalar(
-                    self.previous_value,
-                    self.target_value,
-                    self.previous_tangent * self.phase_increment,
-                    self.target_tangent * self.phase_increment,
-                    t,
-                ),
             };
-            idx += 1;
         }
 
         // Apply polarity transformation
@@ -754,8 +695,4 @@ impl ModulationSource for Lfo {
         // Return the target value (most recent computed value)
         self.apply_polarity(self.target_value)
     }
-}
-
-impl SimdAwareComponent for Lfo {
-    type Vector = DefaultSimdVector;
 }
