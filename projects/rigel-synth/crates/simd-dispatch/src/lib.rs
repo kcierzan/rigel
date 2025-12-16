@@ -1,6 +1,11 @@
-//! SIMD Backend Dispatch Module
+#![no_std]
+#![warn(missing_docs)]
+#![warn(clippy::all)]
+#![allow(unexpected_cfgs)]
+
+//! rigel-simd-dispatch: Runtime SIMD dispatch and SimdContext API
 //!
-//! This module provides runtime SIMD backend selection and dispatch for optimal
+//! This crate provides runtime SIMD backend selection and dispatch for optimal
 //! performance across different CPU architectures. It enables a single binary to
 //! automatically use the best available SIMD instruction set (scalar → AVX2 → AVX-512 on x86_64,
 //! NEON on aarch64).
@@ -32,7 +37,7 @@
 //! # Example Usage
 //!
 //! ```ignore
-//! use rigel_math::simd::{SimdContext, ProcessParams};
+//! use rigel_simd_dispatch::{SimdContext, ProcessParams};
 //!
 //! // Initialize once during engine startup
 //! let ctx = SimdContext::new();
@@ -50,6 +55,10 @@
 //! ctx.process_block(&input, &mut output, &params);
 //! ```
 
+// Re-export everything from rigel-math for convenience
+pub use rigel_math::*;
+
+// Internal modules
 pub mod backend;
 pub mod context;
 pub mod dispatcher;

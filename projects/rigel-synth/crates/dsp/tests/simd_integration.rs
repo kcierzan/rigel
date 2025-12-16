@@ -7,9 +7,9 @@
 //! 4. math module functions work through the abstraction
 //! 5. table module functions work through the abstraction
 
-use rigel_math::simd::{ProcessParams, SimdContext};
-use rigel_math::table::{IndexMode, LookupTable};
-use rigel_math::{math, ops, Block64, DefaultSimdVector, SimdVector};
+use rigel_simd_dispatch::table::{IndexMode, LookupTable};
+use rigel_simd_dispatch::{math, ops, Block64, DefaultSimdVector, SimdVector};
+use rigel_simd_dispatch::{ProcessParams, SimdContext};
 
 #[test]
 fn test_runtime_backend_selection() {

@@ -8,7 +8,7 @@
 //! These tests are critical for ensuring correctness - if a backend produces different
 //! results, it's either buggy or has a precision issue that needs investigation.
 
-use rigel_math::simd::{ProcessParams, ScalarBackend, SimdBackend};
+use rigel_simd_dispatch::{ProcessParams, ScalarBackend, SimdBackend};
 
 #[cfg(test)]
 mod backend_equivalence_tests {
@@ -67,7 +67,7 @@ mod backend_equivalence_tests {
             // AVX2 backend (if compiled)
             #[cfg(all(feature = "avx2", target_arch = "x86_64"))]
             {
-                use rigel_math::simd::Avx2Backend;
+                use rigel_simd_dispatch::Avx2Backend;
                 let mut avx2_output = vec![0.0f32; input.len()];
                 Avx2Backend::process_block(&input, &mut avx2_output, &params);
                 assert_slices_approx_eq(
@@ -81,7 +81,7 @@ mod backend_equivalence_tests {
             // AVX-512 backend (if compiled)
             #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
             {
-                use rigel_math::simd::Avx512Backend;
+                use rigel_simd_dispatch::Avx512Backend;
                 let mut avx512_output = vec![0.0f32; input.len()];
                 Avx512Backend::process_block(&input, &mut avx512_output, &params);
                 assert_slices_approx_eq(
@@ -95,7 +95,7 @@ mod backend_equivalence_tests {
             // NEON backend (if compiled)
             #[cfg(all(feature = "neon", target_arch = "aarch64"))]
             {
-                use rigel_math::simd::NeonBackend;
+                use rigel_simd_dispatch::NeonBackend;
                 let mut neon_output = vec![0.0f32; input.len()];
                 NeonBackend::process_block(&input, &mut neon_output, &params);
                 assert_slices_approx_eq(
@@ -126,7 +126,7 @@ mod backend_equivalence_tests {
             // AVX2 backend
             #[cfg(all(feature = "avx2", target_arch = "x86_64"))]
             {
-                use rigel_math::simd::Avx2Backend;
+                use rigel_simd_dispatch::Avx2Backend;
                 let mut avx2_phases = phases_copy.clone();
                 Avx2Backend::advance_phase_vectorized(&mut avx2_phases, &increments, count);
                 assert_slices_approx_eq(
@@ -140,7 +140,7 @@ mod backend_equivalence_tests {
             // AVX-512 backend
             #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
             {
-                use rigel_math::simd::Avx512Backend;
+                use rigel_simd_dispatch::Avx512Backend;
                 let mut avx512_phases = phases_copy.clone();
                 Avx512Backend::advance_phase_vectorized(&mut avx512_phases, &increments, count);
                 assert_slices_approx_eq(
@@ -154,7 +154,7 @@ mod backend_equivalence_tests {
             // NEON backend
             #[cfg(all(feature = "neon", target_arch = "aarch64"))]
             {
-                use rigel_math::simd::NeonBackend;
+                use rigel_simd_dispatch::NeonBackend;
                 let mut neon_phases = phases_copy;
                 NeonBackend::advance_phase_vectorized(&mut neon_phases, &increments, count);
                 assert_slices_approx_eq(
@@ -182,7 +182,7 @@ mod backend_equivalence_tests {
             // AVX2 backend
             #[cfg(all(feature = "avx2", target_arch = "x86_64"))]
             {
-                use rigel_math::simd::Avx2Backend;
+                use rigel_simd_dispatch::Avx2Backend;
                 let mut avx2_output = vec![0.0f32; positions.len()];
                 Avx2Backend::interpolate_wavetable(&wavetable, &positions, &mut avx2_output);
                 assert_slices_approx_eq(
@@ -196,7 +196,7 @@ mod backend_equivalence_tests {
             // AVX-512 backend
             #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
             {
-                use rigel_math::simd::Avx512Backend;
+                use rigel_simd_dispatch::Avx512Backend;
                 let mut avx512_output = vec![0.0f32; positions.len()];
                 Avx512Backend::interpolate_wavetable(&wavetable, &positions, &mut avx512_output);
                 assert_slices_approx_eq(
@@ -210,7 +210,7 @@ mod backend_equivalence_tests {
             // NEON backend
             #[cfg(all(feature = "neon", target_arch = "aarch64"))]
             {
-                use rigel_math::simd::NeonBackend;
+                use rigel_simd_dispatch::NeonBackend;
                 let mut neon_output = vec![0.0f32; positions.len()];
                 NeonBackend::interpolate_wavetable(&wavetable, &positions, &mut neon_output);
                 assert_slices_approx_eq(

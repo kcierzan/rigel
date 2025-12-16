@@ -17,7 +17,7 @@
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -41,7 +41,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let vec = DefaultSimdVector::splat(2.0);
     /// assert_eq!(vec.horizontal_sum(), 2.0 * DefaultSimdVector::LANES as f32);
     /// ```
@@ -90,7 +90,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let a = DefaultSimdVector::splat(2.0);
     /// let b = DefaultSimdVector::splat(3.0);
     /// let c = DefaultSimdVector::splat(1.0);
@@ -133,7 +133,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let a = DefaultSimdVector::splat(1.0);
     /// let b = DefaultSimdVector::splat(2.0);
     /// let mask = a.lt(b); // All lanes true
@@ -149,7 +149,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let vec = DefaultSimdVector::splat(2.0);
     /// assert_eq!(vec.horizontal_sum(), 2.0 * DefaultSimdVector::LANES as f32);
     /// ```
@@ -170,7 +170,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let vec = DefaultSimdVector::splat(2.7);
     /// let floored = vec.floor();
     /// // floored contains 2.0 in all lanes
@@ -192,7 +192,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let x = DefaultSimdVector::splat(4.0);
     /// let result = x.sqrt();
     /// // result contains 2.0 in all lanes
@@ -213,7 +213,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let x = DefaultSimdVector::splat(2.0);
     /// let estimate = x.rcp_estimate();
     /// // estimate ≈ 0.5 (with reduced precision)
@@ -235,7 +235,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector};
     /// let vec = DefaultSimdVector::splat(1.0);
     /// let bits = vec.to_bits();
     /// // bits now contains 0x3F800000 (IEEE 754 representation of 1.0)
@@ -249,7 +249,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector, SimdInt};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector, SimdInt};
     /// let bits = <DefaultSimdVector as SimdVector>::IntBits::splat(0x3F800000);
     /// let vec = DefaultSimdVector::from_bits(bits);
     /// // vec now contains 1.0
@@ -264,7 +264,7 @@ pub trait SimdVector: Copy + Clone + Sized {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{DefaultSimdVector, SimdVector, SimdInt};
+    /// use rigel_simd::{DefaultSimdVector, SimdVector, SimdInt};
     /// let int_vec = <DefaultSimdVector as SimdVector>::IntBits::splat(5);
     /// let float_vec = DefaultSimdVector::from_int_cast(int_vec);
     /// // float_vec contains 5.0 in all lanes
@@ -324,7 +324,7 @@ pub trait SimdInt: Copy + Clone + Sized {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
 /// let a = DefaultSimdVector::splat(1.0);
 /// let b = DefaultSimdVector::splat(2.0);
 /// let mask = a.lt(b);

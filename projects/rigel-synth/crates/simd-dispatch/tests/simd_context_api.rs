@@ -9,7 +9,7 @@
 
 #[cfg(test)]
 mod simd_context_api_tests {
-    use rigel_math::simd::{ProcessParams, SimdContext};
+    use rigel_simd_dispatch::{ProcessParams, SimdContext};
 
     #[test]
     fn test_simd_context_initialization() {
@@ -114,7 +114,7 @@ mod simd_context_api_tests {
 
         #[cfg(all(target_arch = "aarch64", not(feature = "runtime-dispatch")))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             // Verify SimdContext is zero-sized (compile-time optimization)
             assert_eq!(std::mem::size_of::<SimdContext>(), 0);
         }
@@ -132,7 +132,7 @@ mod simd_context_api_tests {
             not(feature = "runtime-dispatch")
         ))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             let ctx = SimdContext::new();
             let backend_name = ctx.backend_name();
 
@@ -150,7 +150,7 @@ mod simd_context_api_tests {
             not(feature = "runtime-dispatch")
         ))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             let ctx = SimdContext::new();
             let backend_name = ctx.backend_name();
 
@@ -164,7 +164,7 @@ mod simd_context_api_tests {
         // Runtime dispatch mode (CPU feature detection)
         #[cfg(all(target_arch = "x86_64", feature = "runtime-dispatch"))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             let ctx = SimdContext::new();
 
             // Backend should be selected based on CPU features
@@ -184,7 +184,7 @@ mod simd_context_api_tests {
             not(feature = "runtime-dispatch")
         ))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             let ctx = SimdContext::new();
             let backend_name = ctx.backend_name();
 
@@ -207,7 +207,7 @@ mod simd_context_api_tests {
             not(feature = "force-scalar")
         ))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             let ctx = SimdContext::new();
             let backend_name = ctx.backend_name();
 
@@ -221,7 +221,7 @@ mod simd_context_api_tests {
         // Scalar fallback on aarch64 (no neon feature)
         #[cfg(all(target_arch = "aarch64", not(feature = "neon")))]
         {
-            use rigel_math::simd::SimdContext;
+            use rigel_simd_dispatch::SimdContext;
             let ctx = SimdContext::new();
             let backend_name = ctx.backend_name();
 

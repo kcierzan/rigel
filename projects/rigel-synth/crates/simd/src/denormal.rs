@@ -13,7 +13,7 @@
 //! # Usage
 //!
 //! ```rust
-//! use rigel_math::DenormalGuard;
+//! use rigel_simd::DenormalGuard;
 //!
 //! fn process_audio_block() {
 //!     let _guard = DenormalGuard::new(); // Enable denormal protection
@@ -111,7 +111,7 @@ impl DenormalGuard {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::DenormalGuard;
+    /// use rigel_simd::DenormalGuard;
     ///
     /// let result = DenormalGuard::with_protection(|| {
     ///     // Process audio with denormal protection

@@ -9,8 +9,8 @@ use crate::traits::SimdVector;
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::min;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::min;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -27,8 +27,8 @@ pub fn min<V: SimdVector>(a: V, b: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::max;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::max;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -45,8 +45,8 @@ pub fn max<V: SimdVector>(a: V, b: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::abs;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::abs;
 ///
 /// let a = DefaultSimdVector::splat(-2.0);
 /// let result = abs(a);
@@ -64,8 +64,8 @@ pub fn abs<V: SimdVector>(a: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::clamp;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::clamp;
 ///
 /// let a = DefaultSimdVector::splat(5.0);
 /// let min_val = DefaultSimdVector::splat(0.0);

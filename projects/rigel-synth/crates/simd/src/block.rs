@@ -32,7 +32,7 @@ use core::marker::PhantomData;
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{Block64, DefaultSimdVector, SimdVector};
+/// use rigel_simd::{Block64, DefaultSimdVector, SimdVector};
 ///
 /// let mut block = Block64::new();
 ///
@@ -59,7 +59,7 @@ impl<T: Copy + Default, const N: usize> AudioBlock<T, N> {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::Block64;
+    /// use rigel_simd::Block64;
     ///
     /// let block = Block64::new();
     /// assert_eq!(block.len(), 64);
@@ -80,7 +80,7 @@ impl<T: Copy + Default, const N: usize> AudioBlock<T, N> {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::Block64;
+    /// use rigel_simd::Block64;
     ///
     /// let samples = [0.0f32; 64];
     /// let block = Block64::from_slice(&samples);
@@ -139,7 +139,7 @@ impl<T: Copy + Default, const N: usize> AudioBlock<T, N> {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{Block64, DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{Block64, DefaultSimdVector, SimdVector};
     ///
     /// let block = Block64::new();
     /// let chunks = block.as_chunks::<DefaultSimdVector>();
@@ -171,7 +171,7 @@ impl<T: Copy + Default, const N: usize> AudioBlock<T, N> {
     /// # Example
     ///
     /// ```rust
-    /// use rigel_math::{Block64, DefaultSimdVector, SimdVector};
+    /// use rigel_simd::{Block64, DefaultSimdVector, SimdVector};
     ///
     /// let mut block = Block64::new();
     /// let gain = DefaultSimdVector::splat(0.5);

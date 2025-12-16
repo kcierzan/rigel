@@ -1,0 +1,36 @@
+[package]
+name = "rigel-simd-dispatch"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Runtime SIMD dispatch and SimdContext API for real-time audio DSP"
+keywords = ["audio", "dsp", "simd", "synthesizer", "real-time"]
+categories = ["multimedia::audio", "no-std", "algorithms"]
+
+[lib]
+name = "rigel_simd_dispatch"
+path = "src/lib.rs"
+
+[features]
+default = ["scalar"]
+scalar = ["rigel-math/scalar"]
+avx2 = ["rigel-math/avx2"]
+avx512 = ["rigel-math/avx512"]
+neon = ["rigel-math/neon"]
+runtime-dispatch = ["scalar", "avx2", "avx512"]
+
+# Forced backend selection (deterministic testing) - mutually exclusive
+force-scalar = ["scalar"]
+force-avx2 = ["avx2"]
+force-avx512 = ["avx512"]
+force-neon = ["neon"]
+
+[dependencies]
+rigel-math = { path = "../math", default-features = false }
+cpufeatures = "0.2"
+libm = "0.2"
+
+[dev-dependencies]
+proptest = "1.5"
