@@ -92,12 +92,12 @@ fn test_lfo_output_range_unipolar() {
 
     // Unipolar range should be approximately [0.0, 1.0]
     assert!(
-        min_value >= -0.01 && min_value <= 0.1,
+        (-0.01..=0.1).contains(&min_value),
         "Unipolar min should be near 0.0, got {}",
         min_value
     );
     assert!(
-        max_value <= 1.01 && max_value >= 0.9,
+        (0.9..=1.01).contains(&max_value),
         "Unipolar max should be near 1.0, got {}",
         max_value
     );
@@ -114,7 +114,7 @@ fn test_lfo_cycle_frequency() {
     let mut timebase = Timebase::new(sample_rate);
 
     // Reset and get initial value
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
     let mut last_value = lfo.value();
 
     let mut cycle_count = 0;
@@ -136,7 +136,7 @@ fn test_lfo_cycle_frequency() {
     // At 1 Hz over 2 seconds, we should see approximately 2 cycles
     // Allow some tolerance for block boundary effects
     assert!(
-        cycle_count >= 1 && cycle_count <= 3,
+        (1..=3).contains(&cycle_count),
         "Expected ~2 cycles at 1 Hz over 2 seconds, got {}",
         cycle_count
     );
@@ -148,10 +148,10 @@ fn test_waveshape_sine() {
     lfo.set_waveshape(LfoWaveshape::Sine);
     lfo.set_rate(LfoRateMode::Hz(1.0));
 
-    let mut timebase = Timebase::new(44100.0);
+    let timebase = Timebase::new(44100.0);
 
     // At phase 0, sine should be 0
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
     let value_at_zero = lfo.value();
     assert!(
         value_at_zero.abs() < 0.1,
@@ -167,7 +167,7 @@ fn test_waveshape_triangle() {
     lfo.set_rate(LfoRateMode::Hz(100.0)); // Fast for testing
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut values = Vec::new();
     for _ in 0..100 {
@@ -193,13 +193,13 @@ fn test_waveshape_saw() {
     lfo.set_waveshape(LfoWaveshape::Saw);
     lfo.set_rate(LfoRateMode::Hz(100.0));
 
-    let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    let timebase = Timebase::new(44100.0);
+    lfo.reset(&timebase);
 
     // Saw wave starts at -1 at phase 0 and rises to +1
     let initial_value = lfo.value();
     assert!(
-        initial_value >= -1.01 && initial_value <= -0.9,
+        (-1.01..=-0.9).contains(&initial_value),
         "Saw at phase 0 should be near -1, got {}",
         initial_value
     );
@@ -212,7 +212,7 @@ fn test_waveshape_square() {
     lfo.set_rate(LfoRateMode::Hz(100.0));
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut values = Vec::new();
     for _ in 0..100 {
@@ -485,7 +485,7 @@ fn test_pulse_width_effect() {
 
     // Test 25% duty cycle
     lfo.set_pulse_width(0.25);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut high_count = 0;
     let mut low_count = 0;
@@ -546,7 +546,7 @@ fn test_sample_and_hold_stability_within_cycle() {
     lfo.set_rate(LfoRateMode::Hz(0.5)); // Slow rate - one cycle every 2 seconds
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     // Get initial S&H value
     let initial_value = lfo.value();
@@ -570,7 +570,7 @@ fn test_sample_and_hold_changes_at_cycle_boundary() {
     lfo.set_rate(LfoRateMode::Hz(10.0)); // Fast rate for testing
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut values_seen = Vec::new();
     let mut last_value = lfo.value();
@@ -602,7 +602,7 @@ fn test_noise_continuous_variation() {
     lfo.set_rate(LfoRateMode::Hz(1.0));
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut values = Vec::new();
     for _ in 0..100 {
@@ -644,7 +644,7 @@ fn test_polarity_bipolar_range() {
         lfo.update(&timebase);
         let value = lfo.value();
         assert!(
-            value >= -1.01 && value <= 1.01,
+            (-1.01..=1.01).contains(&value),
             "Bipolar value {} out of range [-1, 1]",
             value
         );
@@ -665,7 +665,7 @@ fn test_polarity_unipolar_range() {
         lfo.update(&timebase);
         let value = lfo.value();
         assert!(
-            value >= -0.01 && value <= 1.01,
+            (-0.01..=1.01).contains(&value),
             "Unipolar value {} out of range [0, 1]",
             value
         );
@@ -781,7 +781,7 @@ fn test_modulation_source_trait_reset() {
     }
 
     // Reset should restore to start_phase
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     assert!(
         (lfo.phase() - 0.5).abs() < 0.01,
@@ -835,7 +835,7 @@ fn test_generate_block_fills_buffer() {
     lfo.set_rate(LfoRateMode::Hz(10.0));
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
     timebase.advance_block(64);
     lfo.update(&timebase);
 
@@ -850,7 +850,7 @@ fn test_generate_block_fills_buffer() {
             i
         );
         assert!(
-            value >= -1.01 && value <= 1.01,
+            (-1.01..=1.01).contains(&value),
             "generate_block value {} at {} out of bipolar range",
             value,
             i
@@ -866,7 +866,7 @@ fn test_generate_block_linear_interpolation() {
     lfo.set_interpolation(InterpolationStrategy::Linear);
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     // First block
     timebase.advance_block(64);
@@ -895,7 +895,7 @@ fn test_generate_block_linear_interpolation() {
     // All values should be in valid range
     for (i, &value) in output.iter().enumerate() {
         assert!(
-            value >= -1.01 && value <= 1.01,
+            (-1.01..=1.01).contains(&value),
             "Value {} at {} out of range",
             value,
             i
@@ -911,7 +911,7 @@ fn test_generate_block_hermite_interpolation() {
     lfo.set_interpolation(InterpolationStrategy::CubicHermite);
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     timebase.advance_block(64);
     lfo.update(&timebase);
@@ -923,7 +923,7 @@ fn test_generate_block_hermite_interpolation() {
     for (i, &value) in output.iter().enumerate() {
         assert!(value.is_finite(), "Hermite value at {} should be finite", i);
         assert!(
-            value >= -1.1 && value <= 1.1,
+            (-1.1..=1.1).contains(&value),
             "Hermite value {} at {} out of range",
             value,
             i
@@ -939,7 +939,7 @@ fn test_generate_block_unipolar() {
     lfo.set_polarity(LfoPolarity::Unipolar);
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     timebase.advance_block(64);
     lfo.update(&timebase);
@@ -950,7 +950,7 @@ fn test_generate_block_unipolar() {
     // All values should be in unipolar range [0, 1]
     for (i, &value) in output.iter().enumerate() {
         assert!(
-            value >= -0.01 && value <= 1.01,
+            (-0.01..=1.01).contains(&value),
             "Unipolar generate_block value {} at {} out of range",
             value,
             i
@@ -965,7 +965,7 @@ fn test_generate_block_noise() {
     lfo.set_rate(LfoRateMode::Hz(1.0));
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     timebase.advance_block(64);
     lfo.update(&timebase);
@@ -989,7 +989,7 @@ fn test_generate_block_noise() {
 
     for (i, &value) in output.iter().enumerate() {
         assert!(
-            value >= -1.01 && value <= 1.01,
+            (-1.01..=1.01).contains(&value),
             "Noise value {} at {} out of range",
             value,
             i
@@ -1004,7 +1004,7 @@ fn test_generate_block_sample_and_hold() {
     lfo.set_rate(LfoRateMode::Hz(0.5)); // Slow rate - constant within block
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     timebase.advance_block(64);
     lfo.update(&timebase);
@@ -1036,7 +1036,7 @@ fn test_sample_returns_values() {
     lfo.set_rate(LfoRateMode::Hz(10.0));
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     timebase.advance_block(64);
     lfo.update(&timebase);
@@ -1050,7 +1050,7 @@ fn test_sample_returns_values() {
             i
         );
         assert!(
-            value >= -1.01 && value <= 1.01,
+            (-1.01..=1.01).contains(&value),
             "sample() {} value {} out of range",
             i,
             value
@@ -1073,8 +1073,8 @@ fn test_sample_matches_generate_block() {
     let mut timebase1 = Timebase::new(44100.0);
     let mut timebase2 = Timebase::new(44100.0);
 
-    lfo1.reset(&mut timebase1);
-    lfo2.reset(&mut timebase2);
+    lfo1.reset(&timebase1);
+    lfo2.reset(&timebase2);
 
     timebase1.advance_block(64);
     timebase2.advance_block(64);
@@ -1087,8 +1087,8 @@ fn test_sample_matches_generate_block() {
 
     // Get samples
     let mut sample_output = [0.0f32; 64];
-    for i in 0..64 {
-        sample_output[i] = lfo2.sample();
+    for item in &mut sample_output {
+        *item = lfo2.sample();
     }
 
     // Both should match
@@ -1110,7 +1110,7 @@ fn test_sample_cache_refresh() {
     lfo.set_rate(LfoRateMode::Hz(1.0));
 
     let mut timebase = Timebase::new(44100.0);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     timebase.advance_block(64);
     lfo.update(&timebase);
@@ -1124,7 +1124,7 @@ fn test_sample_cache_refresh() {
     // All values should be valid
     for (i, &value) in values.iter().enumerate() {
         assert!(
-            value.is_finite() && value >= -1.01 && value <= 1.01,
+            value.is_finite() && (-1.01..=1.01).contains(&value),
             "sample() {} value {} invalid",
             i,
             value
@@ -1143,7 +1143,7 @@ fn test_simd_aware_component_lanes() {
 
     // Lanes should be at least 1 (scalar) and at most 16 (AVX-512)
     assert!(
-        lanes >= 1 && lanes <= 16,
+        (1..=16).contains(&lanes),
         "SIMD lanes {} should be in [1, 16]",
         lanes
     );
@@ -1163,7 +1163,7 @@ fn test_sine_accuracy_linear() {
 
     let sample_rate = 44100.0;
     let mut timebase = Timebase::new(sample_rate);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut max_error = 0.0f32;
     let num_blocks = 689; // ~1 second at 64 samples per block
@@ -1203,7 +1203,7 @@ fn test_sine_accuracy_hermite() {
 
     let sample_rate = 44100.0;
     let mut timebase = Timebase::new(sample_rate);
-    lfo.reset(&mut timebase);
+    lfo.reset(&timebase);
 
     let mut max_error = 0.0f32;
     let num_blocks = 689; // ~1 second at 64 samples per block
