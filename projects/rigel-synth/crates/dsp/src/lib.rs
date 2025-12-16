@@ -12,8 +12,8 @@ use rigel_math::DenormalGuard;
 
 // Re-export timing infrastructure from rigel-timing for backward compatibility
 pub use rigel_timing::{
-    ControlRateClock, ControlRateUpdates, ModulationSource, Smoother, SmoothingMode, Timebase,
-    DEFAULT_SAMPLE_RATE, DEFAULT_SMOOTHING_TIME_MS,
+    ControlRateClock, ControlRateUpdates, Smoother, SmoothingMode, Timebase, DEFAULT_SAMPLE_RATE,
+    DEFAULT_SMOOTHING_TIME_MS,
 };
 
 /// Sample rate type
