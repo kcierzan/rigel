@@ -59,12 +59,12 @@ fn test_lfo_output_range_bipolar() {
 
     // Bipolar range should be approximately [-1.0, 1.0]
     assert!(
-        min_value >= -1.01 && min_value <= -0.9,
+        (-1.01..=-0.9).contains(&min_value),
         "Bipolar min should be near -1.0, got {}",
         min_value
     );
     assert!(
-        max_value <= 1.01 && max_value >= 0.9,
+        (0.9..=1.01).contains(&max_value),
         "Bipolar max should be near 1.0, got {}",
         max_value
     );
