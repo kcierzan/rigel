@@ -13,6 +13,7 @@
 //! | 64 LFOs 1-second simulation | < 50 ms | < 5% CPU at 44.1kHz |
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use rigel_math::simd::SimdContext;
 use rigel_modulation::{
     InterpolationStrategy, Lfo, LfoRateMode, LfoWaveshape, ModulationSource, SimdXorshift128,
 };
@@ -97,6 +98,7 @@ fn bench_lfo_waveshapes(c: &mut Criterion) {
 /// Target: Linear < 200 ns, CubicHermite < 400 ns for 64 samples.
 fn bench_generate_block_interpolation(c: &mut Criterion) {
     let mut group = c.benchmark_group("generate_block_interpolation");
+    let simd_ctx = SimdContext::new();
 
     let interpolations = [
         ("linear", InterpolationStrategy::Linear),
@@ -121,7 +123,7 @@ fn bench_generate_block_interpolation(c: &mut Criterion) {
             group.throughput(Throughput::Elements(size as u64));
             group.bench_with_input(BenchmarkId::new(interp_name, size), &size, |b, _| {
                 b.iter(|| {
-                    lfo.generate_block(black_box(&mut output));
+                    lfo.generate_block(black_box(&mut output), &simd_ctx);
                     black_box(&output);
                 })
             });
@@ -134,6 +136,7 @@ fn bench_generate_block_interpolation(c: &mut Criterion) {
 /// Benchmark all waveshapes with generate_block() to identify outliers.
 fn bench_waveshape_block_generation(c: &mut Criterion) {
     let mut group = c.benchmark_group("waveshape_generate_block");
+    let simd_ctx = SimdContext::new();
 
     let waveshapes = [
         ("sine", LfoWaveshape::Sine),
@@ -159,7 +162,7 @@ fn bench_waveshape_block_generation(c: &mut Criterion) {
         group.throughput(Throughput::Elements(64));
         group.bench_function(name, |b| {
             b.iter(|| {
-                lfo.generate_block(black_box(&mut output));
+                lfo.generate_block(black_box(&mut output), &simd_ctx);
                 black_box(&output);
             })
         });
@@ -242,6 +245,7 @@ fn bench_sample_access(c: &mut Criterion) {
 /// Target: 64 LFOs full cycle < 64 µs (1 µs per LFO).
 fn bench_multi_lfo_polyphony(c: &mut Criterion) {
     let mut group = c.benchmark_group("multi_lfo_polyphony");
+    let simd_ctx = SimdContext::new();
 
     // Voice counts: 4, 8, 16 voices with 4 LFOs each
     let voice_counts: [usize; 3] = [4, 8, 16];
@@ -299,7 +303,7 @@ fn bench_multi_lfo_polyphony(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     for (lfo, output) in lfos.iter().zip(outputs.iter_mut()) {
-                        lfo.generate_block(black_box(output));
+                        lfo.generate_block(black_box(output), &simd_ctx);
                     }
                     black_box(&outputs);
                 })
@@ -315,7 +319,7 @@ fn bench_multi_lfo_polyphony(c: &mut Criterion) {
                     timebase.advance_block(64);
                     for (lfo, output) in lfos.iter_mut().zip(outputs.iter_mut()) {
                         lfo.update(black_box(&timebase));
-                        lfo.generate_block(black_box(output));
+                        lfo.generate_block(black_box(output), &simd_ctx);
                     }
                     black_box(&outputs);
                 })
@@ -330,6 +334,7 @@ fn bench_multi_lfo_polyphony(c: &mut Criterion) {
 /// Target: < 50 ms (< 5% CPU at 44.1kHz).
 fn bench_control_rate_efficiency(c: &mut Criterion) {
     let mut group = c.benchmark_group("control_rate_efficiency");
+    let simd_ctx = SimdContext::new();
 
     const LFO_COUNT: usize = 64;
     const BLOCK_SIZE: usize = 64;
@@ -365,7 +370,7 @@ fn bench_control_rate_efficiency(c: &mut Criterion) {
                 timebase.advance_block(64);
                 for (lfo, output) in lfos.iter_mut().zip(outputs.iter_mut()) {
                     lfo.update(black_box(&timebase));
-                    lfo.generate_block(black_box(output));
+                    lfo.generate_block(black_box(output), &simd_ctx);
                 }
             }
             black_box(&outputs);
