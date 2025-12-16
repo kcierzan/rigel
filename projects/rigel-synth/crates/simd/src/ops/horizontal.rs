@@ -12,8 +12,8 @@ use crate::traits::SimdVector;
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::horizontal_sum;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::horizontal_sum;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let result = horizontal_sum(a);
@@ -31,8 +31,8 @@ pub fn horizontal_sum<V: SimdVector>(a: V) -> V::Scalar {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::horizontal_max;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::horizontal_max;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let result = horizontal_max(a);
@@ -50,8 +50,8 @@ pub fn horizontal_max<V: SimdVector>(a: V) -> V::Scalar {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::horizontal_min;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::horizontal_min;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let result = horizontal_min(a);

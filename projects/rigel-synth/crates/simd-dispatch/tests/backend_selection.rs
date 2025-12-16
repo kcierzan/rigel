@@ -5,7 +5,7 @@
 //! 2. Forced backend feature flags (for deterministic testing)
 //! 3. Edge cases (NaN, infinity, zero inputs)
 
-use rigel_math::simd::{BackendType, CpuFeatures, ProcessParams, ScalarBackend, SimdBackend};
+use rigel_simd_dispatch::{BackendType, CpuFeatures, ProcessParams, ScalarBackend, SimdBackend};
 
 #[cfg(test)]
 mod backend_selection_tests {
@@ -128,7 +128,7 @@ mod backend_selection_tests {
     fn test_dispatcher_init_validation() {
         // FR-010: dispatcher.init() correctly validates CPU features and never selects
         // an unsupported backend
-        use rigel_math::simd::BackendDispatcher;
+        use rigel_simd_dispatch::BackendDispatcher;
 
         let dispatcher = BackendDispatcher::init();
         let backend_type = dispatcher.backend_type();
@@ -258,7 +258,7 @@ mod edge_case_tests {
         // AVX2 backend
         #[cfg(all(feature = "avx2", target_arch = "x86_64"))]
         {
-            use rigel_math::simd::Avx2Backend;
+            use rigel_simd_dispatch::Avx2Backend;
             test_fn(&|input, output, params| {
                 Avx2Backend::process_block(input, output, params);
             });
@@ -267,7 +267,7 @@ mod edge_case_tests {
         // AVX-512 backend
         #[cfg(all(feature = "avx512", target_arch = "x86_64"))]
         {
-            use rigel_math::simd::Avx512Backend;
+            use rigel_simd_dispatch::Avx512Backend;
             test_fn(&|input, output, params| {
                 Avx512Backend::process_block(input, output, params);
             });
@@ -276,7 +276,7 @@ mod edge_case_tests {
         // NEON backend
         #[cfg(all(feature = "neon", target_arch = "aarch64"))]
         {
-            use rigel_math::simd::NeonBackend;
+            use rigel_simd_dispatch::NeonBackend;
             test_fn(&|input, output, params| {
                 NeonBackend::process_block(input, output, params);
             });

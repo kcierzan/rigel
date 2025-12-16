@@ -14,8 +14,8 @@ use crate::traits::SimdVector;
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::fma;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::fma;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -36,8 +36,8 @@ pub fn fma<V: SimdVector>(a: V, b: V, c: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::fms;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::fms;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -58,8 +58,8 @@ pub fn fms<V: SimdVector>(a: V, b: V, c: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::fnma;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::fnma;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);

@@ -16,7 +16,7 @@
 //!
 //! Method style (via trait):
 //! ```rust
-//! use rigel_math::{DefaultSimdVector, SimdVector};
+//! use rigel_simd::{DefaultSimdVector, SimdVector};
 //!
 //! let a = DefaultSimdVector::splat(2.0);
 //! let b = DefaultSimdVector::splat(3.0);
@@ -25,8 +25,8 @@
 //!
 //! Functional style (via ops):
 //! ```rust
-//! use rigel_math::{DefaultSimdVector, SimdVector};
-//! use rigel_math::ops::{add, mul};
+//! use rigel_simd::{DefaultSimdVector, SimdVector};
+//! use rigel_simd::ops::{add, mul};
 //!
 //! let a = DefaultSimdVector::splat(2.0);
 //! let b = DefaultSimdVector::splat(3.0);

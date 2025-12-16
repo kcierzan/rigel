@@ -805,8 +805,8 @@ fn test_modulation_source_trait_value_before_update() {
 // New API Tests: Interpolation Strategy
 // ─────────────────────────────────────────────────────────────────────────────
 
-use rigel_math::simd::SimdContext;
 use rigel_modulation::InterpolationStrategy;
+use rigel_simd_dispatch::SimdContext;
 
 #[test]
 fn test_interpolation_strategy_default() {

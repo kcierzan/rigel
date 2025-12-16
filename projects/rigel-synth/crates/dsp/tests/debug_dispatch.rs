@@ -1,4 +1,4 @@
-use rigel_math::simd::dispatcher::{BackendDispatcher, CpuFeatures};
+use rigel_simd_dispatch::{BackendDispatcher, CpuFeatures};
 
 #[test]
 fn debug_runtime_dispatch() {

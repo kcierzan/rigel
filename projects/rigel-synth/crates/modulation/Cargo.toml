@@ -16,6 +16,7 @@ path = "src/lib.rs"
 [dependencies]
 rigel-timing = { path = "../timing" }
 rigel-math = { path = "../math", default-features = false }
+rigel-simd-dispatch = { path = "../simd-dispatch", default-features = false }
 libm = { workspace = true }
 
 [dev-dependencies]

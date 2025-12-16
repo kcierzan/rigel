@@ -9,8 +9,8 @@ use crate::traits::SimdVector;
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::add;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::add;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -27,8 +27,8 @@ pub fn add<V: SimdVector>(a: V, b: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::sub;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::sub;
 ///
 /// let a = DefaultSimdVector::splat(5.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -45,8 +45,8 @@ pub fn sub<V: SimdVector>(a: V, b: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::mul;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::mul;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -63,8 +63,8 @@ pub fn mul<V: SimdVector>(a: V, b: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::div;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::div;
 ///
 /// let a = DefaultSimdVector::splat(6.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -81,8 +81,8 @@ pub fn div<V: SimdVector>(a: V, b: V) -> V {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::ops::neg;
+/// use rigel_simd::{DefaultSimdVector, SimdVector};
+/// use rigel_simd::ops::neg;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let result = neg(a);

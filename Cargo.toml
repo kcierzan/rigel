@@ -4,6 +4,8 @@ members = [
   "projects/rigel-synth/crates/cli",
   "projects/rigel-synth/crates/plugin",
   "projects/rigel-synth/crates/xtask",
+  "projects/rigel-synth/crates/simd",
+  "projects/rigel-synth/crates/simd-dispatch",
   "projects/rigel-synth/crates/math",
   "projects/rigel-synth/crates/timing",
   "projects/rigel-synth/crates/modulation"

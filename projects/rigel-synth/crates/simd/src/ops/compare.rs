@@ -11,8 +11,8 @@ use crate::traits::{SimdMask, SimdVector};
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
-/// use rigel_math::ops::eq;
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::ops::eq;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(2.0);
@@ -31,8 +31,8 @@ pub fn eq<V: SimdVector>(a: V, b: V) -> V::Mask {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
-/// use rigel_math::ops::ne;
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::ops::ne;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -51,8 +51,8 @@ pub fn ne<V: SimdVector>(a: V, b: V) -> V::Mask {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
-/// use rigel_math::ops::lt;
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::ops::lt;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(3.0);
@@ -71,8 +71,8 @@ pub fn lt<V: SimdVector>(a: V, b: V) -> V::Mask {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
-/// use rigel_math::ops::le;
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::ops::le;
 ///
 /// let a = DefaultSimdVector::splat(2.0);
 /// let b = DefaultSimdVector::splat(2.0);
@@ -91,8 +91,8 @@ pub fn le<V: SimdVector>(a: V, b: V) -> V::Mask {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
-/// use rigel_math::ops::gt;
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::ops::gt;
 ///
 /// let a = DefaultSimdVector::splat(3.0);
 /// let b = DefaultSimdVector::splat(2.0);
@@ -111,8 +111,8 @@ pub fn gt<V: SimdVector>(a: V, b: V) -> V::Mask {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::{DefaultSimdVector, SimdVector, SimdMask};
-/// use rigel_math::ops::ge;
+/// use rigel_simd::{DefaultSimdVector, SimdVector, SimdMask};
+/// use rigel_simd::ops::ge;
 ///
 /// let a = DefaultSimdVector::splat(3.0);
 /// let b = DefaultSimdVector::splat(3.0);
