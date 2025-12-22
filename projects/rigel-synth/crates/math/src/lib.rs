@@ -4,19 +4,19 @@
 #![warn(clippy::all)]
 #![allow(unexpected_cfgs)]
 
-//! rigel-math: Trait-based SIMD abstraction library for real-time audio DSP
+//! rigel-math: Fast math kernels and DSP utilities for real-time audio
 //!
-//! This library provides zero-cost SIMD abstractions that enable writing DSP algorithms
-//! once and compiling to optimal SIMD instructions for each platform without #[cfg] directives.
+//! This library provides vectorized math functions and DSP building blocks
+//! built on top of rigel-simd's SIMD abstractions.
 //!
 //! # Features
 //!
-//! - **Trait-based SIMD abstraction**: Write backend-agnostic code using `SimdVector` trait
-//! - **Compile-time backend selection**: Choose scalar, AVX2, AVX512, or NEON via cargo features
-//! - **Block processing**: Fixed-size aligned buffers (64/128 samples) for cache efficiency
 //! - **Fast math kernels**: Vectorized tanh, exp, log, sin/cos, inverse, sqrt, pow
+//! - **Scalar math**: Control-rate approximations (expf, logf, sinf, cosf)
 //! - **Lookup tables**: Wavetable synthesis with linear/cubic interpolation
-//! - **Denormal protection**: RAII-based FTZ/DAZ flags for real-time stability
+//! - **Interpolation**: Linear, cubic hermite, quintic polynomials
+//! - **Waveshaping**: Saturation curves, sigmoid functions
+//! - **Anti-aliasing**: PolyBLEP/PolyBLAMP for band-limited synthesis
 //! - **No allocations**: All operations stack-based, real-time safe
 //!
 //! # Quick Start
@@ -30,38 +30,35 @@
 //!     let gain_vec = DefaultSimdVector::splat(gain);
 //!
 //!     for mut out_chunk in output.as_chunks_mut::<DefaultSimdVector>().iter_mut() {
-//!         // In a real implementation, you'd zip with input chunks
 //!         let value = out_chunk.load();
 //!         out_chunk.store(mul(value, gain_vec));
 //!     }
 //! }
-//!
-//! // Example usage
-//! let mut input = Block64::new();
-//! let mut output = Block64::new();
-//! apply_gain(&input, &mut output, 0.5);
 //! ```
 
 // Re-export libm for use in math kernels (test-only reference implementations)
 extern crate libm;
 
-// Core trait definitions
-pub mod traits;
+// ============================================================================
+// Re-export everything from rigel-simd for backward compatibility
+// ============================================================================
 
-// Backend implementations
-pub mod backends;
+// Re-export all public items from rigel-simd
+pub use rigel_simd::*;
 
-// Block processing
-pub mod block;
+// Re-export modules from rigel-simd for explicit module access (e.g., rigel_math::ops::mul)
+pub use rigel_simd::backends;
+pub use rigel_simd::block;
+pub use rigel_simd::denormal;
+pub use rigel_simd::ops;
+pub use rigel_simd::traits;
 
-// Functional-style vector operations
-pub mod ops;
+// ============================================================================
+// Math-specific modules (not from rigel-simd)
+// ============================================================================
 
-// Denormal protection
-pub mod denormal;
-
-// Fast math kernels
-pub mod math;
+// SIMD vectorized math kernels
+pub mod simd;
 
 // Saturation and waveshaping
 pub mod saturate;
@@ -82,97 +79,15 @@ pub mod table;
 // Crossfade and parameter ramping
 pub mod crossfade;
 
-// Scalar fast-math for control-rate operations
-pub mod scalar_fast;
+// Scalar math for control-rate operations
+pub mod scalar;
 
-// Runtime SIMD dispatch
-pub mod simd;
+// ============================================================================
+// Additional re-exports for convenience
+// ============================================================================
 
-// Public re-exports for convenience
-pub use traits::{SimdInt, SimdMask, SimdVector};
+// Re-export scalar math functions at top level
+pub use scalar::{cosf, expf, logf, sinf};
 
-// Re-export block types
-pub use block::{AudioBlock, Block128, Block64};
-
-// Re-export denormal protection
-pub use denormal::DenormalGuard;
-
-// Re-export scalar fast-math functions
-pub use scalar_fast::{fast_cosf, fast_expf, fast_logf, fast_sinf};
-
-// Re-export backend types
-pub use backends::scalar::{ScalarInt, ScalarInt64, ScalarMask, ScalarVector};
-
-// Only re-export AVX2 types when both feature is enabled AND we're targeting x86/x86_64
-#[cfg(all(feature = "avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-pub use backends::avx2::{Avx2Mask, Avx2Vector};
-
-// Only re-export AVX512 types when both feature is enabled AND we're targeting x86/x86_64
-#[cfg(all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")))]
-pub use backends::avx512::{Avx512Mask, Avx512Vector};
-
-// Only re-export NEON types when both feature is enabled AND we're targeting aarch64
-#[cfg(all(feature = "neon", target_arch = "aarch64"))]
-pub use backends::neon::{NeonMask, NeonVector};
-
-/// Default SIMD vector type based on enabled feature
-///
-/// This type alias resolves to the appropriate SIMD backend selected at compile time:
-/// - `scalar` feature (default): `ScalarVector<f32>` (1 lane)
-/// - `avx2` feature: `Avx2Vector` (8 lanes, x86-64)
-/// - `avx512` feature: `Avx512Vector` (16 lanes, x86-64)
-/// - `neon` feature: `NeonVector` (4 lanes, ARM64)
-///
-/// Note: When `runtime-dispatch` is enabled, multiple backends can coexist and
-/// DefaultSimdVector is set to ScalarVector as a safe fallback.
-#[cfg(all(
-    not(feature = "runtime-dispatch"),
-    not(feature = "avx2"),
-    not(feature = "avx512"),
-    not(feature = "neon")
-))]
-pub type DefaultSimdVector = ScalarVector<f32>;
-
-/// Default SIMD vector type (AVX2 backend for x86-64)
-#[cfg(all(
-    not(feature = "runtime-dispatch"),
-    feature = "avx2",
-    target_arch = "x86_64"
-))]
-pub type DefaultSimdVector = Avx2Vector;
-
-/// Default SIMD vector type (AVX512 backend for x86-64)
-#[cfg(all(
-    not(feature = "runtime-dispatch"),
-    feature = "avx512",
-    target_arch = "x86_64"
-))]
-pub type DefaultSimdVector = Avx512Vector;
-
-/// Default SIMD vector type (NEON backend for ARM64)
-#[cfg(all(
-    not(feature = "runtime-dispatch"),
-    feature = "neon",
-    target_arch = "aarch64"
-))]
-pub type DefaultSimdVector = NeonVector;
-
-/// When runtime-dispatch is enabled, DefaultSimdVector defaults to scalar
-/// (users should use the dispatcher instead of DefaultSimdVector)
-#[cfg(feature = "runtime-dispatch")]
-pub type DefaultSimdVector = ScalarVector<f32>;
-
-// Compile-time checks to prevent conflicting backends for the target architecture
-// Note: These checks are disabled when runtime-dispatch is enabled, as multiple
-// backends need to coexist for runtime selection
-
-// Prevent both AVX2 and AVX512 on x86/x86_64 (they conflict) - UNLESS runtime-dispatch is enabled
-#[cfg(all(
-    not(feature = "runtime-dispatch"),
-    feature = "avx2",
-    feature = "avx512",
-    any(target_arch = "x86", target_arch = "x86_64")
-))]
-compile_error!(
-    "Cannot enable both avx2 and avx512 features simultaneously on x86/x86_64. Choose one backend, or use runtime-dispatch feature."
-);
+// Re-export hermite_scalar for convenience (commonly used)
+pub use interpolate::hermite_scalar;

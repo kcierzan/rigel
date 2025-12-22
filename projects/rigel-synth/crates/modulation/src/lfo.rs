@@ -5,7 +5,7 @@ use crate::simd_rng::SimdXorshift128;
 use crate::traits::ModulationSource;
 use crate::waveshape::LfoWaveshape;
 use rigel_math::interpolate::hermite_scalar;
-use rigel_math::simd::SimdContext;
+use rigel_simd_dispatch::SimdContext;
 use rigel_timing::Timebase;
 
 /// Default block size for sample cache.

@@ -18,21 +18,21 @@ path = "src/lib.rs"
 
 [features]
 default = ["scalar"]
-scalar = []
-avx2 = []
-avx512 = []
-neon = []
+scalar = ["rigel-simd/scalar"]
+avx2 = ["rigel-simd/avx2"]
+avx512 = ["rigel-simd/avx512"]
+neon = ["rigel-simd/neon"]
 runtime-dispatch = []  # Allow multiple backends to coexist for runtime selection
 
 # Forced backend selection (deterministic testing) - mutually exclusive
-force-scalar = []
+force-scalar = ["scalar"]
 force-avx2 = ["avx2"]
 force-avx512 = ["avx512"]
 force-neon = ["neon"]
 
 [dependencies]
+rigel-simd = { path = "../simd", default-features = false }
 libm = "0.2"
-cpufeatures = "0.2"
 
 [dev-dependencies]
 proptest = "1.5"

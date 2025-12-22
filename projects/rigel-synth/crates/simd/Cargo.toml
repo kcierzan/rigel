@@ -1,0 +1,27 @@
+[package]
+name = "rigel-simd"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Trait-based SIMD abstraction layer for real-time audio DSP"
+keywords = ["audio", "dsp", "simd", "synthesizer", "real-time"]
+categories = ["multimedia::audio", "no-std", "algorithms"]
+
+[lib]
+name = "rigel_simd"
+path = "src/lib.rs"
+
+[features]
+default = ["scalar"]
+scalar = []
+avx2 = []
+avx512 = []
+neon = []
+
+[dependencies]
+libm = "0.2"
+
+[dev-dependencies]
+proptest = "1.5"

@@ -1,85 +1,58 @@
-//! SIMD Backend Dispatch Module
+//! Fast math kernels for audio DSP
 //!
-//! This module provides runtime SIMD backend selection and dispatch for optimal
-//! performance across different CPU architectures. It enables a single binary to
-//! automatically use the best available SIMD instruction set (scalar → AVX2 → AVX-512 on x86_64,
-//! NEON on aarch64).
+//! This module provides vectorized implementations of common mathematical functions
+//! optimized for audio DSP applications. All functions work across all SIMD backends
+//! (scalar, AVX2, AVX512, NEON) through the `SimdVector` trait abstraction.
 //!
-//! # Primary Public API
+//! # Modules
 //!
-//! **Use `SimdContext` for all DSP code** - it provides a unified interface that works
-//! identically across all platforms while automatically selecting the optimal backend.
+//! - `tanh`: Hyperbolic tangent for waveshaping and soft clipping
+//! - `exp`: Exponential functions for envelopes and decay curves
+//! - `log`: Logarithm functions for frequency calculations
+//! - `trig`: Sine, cosine, and sincos for oscillators and modulation
+//! - `inverse`: Fast reciprocal (1/x) for division-free algorithms
+//! - `sqrt`: Square root and reciprocal square root
+//! - `pow`: Power functions
+//! - `atan`: Arctangent for phase calculations
+//! - `exp2_log2`: Base-2 exponential and logarithm with IEEE 754 optimization
 //!
-//! # Architecture
+//! # Example
 //!
-//! - `context`: SimdContext unified API (PRIMARY PUBLIC INTERFACE)
-//! - `backend`: SimdBackend trait definition and ProcessParams struct
-//! - `scalar`: Scalar (non-SIMD) fallback implementation
-//! - `dispatcher`: CPU feature detection and BackendType selection
-//! - Platform-specific backends: `avx2`, `avx512`, `neon`
+//! ```rust
+//! use rigel_math::{DefaultSimdVector, SimdVector};
+//! use rigel_math::simd::{tanh, exp, sin};
 //!
-//! # Feature Flags
+//! // Waveshaping with tanh
+//! let input = DefaultSimdVector::splat(2.0);
+//! let shaped = tanh(input);
 //!
-//! - `runtime-dispatch`: Enable runtime CPU detection and backend selection
-//! - `avx2`: Compile AVX2 backend (x86_64)
-//! - `avx512`: Compile AVX-512 backend (x86_64, experimental)
-//! - `neon`: Compile NEON backend (aarch64)
-//! - `force-scalar`: Force scalar backend for deterministic testing
-//! - `force-avx2`: Force AVX2 backend for deterministic testing
-//! - `force-avx512`: Force AVX-512 backend for experimental testing
-//! - `force-neon`: Force NEON backend for deterministic testing
+//! // Envelope generation with exp
+//! let decay = DefaultSimdVector::splat(-5.0);
+//! let envelope = exp(decay);
 //!
-//! # Example Usage
-//!
-//! ```ignore
-//! use rigel_math::simd::{SimdContext, ProcessParams};
-//!
-//! // Initialize once during engine startup
-//! let ctx = SimdContext::new();
-//! println!("Using SIMD backend: {}", ctx.backend_name());
-//!
-//! // Use for DSP operations
-//! let input = [1.0f32; 64];
-//! let mut output = [0.0f32; 64];
-//! let params = ProcessParams {
-//!     gain: 0.5,
-//!     frequency: 440.0,
-//!     sample_rate: 44100.0,
-//! };
-//!
-//! ctx.process_block(&input, &mut output, &params);
+//! // Oscillator with sin
+//! let phase = DefaultSimdVector::splat(0.5);
+//! let output = sin(phase);
 //! ```
 
-pub mod backend;
-pub mod context;
-pub mod dispatcher;
-pub mod helpers;
-pub mod scalar;
+// Math kernel modules
+pub mod atan;
+pub mod exp;
+pub mod exp2_log2;
+pub mod inverse;
+pub mod log;
+pub mod pow;
+pub mod sqrt;
+pub mod tanh;
+pub mod trig;
 
-// Platform-specific backend modules
-#[cfg(all(feature = "avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-pub mod avx2;
-
-#[cfg(all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")))]
-pub mod avx512;
-
-#[cfg(all(feature = "neon", target_arch = "aarch64"))]
-pub mod neon;
-
-// Re-export primary public API
-pub use context::SimdContext;
-
-// Re-export supporting types
-pub use backend::{ProcessParams, SimdBackend};
-pub use dispatcher::{BackendDispatcher, BackendType, CpuFeatures};
-pub use scalar::ScalarBackend;
-
-// Conditionally re-export SIMD backends
-#[cfg(all(feature = "avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-pub use avx2::Avx2Backend;
-
-#[cfg(all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")))]
-pub use avx512::Avx512Backend;
-
-#[cfg(all(feature = "neon", target_arch = "aarch64"))]
-pub use neon::NeonBackend;
+// Re-export commonly used functions
+pub use self::atan::{atan, atan2};
+pub use self::exp::{exp, exp_envelope};
+pub use self::exp2_log2::{fast_exp2, fast_log2};
+pub use self::inverse::{recip, recip_rough};
+pub use self::log::{log, log10, log1p, log2};
+pub use self::pow::pow;
+pub use self::sqrt::{rsqrt, sqrt};
+pub use self::tanh::{tanh, tanh_fast};
+pub use self::trig::{cos, sin, sincos};

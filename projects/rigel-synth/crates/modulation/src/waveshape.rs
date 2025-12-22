@@ -1,7 +1,7 @@
 //! LFO waveshape definitions.
 
 use core::f32::consts::TAU;
-use rigel_math::{fast_cosf, fast_sinf};
+use rigel_math::{cosf, sinf};
 
 /// Available LFO waveshapes.
 ///
@@ -53,7 +53,7 @@ impl LfoWaveshape {
     #[inline]
     pub fn generate(self, phase: f32, pulse_width: f32, held_value: f32, noise_value: f32) -> f32 {
         match self {
-            LfoWaveshape::Sine => fast_sinf(phase * TAU),
+            LfoWaveshape::Sine => sinf(phase * TAU),
             LfoWaveshape::Triangle => {
                 // Triangle wave: rises to +1 at 0.25, falls to -1 at 0.75
                 if phase < 0.25 {
@@ -105,7 +105,7 @@ impl LfoWaveshape {
         match self {
             LfoWaveshape::Sine => {
                 // d/d(phase) sin(2*pi*phase) = 2*pi * cos(2*pi*phase)
-                TAU * fast_cosf(phase * TAU)
+                TAU * cosf(phase * TAU)
             }
             LfoWaveshape::Triangle => {
                 // Piecewise linear with slopes:

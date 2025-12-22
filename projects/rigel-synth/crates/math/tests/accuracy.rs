@@ -210,7 +210,7 @@ fn test_denormal_protection_preserves_normal_values() {
 // Fast Math Kernel Accuracy Tests (User Story 4)
 // =============================================================================
 
-use rigel_math::math::{atan, exp, fast_exp2, fast_log2, log1p, recip, sin, sincos, tanh};
+use rigel_math::simd::{atan, exp, fast_exp2, fast_log2, log1p, recip, sin, sincos, tanh};
 
 /// Helper function to calculate relative error as a percentage
 fn relative_error_percent(actual: f32, expected: f32) -> f32 {

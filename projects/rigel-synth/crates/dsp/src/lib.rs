@@ -6,9 +6,9 @@
 //! Provides fast, deterministic audio processing components.
 
 use core::f32::consts::TAU;
-use rigel_math::fast_expf;
-use rigel_math::simd::SimdContext;
-use rigel_math::DenormalGuard;
+use rigel_math::expf;
+use rigel_simd::DenormalGuard;
+use rigel_simd_dispatch::SimdContext;
 
 // Re-export timing infrastructure from rigel-timing for backward compatibility
 pub use rigel_timing::{
@@ -80,9 +80,9 @@ pub fn clamp(value: f32, min: f32, max: f32) -> f32 {
 #[inline]
 pub fn soft_clip(sample: f32) -> f32 {
     if sample > 1.0 {
-        1.0 - fast_expf(-(sample - 1.0))
+        1.0 - expf(-(sample - 1.0))
     } else if sample < -1.0 {
-        -1.0 + fast_expf(sample + 1.0)
+        -1.0 + expf(sample + 1.0)
     } else {
         sample
     }

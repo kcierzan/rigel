@@ -4,8 +4,8 @@
 //! Run with: cargo bench --bench criterion_benches
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use rigel_math::math::*;
 use rigel_math::ops::{add, clamp, div, fma, max, min, mul, sub};
+use rigel_math::simd::*;
 use rigel_math::{DefaultSimdVector, SimdVector};
 
 /// Benchmark basic arithmetic operations
@@ -232,7 +232,6 @@ fn bench_ops_module(c: &mut Criterion) {
             ))
         })
     });
-
     group.finish();
 }
 
@@ -270,8 +269,6 @@ fn bench_ops_pipeline(c: &mut Criterion) {
 /// Benchmark SIMD math functions vs scalar libm
 fn bench_math_simd_vs_scalar(c: &mut Criterion) {
     let mut group = c.benchmark_group("math_simd_vs_scalar");
-
-    // Test values for different functions
     let exp_val = 2.0;
     let log_val = 2.5;
     let trig_val = 0.7;
@@ -299,7 +296,6 @@ fn bench_math_simd_vs_scalar(c: &mut Criterion) {
     group.bench_function("log_scalar", |bencher| {
         bencher.iter(|| black_box(libm::logf(black_box(log_val))))
     });
-
     group.bench_function("log2_simd", |bencher| {
         let x = DefaultSimdVector::splat(log_val);
         bencher.iter(|| black_box(log2(black_box(x))))

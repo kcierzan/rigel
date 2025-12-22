@@ -14,24 +14,25 @@ crate-type = ["lib"]
 
 [dependencies]
 libm = "0.2"
-cpufeatures = { version = "0.2", optional = true }
-rigel-math = { path = "../math", default-features = false }
+rigel-simd-dispatch = { path = "../simd-dispatch", default-features = false }
 rigel-timing = { path = "../timing" }
+rigel-math = { path = "../math/" }
+rigel-simd = { path = "../simd/" }
 
 [features]
 default = []
-runtime-dispatch = ["cpufeatures", "rigel-math/runtime-dispatch", "rigel-math/scalar", "rigel-math/avx2", "rigel-math/avx512", "avx2", "avx512"]
+runtime-dispatch = ["rigel-simd-dispatch/runtime-dispatch"]
 
-# SIMD backend compilation flags (enable corresponding rigel-math backends)
-avx2 = ["rigel-math/avx2"]
-avx512 = ["rigel-math/avx512"]
-neon = ["rigel-math/neon"]
+# SIMD backend compilation flags
+avx2 = ["rigel-simd-dispatch/avx2"]
+avx512 = ["rigel-simd-dispatch/avx512"]
+neon = ["rigel-simd-dispatch/neon"]
 
 # Forced backend selection (deterministic testing)
-force-scalar = ["rigel-math/scalar"]
-force-avx2 = ["avx2"]
-force-avx512 = ["avx512"]
-force-neon = ["neon"]
+force-scalar = ["rigel-simd-dispatch/force-scalar"]
+force-avx2 = ["rigel-simd-dispatch/force-avx2"]
+force-avx512 = ["rigel-simd-dispatch/force-avx512"]
+force-neon = ["rigel-simd-dispatch/force-neon"]
 
 [dev-dependencies]
 # Statistical benchmarking with wall-clock time measurements

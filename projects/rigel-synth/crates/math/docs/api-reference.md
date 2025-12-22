@@ -18,7 +18,7 @@ Complete reference for `rigel-math` functions with error bounds, performance cha
 
 ## Math Functions
 
-All math functions are available in the `rigel_math::math` module.
+All math functions are available in the `rigel_math::simd` module.
 
 ### Exponential Functions
 
@@ -70,7 +70,7 @@ Base-2 exponential (2^x) using polynomial approximation.
 
 **Example:**
 ```rust
-use rigel_math::math::fast_exp2;
+use rigel_math::simd::fast_exp2;
 
 let midi_note = DefaultSimdVector::splat(69.0); // A4
 let freq_ratio = fast_exp2((midi_note - 69.0) / 12.0);  // Ratio to A4 (440 Hz)
@@ -95,7 +95,7 @@ Exponential decay envelope: exp(-rate * time).
 
 **Example:**
 ```rust
-use rigel_math::math::exp_envelope;
+use rigel_math::simd::exp_envelope;
 
 let decay_rate = DefaultSimdVector::splat(5.0); // 5/second
 let time = DefaultSimdVector::splat(0.2);       // 200ms
@@ -125,7 +125,7 @@ Natural logarithm (ln(x)) using polynomial approximation.
 
 **Example:**
 ```rust
-use rigel_math::math::log;
+use rigel_math::simd::log;
 
 let x = DefaultSimdVector::splat(2.718);
 let result = log(x);  // ln(e) ≈ 1.0
@@ -189,7 +189,7 @@ Sine function using polynomial approximation (range-reduced).
 
 **Example:**
 ```rust
-use rigel_math::math::sin;
+use rigel_math::simd::sin;
 
 let phase = DefaultSimdVector::splat(std::f32::consts::PI / 2.0);
 let result = sin(phase);  // sin(π/2) = 1.0
@@ -227,7 +227,7 @@ Compute sine and cosine simultaneously (faster than separate calls).
 
 **Example:**
 ```rust
-use rigel_math::math::sincos;
+use rigel_math::simd::sincos;
 
 let phase = DefaultSimdVector::splat(1.0);
 let (s, c) = sincos(phase);  // (sin(1.0), cos(1.0))
@@ -257,7 +257,7 @@ Hyperbolic tangent using Padé[5/5] approximation.
 
 **Example:**
 ```rust
-use rigel_math::math::tanh;
+use rigel_math::simd::tanh;
 
 let x = DefaultSimdVector::splat(2.0);
 let saturated = tanh(x);  // Soft clip to ≈0.964
@@ -305,7 +305,7 @@ Power function (x^y) using exp2(y * log2(x)).
 
 **Example:**
 ```rust
-use rigel_math::math::pow;
+use rigel_math::simd::pow;
 
 let x = DefaultSimdVector::splat(2.0);
 let y = DefaultSimdVector::splat(3.0);
