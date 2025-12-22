@@ -16,6 +16,8 @@ crate-type = ["lib"]
 libm = "0.2"
 rigel-simd-dispatch = { path = "../simd-dispatch", default-features = false }
 rigel-timing = { path = "../timing" }
+rigel-math = { path = "../math/" }
+rigel-simd = { path = "../simd/" }
 
 [features]
 default = []
