@@ -269,7 +269,6 @@ fn bench_ops_pipeline(c: &mut Criterion) {
 /// Benchmark SIMD math functions vs scalar libm
 fn bench_math_simd_vs_scalar(c: &mut Criterion) {
     let mut group = c.benchmark_group("math_simd_vs_scalar");
-
     let exp_val = 2.0;
     let log_val = 2.5;
     let trig_val = 0.7;
