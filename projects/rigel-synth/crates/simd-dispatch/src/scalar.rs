@@ -17,8 +17,8 @@
 
 use super::backend::{ProcessParams, SimdBackend};
 use super::helpers::{process_binary, process_ternary, process_unary};
-use crate::simd;
 use crate::ops;
+use crate::simd;
 use crate::ScalarVector;
 use core::f32::consts::TAU;
 
