@@ -7,8 +7,8 @@
 
 use core::f32::consts::TAU;
 use rigel_math::fast_expf;
-use rigel_math::simd::SimdContext;
-use rigel_math::DenormalGuard;
+use rigel_simd::DenormalGuard;
+use rigel_simd_dispatch::SimdContext;
 
 // Re-export timing infrastructure from rigel-timing for backward compatibility
 pub use rigel_timing::{
