@@ -8,7 +8,7 @@
 //! 5. table module functions work through the abstraction
 
 use rigel_simd_dispatch::table::{IndexMode, LookupTable};
-use rigel_simd_dispatch::{simd, ops, Block64, DefaultSimdVector, SimdVector};
+use rigel_simd_dispatch::{ops, simd, Block64, DefaultSimdVector, SimdVector};
 use rigel_simd_dispatch::{ProcessParams, SimdContext};
 
 #[test]
