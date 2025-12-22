@@ -18,7 +18,7 @@ use crate::traits::SimdVector;
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::atan;
+/// use rigel_math::simd::atan;
 ///
 /// let x = DefaultSimdVector::splat(1.0);
 /// let result = atan(x);
@@ -100,7 +100,7 @@ pub fn atan<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::atan2;
+/// use rigel_math::simd::atan2;
 ///
 /// let y = DefaultSimdVector::splat(1.0);
 /// let x = DefaultSimdVector::splat(1.0);

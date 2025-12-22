@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! use rigel_math::{DefaultSimdVector, SimdVector};
-//! use rigel_math::math::{tanh, exp, sin};
+//! use rigel_math::simd::{tanh, exp, sin};
 //!
 //! // Waveshaping with tanh
 //! let input = DefaultSimdVector::splat(2.0);

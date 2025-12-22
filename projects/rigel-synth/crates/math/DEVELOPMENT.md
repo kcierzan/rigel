@@ -292,7 +292,7 @@ cargo test test_new_feature --no-default-features --features scalar
 
 #### 2. Implement the Feature
 
-Add implementation in appropriate module (e.g., `src/math/new_feature.rs`):
+Add implementation in appropriate module (e.g., `src/simd/new_feature.rs`):
 
 ```rust
 use crate::SimdVector;
@@ -608,7 +608,7 @@ firefox flamegraph.svg
 cargo install cargo-asm
 
 # View assembly for function
-cargo asm --no-default-features --features avx2 rigel_math::math::exp --rust
+cargo asm --no-default-features --features avx2 rigel_math::simd::exp --rust
 ```
 
 Look for AVX2 instructions (`vaddps`, `vmulps`, `vfmadd231ps`).

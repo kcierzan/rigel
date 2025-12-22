@@ -21,7 +21,7 @@ use crate::traits::SimdVector;
 #[inline(always)]
 pub fn soft_clip<V: SimdVector<Scalar = f32>>(x: V) -> V {
     // Use tanh approximation for smooth saturation
-    use crate::math::tanh;
+    use crate::simd::tanh;
     tanh(x)
 }
 

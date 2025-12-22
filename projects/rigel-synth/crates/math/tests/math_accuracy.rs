@@ -5,7 +5,7 @@
 
 #![allow(clippy::redundant_closure)]
 
-use rigel_math::math::*;
+use rigel_math::simd::*;
 use rigel_math::{DefaultSimdVector, SimdVector};
 
 /// Test helper: compute maximum relative error across a range

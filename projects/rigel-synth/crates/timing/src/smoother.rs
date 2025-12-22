@@ -1,7 +1,7 @@
 //! Parameter smoothing with configurable curve types.
 
 use crate::{DEFAULT_SAMPLE_RATE, DEFAULT_SMOOTHING_TIME_MS};
-use rigel_math::{fast_expf, fast_logf};
+use rigel_math::{expf, logf};
 
 /// Threshold for exponential smoothing completion (0.1%)
 const EXPONENTIAL_THRESHOLD: f32 = 0.001;
@@ -159,7 +159,7 @@ impl Smoother {
             return 1.0; // Instant transition
         }
         let tau = smoothing_time_ms / 1000.0;
-        1.0 - fast_expf(-1.0 / (tau * sample_rate))
+        1.0 - expf(-1.0 / (tau * sample_rate))
     }
 
     /// Safe logarithm that handles zero and negative values
@@ -170,7 +170,7 @@ impl Smoother {
         } else {
             LOG_MIN_VALUE
         };
-        fast_logf(clamped)
+        logf(clamped)
     }
 
     /// Set a new target value.
@@ -306,7 +306,7 @@ impl Smoother {
                 self.log_current += self.coefficient * (self.log_target - self.log_current);
 
                 // Convert back to linear domain
-                self.current = fast_expf(self.log_current);
+                self.current = expf(self.log_current);
 
                 // Check threshold
                 if self.has_reached_target() {

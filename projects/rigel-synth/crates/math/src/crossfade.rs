@@ -58,7 +58,7 @@ pub fn crossfade_linear<V: SimdVector<Scalar = f32>>(a: V, b: V, t: V) -> V {
 /// let result = crossfade_equal_power(signal_a, signal_b, mix);
 /// ```
 pub fn crossfade_equal_power<V: SimdVector<Scalar = f32>>(a: V, b: V, t: V) -> V {
-    use crate::math::{cos, sin};
+    use crate::simd::{cos, sin};
 
     // Equal power crossfade using sin/cos pan law
     // angle = t * pi/2

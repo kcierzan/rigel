@@ -4,11 +4,11 @@
 //! 1. Backend selection works correctly (compile-time and runtime)
 //! 2. SimdContext provides a unified API regardless of backend
 //! 3. ops module functions work through the abstraction
-//! 4. math module functions work through the abstraction
+//! 4. simd module functions work through the abstraction
 //! 5. table module functions work through the abstraction
 
 use rigel_simd_dispatch::table::{IndexMode, LookupTable};
-use rigel_simd_dispatch::{math, ops, Block64, DefaultSimdVector, SimdVector};
+use rigel_simd_dispatch::{simd, ops, Block64, DefaultSimdVector, SimdVector};
 use rigel_simd_dispatch::{ProcessParams, SimdContext};
 
 #[test]
@@ -258,7 +258,7 @@ fn test_math_module_functions() {
 
     // Test sqrt (allow tolerance for fast approximation)
     let x = DefaultSimdVector::splat(16.0);
-    let sqrt_result = math::sqrt(x);
+    let sqrt_result = simd::sqrt(x);
     let mut sqrt_buf = [0.0f32; 16];
     sqrt_result.to_slice(&mut sqrt_buf[..DefaultSimdVector::LANES]);
 
@@ -273,7 +273,7 @@ fn test_math_module_functions() {
 
     // Test tanh (soft clipping) - should be in range [-1, 1]
     let values = DefaultSimdVector::splat(0.5);
-    let tanh_result = math::tanh(values);
+    let tanh_result = simd::tanh(values);
     let mut tanh_buf = [0.0f32; 16];
     tanh_result.to_slice(&mut tanh_buf[..DefaultSimdVector::LANES]);
 
@@ -288,7 +288,7 @@ fn test_math_module_functions() {
 
     // Test exp
     let zero = DefaultSimdVector::splat(0.0);
-    let exp_result = math::exp(zero);
+    let exp_result = simd::exp(zero);
     let mut exp_buf = [0.0f32; 16];
     exp_result.to_slice(&mut exp_buf[..DefaultSimdVector::LANES]);
 
@@ -302,7 +302,7 @@ fn test_math_module_functions() {
     }
 
     println!(
-        "✓ math module (sqrt, tanh, exp) works with {} backend",
+        "✓ simd module (sqrt, tanh, exp) works with {} backend",
         ctx.backend_name()
     );
 }
@@ -379,8 +379,8 @@ fn test_complete_dsp_pipeline() {
         let gain = DefaultSimdVector::splat(2.0);
         let gained = ops::mul(in_vec, gain);
 
-        // Step 2: Soft clipping (math module)
-        let clipped = math::tanh(gained);
+        // Step 2: Soft clipping (simd module)
+        let clipped = simd::tanh(gained);
 
         // Step 3: Final scaling (ops module)
         let scale = DefaultSimdVector::splat(0.8);
@@ -399,7 +399,7 @@ fn test_complete_dsp_pipeline() {
         );
     }
 
-    println!("✓ Complete DSP pipeline (ops + math) works correctly");
+    println!("✓ Complete DSP pipeline (ops + simd) works correctly");
     println!(
         "✓ All SIMD modules verified working with {} backend",
         ctx.backend_name()

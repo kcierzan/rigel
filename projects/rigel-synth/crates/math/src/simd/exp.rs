@@ -27,7 +27,7 @@
 //!
 //! ```rust
 //! use rigel_math::{DefaultSimdVector, SimdVector};
-//! use rigel_math::math::exp;
+//! use rigel_math::simd::exp;
 //!
 //! // Exponential decay envelope (typical audio use case)
 //! let decay_rate = DefaultSimdVector::splat(-5.0);
@@ -71,7 +71,7 @@ use crate::traits::SimdVector;
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::exp;
+/// use rigel_math::simd::exp;
 ///
 /// // Envelope generation (typical audio use case)
 /// let x = DefaultSimdVector::splat(-2.0);
@@ -187,7 +187,7 @@ pub fn exp<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::exp_envelope;
+/// use rigel_math::simd::exp_envelope;
 ///
 /// // Generate exponential decay envelope
 /// let decay_rate = DefaultSimdVector::splat(-10.0);

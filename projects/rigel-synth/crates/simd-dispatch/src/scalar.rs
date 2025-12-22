@@ -17,7 +17,7 @@
 
 use super::backend::{ProcessParams, SimdBackend};
 use super::helpers::{process_binary, process_ternary, process_unary};
-use crate::math;
+use crate::simd;
 use crate::ops;
 use crate::ScalarVector;
 use core::f32::consts::TAU;
@@ -169,32 +169,32 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn sqrt(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::sqrt::sqrt, libm::sqrtf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::sqrt::sqrt, libm::sqrtf);
     }
 
     #[inline]
     fn exp(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::exp::exp, libm::expf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::exp::exp, libm::expf);
     }
 
     #[inline]
     fn log(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::log::log, libm::logf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::log::log, libm::logf);
     }
 
     #[inline]
     fn log2(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::log::log2, libm::log2f);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::log::log2, libm::log2f);
     }
 
     #[inline]
     fn log10(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::log::log10, libm::log10f);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::log::log10, libm::log10f);
     }
 
     #[inline]
     fn pow(base: &[f32], exponent: &[f32], output: &mut [f32]) {
-        // math::pow takes scalar exponent, not vector exponent
+        // simd::pow takes scalar exponent, not vector exponent
         // So we can't use the helper here - just use libm::powf
         for i in 0..output.len() {
             output[i] = libm::powf(base[i], exponent[i]);
@@ -207,12 +207,12 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn sin(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::trig::sin, libm::sinf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::trig::sin, libm::sinf);
     }
 
     #[inline]
     fn cos(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::trig::cos, libm::cosf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::trig::cos, libm::cosf);
     }
 
     #[inline]
@@ -241,12 +241,12 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn atan(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::atan::atan, libm::atanf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::atan::atan, libm::atanf);
     }
 
     #[inline]
     fn atan2(y: &[f32], x: &[f32], output: &mut [f32]) {
-        process_binary::<ScalarVector<f32>, _>(y, x, output, math::atan::atan2, libm::atan2f);
+        process_binary::<ScalarVector<f32>, _>(y, x, output, simd::atan::atan2, libm::atan2f);
     }
 
     // ========================================================================
@@ -271,7 +271,7 @@ impl SimdBackend for ScalarBackend {
 
     #[inline]
     fn tanh(input: &[f32], output: &mut [f32]) {
-        process_unary::<ScalarVector<f32>, _>(input, output, math::tanh::tanh, libm::tanhf);
+        process_unary::<ScalarVector<f32>, _>(input, output, simd::tanh::tanh, libm::tanhf);
     }
 
     // ========================================================================

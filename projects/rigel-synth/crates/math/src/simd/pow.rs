@@ -43,7 +43,7 @@ use crate::traits::SimdVector;
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::pow;
+/// use rigel_math::simd::pow;
 ///
 /// let base = DefaultSimdVector::splat(2.0);
 /// let result = pow(base, 3.0);
