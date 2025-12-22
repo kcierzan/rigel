@@ -12,7 +12,7 @@
 //! # Features
 //!
 //! - **Fast math kernels**: Vectorized tanh, exp, log, sin/cos, inverse, sqrt, pow
-//! - **Scalar fast math**: Control-rate approximations (fast_expf, fast_logf, etc.)
+//! - **Scalar math**: Control-rate approximations (expf, logf, sinf, cosf)
 //! - **Lookup tables**: Wavetable synthesis with linear/cubic interpolation
 //! - **Interpolation**: Linear, cubic hermite, quintic polynomials
 //! - **Waveshaping**: Saturation curves, sigmoid functions
@@ -57,8 +57,8 @@ pub use rigel_simd::traits;
 // Math-specific modules (not from rigel-simd)
 // ============================================================================
 
-// Fast math kernels
-pub mod math;
+// SIMD vectorized math kernels
+pub mod simd;
 
 // Saturation and waveshaping
 pub mod saturate;
@@ -79,15 +79,15 @@ pub mod table;
 // Crossfade and parameter ramping
 pub mod crossfade;
 
-// Scalar fast-math for control-rate operations
-pub mod scalar_fast;
+// Scalar math for control-rate operations
+pub mod scalar;
 
 // ============================================================================
 // Additional re-exports for convenience
 // ============================================================================
 
-// Re-export scalar fast-math functions at top level
-pub use scalar_fast::{fast_cosf, fast_expf, fast_logf, fast_sinf};
+// Re-export scalar math functions at top level
+pub use scalar::{cosf, expf, logf, sinf};
 
 // Re-export hermite_scalar for convenience (commonly used)
 pub use interpolate::hermite_scalar;

@@ -46,7 +46,7 @@ use crate::traits::SimdVector;
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::recip;
+/// use rigel_math::simd::recip;
 ///
 /// let x = DefaultSimdVector::splat(2.0);
 /// let result = recip(x);
@@ -91,7 +91,7 @@ pub fn recip<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::recip_rough;
+/// use rigel_math::simd::recip_rough;
 ///
 /// let x = DefaultSimdVector::splat(4.0);
 /// let result = recip_rough(x);

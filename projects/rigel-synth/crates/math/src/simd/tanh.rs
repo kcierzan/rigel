@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! use rigel_math::{DefaultSimdVector, SimdVector};
-//! use rigel_math::math::tanh;
+//! use rigel_math::simd::tanh;
 //!
 //! let x = DefaultSimdVector::splat(0.5);
 //! let result = tanh(x);
@@ -46,7 +46,7 @@ use crate::traits::SimdVector;
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::tanh;
+/// use rigel_math::simd::tanh;
 ///
 /// // Soft clipping example
 /// let input = DefaultSimdVector::splat(2.0);
@@ -99,7 +99,7 @@ pub fn tanh<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::tanh_fast;
+/// use rigel_math::simd::tanh_fast;
 ///
 /// let x = DefaultSimdVector::splat(1.0);
 /// let result = tanh_fast(x);

@@ -211,7 +211,7 @@ library_benchmark_group!(
 
 // Math kernel benchmarks (T117)
 
-use rigel_math::math::*;
+use rigel_math::simd::*;
 
 #[library_benchmark]
 fn bench_math_tanh() -> DefaultSimdVector {

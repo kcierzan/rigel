@@ -29,9 +29,9 @@ use crate::traits::SimdVector;
 /// # Example
 ///
 /// ```rust,ignore
-/// use rigel_math::math::exp;
-/// use rigel_math::backends::ScalarVector;
-/// use rigel_math::simd::helpers::process_unary;
+/// use rigel_simd::simd::exp;
+/// use rigel_simd::backends::ScalarVector;
+/// use rigel_simd_dispatch::helpers::process_unary;
 ///
 /// fn exp_impl(input: &[f32], output: &mut [f32]) {
 ///     process_unary::<ScalarVector<f32>, _>(
@@ -106,9 +106,9 @@ pub fn process_unary<V, F>(
 /// # Example
 ///
 /// ```rust,ignore
-/// use rigel_math::ops::add;
-/// use rigel_math::backends::Avx2Vector;
-/// use rigel_math::simd::helpers::process_binary;
+/// use rigel_simd::ops::add;
+/// use rigel_simd::backends::Avx2Vector;
+/// use rigel_simd::simd::helpers::process_binary;
 ///
 /// fn add_impl(a: &[f32], b: &[f32], output: &mut [f32]) {
 ///     process_binary::<Avx2Vector, _>(
@@ -189,8 +189,8 @@ pub fn process_binary<V, F>(
 /// # Example
 ///
 /// ```rust,ignore
-/// use rigel_math::backends::ScalarVector;
-/// use rigel_math::simd::helpers::process_ternary;
+/// use rigel_simd::backends::ScalarVector;
+/// use rigel_simd::simd::helpers::process_ternary;
 ///
 /// fn fma_impl(a: &[f32], b: &[f32], c: &[f32], output: &mut [f32]) {
 ///     process_ternary::<ScalarVector<f32>, _>(
@@ -260,7 +260,7 @@ pub fn process_ternary<V, F>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math;
+    use crate::simd;
     use crate::ScalarVector;
 
     #[test]
@@ -269,7 +269,7 @@ mod tests {
         let input = [2.0_f32];
         let mut output = [0.0_f32; 1];
 
-        process_unary::<ScalarVector<f32>, _>(&input, &mut output, math::exp::exp, libm::expf);
+        process_unary::<ScalarVector<f32>, _>(&input, &mut output, simd::exp::exp, libm::expf);
 
         // exp(2) ≈ 7.389
         assert!((output[0] - 7.389).abs() < 0.01);
@@ -282,7 +282,7 @@ mod tests {
         let input = [1.0, 2.0, 3.0];
         let mut output = [0.0; 3];
 
-        process_unary::<ScalarVector<f32>, _>(&input, &mut output, math::exp::exp, libm::expf);
+        process_unary::<ScalarVector<f32>, _>(&input, &mut output, simd::exp::exp, libm::expf);
 
         // Check all values are processed
         assert!(output[0] > 0.0);
@@ -331,6 +331,6 @@ mod tests {
         let input = [1.0, 2.0];
         let mut output = [0.0; 3]; // Wrong length
 
-        process_unary::<ScalarVector<f32>, _>(&input, &mut output, math::exp::exp, libm::expf);
+        process_unary::<ScalarVector<f32>, _>(&input, &mut output, simd::exp::exp, libm::expf);
     }
 }

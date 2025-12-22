@@ -1,4 +1,4 @@
-//! Scalar fast-math approximations for control-rate DSP
+//! Scalar math approximations for control-rate DSP
 //!
 //! Provides ~3-5x speedup over libm with <1% error.
 //! Designed for smoothing, envelopes, LFOs, and other control-rate operations
@@ -15,26 +15,26 @@
 //!
 //! - Sample-accurate synthesis requiring <0.01% error
 //! - Scientific computing requiring IEEE 754 compliance
-//! - Cases where you're already using SIMD (use `math::exp`/`math::log` instead)
+//! - Cases where you're already using SIMD (use `simd::exp`/`simd::log` instead)
 //!
 //! # Error Bounds
 //!
-//! - `fast_expf`: <1% relative error for x ∈ [-20, 20]
-//! - `fast_logf`: <1% relative error for x > 0
+//! - `expf`: <1% relative error for x ∈ [-20, 20]
+//! - `logf`: <1% relative error for x > 0
 //!
 //! # Example
 //!
 //! ```rust
-//! use rigel_math::scalar_fast::{fast_expf, fast_logf};
+//! use rigel_math::scalar::{expf, logf};
 //!
 //! // Exponential decay envelope
 //! let decay_rate = -5.0;
 //! let time = 0.1;
-//! let envelope = fast_expf(decay_rate * time); // ~0.606
+//! let envelope = expf(decay_rate * time); // ~0.606
 //!
 //! // Log-domain parameter smoothing
 //! let frequency = 1000.0;
-//! let log_freq = fast_logf(frequency); // ~6.9
+//! let log_freq = logf(frequency); // ~6.9
 //! ```
 
 /// Fast scalar exp(x) using Padé[4/4] approximation with range reduction
@@ -57,13 +57,13 @@
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::scalar_fast::fast_expf;
+/// use rigel_math::scalar::expf;
 ///
-/// let decay = fast_expf(-5.0); // ~0.00674
+/// let decay = expf(-5.0); // ~0.00674
 /// assert!((decay - 0.00674).abs() < 0.0001);
 /// ```
 #[inline(always)]
-pub fn fast_expf(x: f32) -> f32 {
+pub fn expf(x: f32) -> f32 {
     // Clamp to prevent overflow/underflow
     // exp(-87) ≈ 1.2e-38 (near f32 min)
     // exp(87) ≈ 6.1e37 (near f32 max, with headroom for squaring)
@@ -133,13 +133,13 @@ pub fn fast_expf(x: f32) -> f32 {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::scalar_fast::fast_logf;
+/// use rigel_math::scalar::logf;
 ///
-/// let log_1000 = fast_logf(1000.0); // ~6.9
+/// let log_1000 = logf(1000.0); // ~6.9
 /// assert!((log_1000 - 6.907).abs() < 0.1);
 /// ```
 #[inline(always)]
-pub fn fast_logf(x: f32) -> f32 {
+pub fn logf(x: f32) -> f32 {
     // IEEE 754 single precision: sign(1) | exponent(8) | mantissa(23)
     // For x = 1.mantissa × 2^(exp-127)
     // log(x) = (exp - 127) × ln(2) + log(1.mantissa)
@@ -223,14 +223,14 @@ pub fn fast_logf(x: f32) -> f32 {
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::scalar_fast::fast_sinf;
+/// use rigel_math::scalar::sinf;
 ///
 /// let phase = core::f32::consts::FRAC_PI_2;
-/// let result = fast_sinf(phase); // ~1.0
+/// let result = sinf(phase); // ~1.0
 /// assert!((result - 1.0).abs() < 0.01);
 /// ```
 #[inline(always)]
-pub fn fast_sinf(x: f32) -> f32 {
+pub fn sinf(x: f32) -> f32 {
     use core::f32::consts::{FRAC_PI_2, PI, TAU};
 
     // Cody-Waite range reduction constants
@@ -281,25 +281,25 @@ pub fn fast_sinf(x: f32) -> f32 {
     }
 }
 
-/// Fast scalar cos(x) using fast_sinf
+/// Fast scalar cos(x) using sinf
 ///
 /// Uses the identity: cos(x) = sin(x + pi/2)
 ///
 /// # Performance
 ///
-/// Same performance characteristics as `fast_sinf`.
+/// Same performance characteristics as `sinf`.
 ///
 /// # Example
 ///
 /// ```rust
-/// use rigel_math::scalar_fast::fast_cosf;
+/// use rigel_math::scalar::cosf;
 ///
-/// let result = fast_cosf(0.0); // ~1.0
+/// let result = cosf(0.0); // ~1.0
 /// assert!((result - 1.0).abs() < 0.01);
 /// ```
 #[inline(always)]
-pub fn fast_cosf(x: f32) -> f32 {
-    fast_sinf(x + core::f32::consts::FRAC_PI_2)
+pub fn cosf(x: f32) -> f32 {
+    sinf(x + core::f32::consts::FRAC_PI_2)
 }
 
 #[cfg(test)]
@@ -316,8 +316,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_expf_zero() {
-        let result = fast_expf(0.0);
+    fn test_expf_zero() {
+        let result = expf(0.0);
         let expected = 1.0;
         let error = relative_error(result, expected);
         assert!(
@@ -330,8 +330,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_expf_one() {
-        let result = fast_expf(1.0);
+    fn test_expf_one() {
+        let result = expf(1.0);
         let expected = core::f32::consts::E;
         let error = relative_error(result, expected);
         assert!(
@@ -344,8 +344,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_expf_negative() {
-        let result = fast_expf(-2.0);
+    fn test_expf_negative() {
+        let result = expf(-2.0);
         let expected = libm::expf(-2.0);
         let error = relative_error(result, expected);
         assert!(
@@ -358,9 +358,9 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_expf_typical_envelope_decay() {
+    fn test_expf_typical_envelope_decay() {
         // Typical envelope decay: exp(-5) ≈ 0.00674
-        let result = fast_expf(-5.0);
+        let result = expf(-5.0);
         let expected = libm::expf(-5.0);
         let error = relative_error(result, expected);
         assert!(
@@ -373,13 +373,13 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_expf_clamping() {
+    fn test_expf_clamping() {
         // Should not overflow
-        let result = fast_expf(100.0);
+        let result = expf(100.0);
         assert!(result.is_finite(), "exp(100) should be clamped and finite");
 
         // Should not underflow to zero
-        let result = fast_expf(-100.0);
+        let result = expf(-100.0);
         assert!(
             result > 0.0,
             "exp(-100) should be clamped to positive value"
@@ -387,8 +387,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_logf_one() {
-        let result = fast_logf(1.0);
+    fn test_logf_one() {
+        let result = logf(1.0);
         let expected = 0.0;
         assert!(
             result.abs() < 0.001,
@@ -399,8 +399,8 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_logf_e() {
-        let result = fast_logf(core::f32::consts::E);
+    fn test_logf_e() {
+        let result = logf(core::f32::consts::E);
         let expected = 1.0;
         let error = relative_error(result, expected);
         assert!(
@@ -413,9 +413,9 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_logf_typical_frequency() {
+    fn test_logf_typical_frequency() {
         // log(1000) ≈ 6.907 (typical filter frequency)
-        let result = fast_logf(1000.0);
+        let result = logf(1000.0);
         let expected = libm::logf(1000.0);
         let error = relative_error(result, expected);
         assert!(
@@ -428,9 +428,9 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_logf_small_values() {
+    fn test_logf_small_values() {
         // log(0.01) ≈ -4.605
-        let result = fast_logf(0.01);
+        let result = logf(0.01);
         let expected = libm::logf(0.01);
         let error = relative_error(result, expected);
         assert!(
@@ -447,7 +447,7 @@ mod tests {
         // exp(log(x)) should approximately equal x
         let test_values = [0.1, 0.5, 1.0, 2.0, 10.0, 100.0, 1000.0];
         for &x in &test_values {
-            let roundtrip = fast_expf(fast_logf(x));
+            let roundtrip = expf(logf(x));
             let error = relative_error(roundtrip, x);
             assert!(
                 error < 0.02,
@@ -465,7 +465,7 @@ mod tests {
         let test_values: [f32; 11] = [-10.0, -5.0, -2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 5.0, 10.0];
 
         for &x in &test_values {
-            let result = fast_expf(x);
+            let result = expf(x);
             let expected = libm::expf(x);
             let error = relative_error(result, expected);
             assert!(
@@ -480,18 +480,18 @@ mod tests {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // fast_sinf tests
+    // sinf tests
     // ─────────────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_fast_sinf_zero() {
-        let result = fast_sinf(0.0);
+    fn test_sinf_zero() {
+        let result = sinf(0.0);
         assert!(result.abs() < 0.001, "sin(0) = {}, expected 0.0", result);
     }
 
     #[test]
-    fn test_fast_sinf_pi_over_2() {
-        let result = fast_sinf(core::f32::consts::FRAC_PI_2);
+    fn test_sinf_pi_over_2() {
+        let result = sinf(core::f32::consts::FRAC_PI_2);
         let error = (result - 1.0).abs();
         assert!(
             error < 0.01,
@@ -502,14 +502,14 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_sinf_pi() {
-        let result = fast_sinf(core::f32::consts::PI);
+    fn test_sinf_pi() {
+        let result = sinf(core::f32::consts::PI);
         assert!(result.abs() < 0.01, "sin(π) = {}, expected 0.0", result);
     }
 
     #[test]
-    fn test_fast_sinf_negative() {
-        let result = fast_sinf(-core::f32::consts::FRAC_PI_2);
+    fn test_sinf_negative() {
+        let result = sinf(-core::f32::consts::FRAC_PI_2);
         let error = (result + 1.0).abs();
         assert!(
             error < 0.01,
@@ -520,11 +520,11 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_sinf_lfo_range() {
+    fn test_sinf_lfo_range() {
         // Test typical LFO phase range [0, 2π]
         for i in 0..=100 {
             let phase = (i as f32) * core::f32::consts::TAU / 100.0;
-            let result = fast_sinf(phase);
+            let result = sinf(phase);
             let expected = libm::sinf(phase);
             let error = (result - expected).abs();
             assert!(
@@ -539,7 +539,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_sinf_large_values() {
+    fn test_sinf_large_values() {
         // Test range reduction with large values
         let test_values = [
             10.0 * core::f32::consts::PI,
@@ -548,7 +548,7 @@ mod tests {
         ];
 
         for &x in &test_values {
-            let result = fast_sinf(x);
+            let result = sinf(x);
             let expected = libm::sinf(x);
             let error = (result - expected).abs();
             assert!(
@@ -563,12 +563,12 @@ mod tests {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // fast_cosf tests
+    // cosf tests
     // ─────────────────────────────────────────────────────────────────────
 
     #[test]
-    fn test_fast_cosf_zero() {
-        let result = fast_cosf(0.0);
+    fn test_cosf_zero() {
+        let result = cosf(0.0);
         let error = (result - 1.0).abs();
         assert!(
             error < 0.01,
@@ -579,19 +579,19 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_cosf_pi_over_2() {
-        let result = fast_cosf(core::f32::consts::FRAC_PI_2);
+    fn test_cosf_pi_over_2() {
+        let result = cosf(core::f32::consts::FRAC_PI_2);
         assert!(result.abs() < 0.01, "cos(π/2) = {}, expected 0.0", result);
     }
 
     #[test]
-    fn test_fast_sinf_cosf_pythagorean() {
+    fn test_sinf_cosf_pythagorean() {
         // sin²(x) + cos²(x) = 1
         let test_values = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0];
 
         for &x in &test_values {
-            let s = fast_sinf(x);
-            let c = fast_cosf(x);
+            let s = sinf(x);
+            let c = cosf(x);
             let identity = s * s + c * c;
             let error = (identity - 1.0).abs();
             assert!(

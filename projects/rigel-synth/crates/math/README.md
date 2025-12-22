@@ -74,7 +74,7 @@ AVX2, AVX512, and NEON backends use **vectorized polynomial approximations**:
 
 ```rust
 use rigel_math::{DefaultSimdVector, SimdVector};
-use rigel_math::math::exp;
+use rigel_math::simd::exp;
 
 let x = DefaultSimdVector::splat(2.0);
 let result = exp(x);  // Padé[5/5] approximation, all lanes in parallel

@@ -21,7 +21,7 @@ use crate::traits::SimdVector;
 #[inline(always)]
 pub fn logistic<V: SimdVector<Scalar = f32>>(x: V) -> V {
     // sigmoid(x) = 1 / (1 + exp(-x))
-    use crate::math::exp;
+    use crate::simd::exp;
 
     let one = V::splat(1.0);
     let neg_x = x.neg();

@@ -32,7 +32,7 @@
 //!
 //! ```rust
 //! use rigel_math::{DefaultSimdVector, SimdVector};
-//! use rigel_math::math::{sin, cos, sincos};
+//! use rigel_math::simd::{sin, cos, sincos};
 //!
 //! let phase = DefaultSimdVector::splat(core::f32::consts::FRAC_PI_2);
 //! let s = sin(phase); // ≈ 1.0
@@ -73,7 +73,7 @@ const INV_TWO_PI: f32 = 0.15915494309189533577; // 1/(2π)
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::sin;
+/// use rigel_math::simd::sin;
 ///
 /// let phase = DefaultSimdVector::splat(0.0);
 /// let result = sin(phase);
@@ -145,7 +145,7 @@ pub fn sin<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::cos;
+/// use rigel_math::simd::cos;
 ///
 /// let phase = DefaultSimdVector::splat(0.0);
 /// let result = cos(phase);
@@ -172,7 +172,7 @@ pub fn cos<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::sincos;
+/// use rigel_math::simd::sincos;
 ///
 /// let phase = DefaultSimdVector::splat(core::f32::consts::FRAC_PI_4);
 /// let (s, c) = sincos(phase);

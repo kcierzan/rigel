@@ -3,7 +3,7 @@
 //! This test analyzes the practical frequency accuracy of fast_exp2
 //! for MIDI-to-frequency conversion across the full MIDI range.
 
-use rigel_math::math::fast_exp2;
+use rigel_math::simd::fast_exp2;
 use rigel_math::{DefaultSimdVector, SimdVector};
 
 #[test]

@@ -29,7 +29,7 @@
 //!
 //! ```rust
 //! use rigel_math::{DefaultSimdVector, SimdVector};
-//! use rigel_math::math::{log, log1p};
+//! use rigel_math::simd::{log, log1p};
 //!
 //! // Frequency ratio calculation
 //! let freq_ratio = DefaultSimdVector::splat(2.0);
@@ -53,7 +53,7 @@ use crate::traits::{SimdInt, SimdVector};
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::log;
+/// use rigel_math::simd::log;
 ///
 /// let x = DefaultSimdVector::splat(core::f32::consts::E);
 /// let result = log(x);
@@ -165,7 +165,7 @@ pub fn log<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::log1p;
+/// use rigel_math::simd::log1p;
 ///
 /// // Frequency ratio: 1% increase
 /// let ratio = DefaultSimdVector::splat(0.01);
@@ -215,7 +215,7 @@ pub fn log1p<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::log2;
+/// use rigel_math::simd::log2;
 ///
 /// let x = DefaultSimdVector::splat(8.0);
 /// let result = log2(x);
@@ -241,7 +241,7 @@ pub fn log2<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::log10;
+/// use rigel_math::simd::log10;
 ///
 /// let x = DefaultSimdVector::splat(100.0);
 /// let result = log10(x);

@@ -28,7 +28,7 @@ use crate::traits::SimdVector;
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::sqrt;
+/// use rigel_math::simd::sqrt;
 ///
 /// let x = DefaultSimdVector::splat(4.0);
 /// let result = sqrt(x);
@@ -54,7 +54,7 @@ pub fn sqrt<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::rsqrt;
+/// use rigel_math::simd::rsqrt;
 ///
 /// let x = DefaultSimdVector::splat(4.0);
 /// let result = rsqrt(x);

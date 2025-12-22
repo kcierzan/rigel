@@ -62,7 +62,7 @@ use crate::traits::{SimdInt, SimdVector};
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::fast_exp2;
+/// use rigel_math::simd::fast_exp2;
 ///
 /// // MIDI-to-frequency conversion
 /// let midi_note = DefaultSimdVector::splat(60.0); // Middle C
@@ -136,7 +136,7 @@ pub fn fast_exp2<V: SimdVector<Scalar = f32>>(x: V) -> V {
 ///
 /// ```rust
 /// use rigel_math::{DefaultSimdVector, SimdVector};
-/// use rigel_math::math::fast_log2;
+/// use rigel_math::simd::fast_log2;
 ///
 /// let x = DefaultSimdVector::splat(8.0);
 /// let result = fast_log2(x);

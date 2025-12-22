@@ -4,8 +4,8 @@
 //! Run with: cargo bench --bench criterion_benches
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use rigel_math::math::*;
 use rigel_math::ops::{add, clamp, div, fma, max, min, mul, sub};
+use rigel_math::simd::*;
 use rigel_math::{DefaultSimdVector, SimdVector};
 
 /// Benchmark basic arithmetic operations
@@ -269,7 +269,6 @@ fn bench_ops_pipeline(c: &mut Criterion) {
 /// Benchmark SIMD math functions vs scalar libm
 fn bench_math_simd_vs_scalar(c: &mut Criterion) {
     let mut group = c.benchmark_group("math_simd_vs_scalar");
-
 
     let exp_val = 2.0;
     let log_val = 2.5;
