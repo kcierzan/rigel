@@ -13,6 +13,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -192,7 +193,7 @@ jobs:
 
   build-plugin-macos:
     name: Build Plugin (macOS)
-    runs-on: macos-latest
+    runs-on: macos-14
     needs: [rigel-pipeline, wtgen-pipeline]
     steps:
       - uses: actions/checkout@v4
