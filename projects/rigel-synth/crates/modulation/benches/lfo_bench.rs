@@ -13,12 +13,12 @@
 //! | 64 LFOs 1-second simulation | < 50 ms | < 5% CPU at 44.1kHz |
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use rigel_modulation::{
     InterpolationStrategy, Lfo, LfoRateMode, LfoWaveshape, ModulationSource, SimdXorshift128,
 };
 use rigel_simd_dispatch::SimdContext;
 use rigel_timing::Timebase;
+use std::hint::black_box;
 
 // =============================================================================
 // Existing Benchmarks (kept for regression tracking)
