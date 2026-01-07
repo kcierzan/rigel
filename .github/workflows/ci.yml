@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,6 +31,9 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache for Rust
+        run: echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> $GITHUB_ENV
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
@@ -140,7 +142,6 @@ jobs:
     needs: [rigel-pipeline, wtgen-pipeline]
     env:
       SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     strategy:
       fail-fast: true
       matrix:
@@ -158,6 +159,9 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache for Rust
+        run: echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> $GITHUB_ENV
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
@@ -207,7 +211,6 @@ jobs:
     needs: [rigel-pipeline, wtgen-pipeline]
     env:
       SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -215,6 +218,9 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure sccache for Rust
+        run: echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> $GITHUB_ENV
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
