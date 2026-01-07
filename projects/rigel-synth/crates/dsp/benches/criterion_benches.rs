@@ -1,4 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use rigel_dsp::{
     clamp, lerp, midi_to_freq, soft_clip, ControlRateClock, Envelope, NoteNumber, SimpleOscillator,
     Smoother, SmoothingMode, SynthEngine, SynthParams, Timebase,

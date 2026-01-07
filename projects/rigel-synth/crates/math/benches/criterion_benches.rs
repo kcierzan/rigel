@@ -3,7 +3,8 @@
 //! Measures wall-clock time for vector operations across backends.
 //! Run with: cargo bench --bench criterion_benches
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 use rigel_math::ops::{add, clamp, div, fma, max, min, mul, sub};
 use rigel_math::simd::*;
 use rigel_math::{DefaultSimdVector, SimdVector};

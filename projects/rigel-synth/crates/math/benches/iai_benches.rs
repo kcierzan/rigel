@@ -3,7 +3,8 @@
 //! Measures instruction counts for vector operations (deterministic, cachegrind-based).
 //! Run with: cargo bench --bench iai_benches
 
-use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
+use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+use std::hint::black_box;
 use rigel_math::ops::{add, clamp, div, fma, max, min, mul, sub};
 use rigel_math::{DefaultSimdVector, SimdVector};
 

@@ -20,7 +20,7 @@ rigel-simd-dispatch = { path = "../simd-dispatch", default-features = false }
 libm = { workspace = true }
 
 [dev-dependencies]
-criterion = { version = "0.5", default-features = false }
+criterion = { version = "0.7", default-features = false }
 
 [[bench]]
 name = "lfo_bench"
