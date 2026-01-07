@@ -179,9 +179,6 @@ in
       # Linux-specific profiling tools
       valgrind # Required for iai-callgrind benchmarks
       perf # Hardware performance counters
-      # Fast linker for faster builds
-      mold
-      clang # Linker driver for mold
     ]
     ++ lib.optionals isDarwin [
       # macOS-specific dependencies
