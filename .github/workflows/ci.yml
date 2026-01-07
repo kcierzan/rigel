@@ -13,12 +13,10 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
-  id-token: write
 
 env:
   CARGO_TERM_COLOR: always
   GCC_SPECS: ""
-  FLAKEHUB_DISABLE_TELEMETRY: "1"
 
 jobs:
   rigel-pipeline:
