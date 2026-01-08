@@ -36,10 +36,10 @@ force-neon = ["rigel-simd-dispatch/force-neon"]
 
 [dev-dependencies]
 # Statistical benchmarking with wall-clock time measurements
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.7", features = ["html_reports"] }
 
 # Deterministic instruction-count benchmarking for CI
-iai-callgrind = "0.14"
+iai-callgrind = "0.16"
 
 [[bench]]
 name = "criterion_benches"

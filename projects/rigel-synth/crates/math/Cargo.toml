@@ -36,8 +36,8 @@ libm = "0.2"
 
 [dev-dependencies]
 proptest = "1.5"
-criterion = { version = "0.5", features = ["html_reports"] }
-iai-callgrind = "0.14"
+criterion = { version = "0.7", features = ["html_reports"] }
+iai-callgrind = "0.16"
 
 [[bench]]
 name = "criterion_benches"
