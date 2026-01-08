@@ -22,16 +22,10 @@ jobs:
   rigel-pipeline:
     name: Rigel Lint & Tests
     runs-on: ubuntu-latest
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
@@ -39,11 +33,14 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-prefix: rigel
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
         with:
-          workspaces: "."
-          cache-on-failure: false
+          path: target
+          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+          restore-keys: |
+            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            rust-target-${{ runner.os }}-
 
       - name: Workaround GCC specs directory conflict
         run: test -d specs && mv specs specs.bak || true
@@ -159,12 +156,14 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-prefix: rigel
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
         with:
-          workspaces: "."
-          cache-on-failure: false
-          shared-key: ${{ matrix.target }}
+          path: target
+          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.target }}
+          restore-keys: |
+            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            rust-target-${{ runner.os }}-
 
       - name: Cache xwin SDK
         if: matrix.target == 'windows'
@@ -210,12 +209,14 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-prefix: rigel
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
         with:
-          workspaces: "."
-          cache-on-failure: false
-          shared-key: macos
+          path: target
+          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-macos
+          restore-keys: |
+            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            rust-target-${{ runner.os }}-
 
       - name: Test NEON backend
         env:
