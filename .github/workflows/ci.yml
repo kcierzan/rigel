@@ -45,6 +45,11 @@ jobs:
       - name: Workaround GCC specs directory conflict
         run: test -d specs && mv specs specs.bak || true
 
+      - name: Fetch dependencies
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell cargo fetch --locked
+
       - name: Check formatting
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -53,18 +58,18 @@ jobs:
       - name: Run clippy
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo clippy --all-targets -- -D warnings
+        run: devenv shell cargo clippy --locked --all-targets -- -D warnings
 
       - name: Run tests
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo test
+        run: devenv shell cargo test --locked
 
       - name: Test AVX2 backend
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
           RUSTFLAGS: "-C target-feature=+avx2,+fma"
-        run: devenv shell cargo test --features avx2
+        run: devenv shell cargo test --locked --features avx2
 
       - name: Restore specs directory
         if: always()
@@ -177,6 +182,11 @@ jobs:
       - name: Workaround GCC specs directory conflict
         run: test -d specs && mv specs specs.bak || true
 
+      - name: Fetch dependencies
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell cargo fetch --locked
+
       - name: Build plugin (${{ matrix.target }})
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -218,10 +228,15 @@ jobs:
             rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
             rust-target-${{ runner.os }}-
 
+      - name: Fetch dependencies
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: devenv shell cargo fetch --locked
+
       - name: Test NEON backend
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo test --features neon
+        run: devenv shell cargo test --locked --features neon
 
       - name: Build plugin (macOS)
         env:
