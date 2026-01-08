@@ -22,18 +22,10 @@ jobs:
   rigel-pipeline:
     name: Rigel Lint & Tests
     runs-on: ubuntu-latest
-    env:
-      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache for Rust
-        run: echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> $GITHUB_ENV
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
@@ -41,11 +33,14 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-prefix: rigel
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
         with:
-          workspaces: "."
-          cache-on-failure: false
+          path: target
+          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
+          restore-keys: |
+            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            rust-target-${{ runner.os }}-
 
       - name: Workaround GCC specs directory conflict
         run: test -d specs && mv specs specs.bak || true
@@ -140,8 +135,6 @@ jobs:
     name: Build Plugin (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [rigel-pipeline, wtgen-pipeline]
-    env:
-      SCCACHE_GHA_ENABLED: "true"
     strategy:
       fail-fast: true
       matrix:
@@ -157,24 +150,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache for Rust
-        run: echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> $GITHUB_ENV
-
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-prefix: rigel
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
         with:
-          workspaces: "."
-          cache-on-failure: false
-          shared-key: ${{ matrix.target }}
+          path: target
+          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.target }}
+          restore-keys: |
+            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            rust-target-${{ runner.os }}-
 
       - name: Cache xwin SDK
         if: matrix.target == 'windows'
@@ -209,18 +198,10 @@ jobs:
     name: Build Plugin (macOS)
     runs-on: macos-14
     needs: [rigel-pipeline, wtgen-pipeline]
-    env:
-      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache for Rust
-        run: echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> $GITHUB_ENV
 
       - name: Setup devenv
         uses: ./.github/actions/setup-devenv
@@ -228,12 +209,14 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-prefix: rigel
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
         with:
-          workspaces: "."
-          cache-on-failure: false
-          shared-key: macos
+          path: target
+          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-macos
+          restore-keys: |
+            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            rust-target-${{ runner.os }}-
 
       - name: Test NEON backend
         env:
