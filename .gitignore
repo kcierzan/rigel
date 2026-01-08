@@ -3,7 +3,6 @@ nih-plug
 
 # Rust
 /target/
-Cargo.lock
 
 # DAW Plugin Bundles
 *.vst3/
