@@ -3,7 +3,7 @@
 //! Minimal headless wavetable synthesizer plugin using nih-plug and rigel-dsp core.
 
 use nih_plug::prelude::*;
-use nih_plug_iced::IcedState;
+use nih_plug_vizia::ViziaState;
 use rigel_dsp::{SynthEngine, SynthParams};
 use std::sync::Arc;
 
@@ -21,7 +21,7 @@ pub struct RigelPluginParams {
     /// The editor state, saved together with the parameter state so the custom scaling can be
     /// restored.
     #[persist = "editor-state"]
-    editor_state: Arc<IcedState>,
+    editor_state: Arc<ViziaState>,
 
     /// Master volume
     #[id = "volume"]
