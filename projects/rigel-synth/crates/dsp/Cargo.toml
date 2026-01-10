@@ -18,6 +18,7 @@ rigel-simd-dispatch = { path = "../simd-dispatch", default-features = false }
 rigel-timing = { path = "../timing" }
 rigel-math = { path = "../math/" }
 rigel-simd = { path = "../simd/" }
+rigel-modulation = { path = "../modulation", default-features = false }
 
 [features]
 default = []

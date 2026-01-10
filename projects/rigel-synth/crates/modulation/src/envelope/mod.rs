@@ -59,8 +59,8 @@ pub use config::{
 };
 pub use rates::{
     calculate_increment_q8, get_static_count, level_to_linear, levels_to_linear_simd,
-    linear_to_level, param_to_q8_level, rate_to_qrate, scale_output_level, scale_rate,
-    JUMP_TARGET_Q8, LEVEL_LUT, STATICS,
+    linear_to_level, linear_to_param_level, param_to_q8_level, rate_to_qrate, scale_output_level,
+    scale_rate, seconds_to_rate, JUMP_TARGET_Q8, LEVEL_LUT, STATICS,
 };
 pub use segment::Segment;
 pub use state::{EnvelopeLevel, EnvelopePhase, EnvelopeState, LEVEL_MAX, LEVEL_MIN};

@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use crate::RigelPluginParams;
 
-/// Default editor state - 300x400 window size
+/// Default editor state - 600x700 window size for FM envelope controls
 pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::new(|| (300, 400))
+    ViziaState::new(|| (600, 700))
 }
 
 /// Data struct for reactive binding via Lens derive
@@ -30,28 +30,140 @@ pub(crate) fn create(
         .build(cx);
 
         VStack::new(cx, |cx| {
-            Label::new(cx, "Rigel");
-            Label::new(cx, "Wavetable Synthesizer");
+            // Header
+            Label::new(cx, "Rigel").font_size(24.0);
+            Label::new(cx, "FM Wavetable Synthesizer");
 
-            Label::new(cx, "Volume");
-            ParamSlider::new(cx, Data::params, |params| &params.volume);
+            // Master controls
+            HStack::new(cx, |cx| {
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Volume");
+                    ParamSlider::new(cx, Data::params, |params| &params.volume);
+                })
+                .width(Stretch(1.0));
 
-            Label::new(cx, "Pitch");
-            ParamSlider::new(cx, Data::params, |params| &params.pitch_offset);
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Pitch");
+                    ParamSlider::new(cx, Data::params, |params| &params.pitch_offset);
+                })
+                .width(Stretch(1.0));
+            })
+            .col_between(Pixels(10.0));
 
-            Label::new(cx, "Envelope");
+            // Separator
+            Element::new(cx)
+                .height(Pixels(1.0))
+                .background_color(Color::gray());
 
-            Label::new(cx, "Attack");
-            ParamSlider::new(cx, Data::params, |params| &params.env_attack);
+            // Key-On Segments Header
+            Label::new(cx, "Key-On Segments (Attack/Decay)").font_size(16.0);
 
-            Label::new(cx, "Decay");
-            ParamSlider::new(cx, Data::params, |params| &params.env_decay);
+            // Segments 1-3 (Attack and first decays)
+            HStack::new(cx, |cx| {
+                // Segment 1 (Attack)
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Seg 1 (Attack)");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg1_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg1_level);
+                })
+                .width(Stretch(1.0));
 
-            Label::new(cx, "Sustain");
-            ParamSlider::new(cx, Data::params, |params| &params.env_sustain);
+                // Segment 2 (Decay 1)
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Seg 2 (Decay)");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg2_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg2_level);
+                })
+                .width(Stretch(1.0));
 
-            Label::new(cx, "Release");
-            ParamSlider::new(cx, Data::params, |params| &params.env_release);
+                // Segment 3
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Seg 3");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg3_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg3_level);
+                })
+                .width(Stretch(1.0));
+            })
+            .col_between(Pixels(10.0));
+
+            // Segments 4-6 (Later decays and sustain)
+            HStack::new(cx, |cx| {
+                // Segment 4
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Seg 4");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg4_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg4_level);
+                })
+                .width(Stretch(1.0));
+
+                // Segment 5
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Seg 5");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg5_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg5_level);
+                })
+                .width(Stretch(1.0));
+
+                // Segment 6 (Sustain)
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Seg 6 (Sustain)");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg6_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg6_level);
+                })
+                .width(Stretch(1.0));
+            })
+            .col_between(Pixels(10.0));
+
+            // Separator
+            Element::new(cx)
+                .height(Pixels(1.0))
+                .background_color(Color::gray());
+
+            // Release Segments Header
+            Label::new(cx, "Release Segments").font_size(16.0);
+
+            HStack::new(cx, |cx| {
+                // Release 1
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Release 1");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.rel1_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.rel1_level);
+                })
+                .width(Stretch(1.0));
+
+                // Release 2
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Release 2");
+                    Label::new(cx, "Rate");
+                    ParamSlider::new(cx, Data::params, |params| &params.rel2_rate);
+                    Label::new(cx, "Level");
+                    ParamSlider::new(cx, Data::params, |params| &params.rel2_level);
+                })
+                .width(Stretch(1.0));
+
+                // Rate Scaling
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Rate Scaling");
+                    ParamSlider::new(cx, Data::params, |params| &params.rate_scaling);
+                    Label::new(cx, "(Keyboard tracking)");
+                })
+                .width(Stretch(1.0));
+            })
+            .col_between(Pixels(10.0));
 
             ResizeHandle::new(cx);
         })

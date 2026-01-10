@@ -31,8 +31,8 @@ enum Commands {
         #[arg(short, long, default_value = "60")]
         note: u8,
 
-        /// Duration in seconds
-        #[arg(short, long, default_value = "2.0")]
+        /// Duration in seconds (note-on duration, release added automatically)
+        #[arg(short, long, default_value = "1.0")]
         duration: f32,
 
         /// Sample rate in Hz
@@ -42,6 +42,22 @@ enum Commands {
         /// Velocity (0.0 to 1.0)
         #[arg(short, long, default_value = "0.8")]
         velocity: f32,
+
+        /// Envelope attack time in seconds
+        #[arg(long, default_value = "0.01")]
+        attack: f32,
+
+        /// Envelope decay time in seconds
+        #[arg(long, default_value = "0.3")]
+        decay: f32,
+
+        /// Envelope sustain level (0.0 to 1.0)
+        #[arg(long, default_value = "0.7")]
+        sustain: f32,
+
+        /// Envelope release time in seconds
+        #[arg(long, default_value = "0.5")]
+        release: f32,
     },
 
     /// Generate a chord
@@ -58,8 +74,8 @@ enum Commands {
         #[arg(short, long, default_value = "major")]
         chord_type: String,
 
-        /// Duration in seconds
-        #[arg(short, long, default_value = "3.0")]
+        /// Duration in seconds (note-on duration, release added automatically)
+        #[arg(short, long, default_value = "2.0")]
         duration: f32,
 
         /// Sample rate in Hz
@@ -69,6 +85,22 @@ enum Commands {
         /// Velocity (0.0 to 1.0)
         #[arg(short, long, default_value = "0.7")]
         velocity: f32,
+
+        /// Envelope attack time in seconds
+        #[arg(long, default_value = "0.01")]
+        attack: f32,
+
+        /// Envelope decay time in seconds
+        #[arg(long, default_value = "0.3")]
+        decay: f32,
+
+        /// Envelope sustain level (0.0 to 1.0)
+        #[arg(long, default_value = "0.7")]
+        sustain: f32,
+
+        /// Envelope release time in seconds
+        #[arg(long, default_value = "0.5")]
+        release: f32,
     },
 
     /// Generate a scale
@@ -85,8 +117,8 @@ enum Commands {
         #[arg(short, long, default_value = "1")]
         octaves: u8,
 
-        /// Note duration in seconds
-        #[arg(short, long, default_value = "0.5")]
+        /// Note duration in seconds (note-on duration per note)
+        #[arg(short, long, default_value = "0.3")]
         note_duration: f32,
 
         /// Sample rate in Hz
@@ -96,6 +128,22 @@ enum Commands {
         /// Scale type (major, minor, chromatic)
         #[arg(short, long, default_value = "major")]
         scale_type: String,
+
+        /// Envelope attack time in seconds
+        #[arg(long, default_value = "0.01")]
+        attack: f32,
+
+        /// Envelope decay time in seconds
+        #[arg(long, default_value = "0.1")]
+        decay: f32,
+
+        /// Envelope sustain level (0.0 to 1.0)
+        #[arg(long, default_value = "0.8")]
+        sustain: f32,
+
+        /// Envelope release time in seconds
+        #[arg(long, default_value = "0.15")]
+        release: f32,
     },
 
     /// Test wavetable morphing
@@ -108,8 +156,8 @@ enum Commands {
         #[arg(short, long, default_value = "60")]
         note: u8,
 
-        /// Duration in seconds
-        #[arg(short, long, default_value = "4.0")]
+        /// Duration in seconds (note-on duration, release added automatically)
+        #[arg(short, long, default_value = "3.0")]
         duration: f32,
 
         /// Sample rate in Hz
@@ -119,7 +167,31 @@ enum Commands {
         /// Morph speed (cycles per second)
         #[arg(short, long, default_value = "0.5")]
         morph_speed: f32,
+
+        /// Envelope attack time in seconds
+        #[arg(long, default_value = "0.5")]
+        attack: f32,
+
+        /// Envelope decay time in seconds
+        #[arg(long, default_value = "0.5")]
+        decay: f32,
+
+        /// Envelope sustain level (0.0 to 1.0)
+        #[arg(long, default_value = "0.8")]
+        sustain: f32,
+
+        /// Envelope release time in seconds
+        #[arg(long, default_value = "1.0")]
+        release: f32,
     },
+}
+
+/// Envelope parameters for CLI commands
+struct EnvelopeParams {
+    attack: f32,
+    decay: f32,
+    sustain: f32,
+    release: f32,
 }
 
 fn main() -> Result<()> {
@@ -132,7 +204,23 @@ fn main() -> Result<()> {
             duration,
             sample_rate,
             velocity,
-        } => generate_note(&output, note, duration, sample_rate as f32, velocity),
+            attack,
+            decay,
+            sustain,
+            release,
+        } => generate_note(
+            &output,
+            note,
+            duration,
+            sample_rate as f32,
+            velocity,
+            EnvelopeParams {
+                attack,
+                decay,
+                sustain,
+                release,
+            },
+        ),
 
         Commands::Chord {
             output,
@@ -141,6 +229,10 @@ fn main() -> Result<()> {
             duration,
             sample_rate,
             velocity,
+            attack,
+            decay,
+            sustain,
+            release,
         } => generate_chord(
             &output,
             root,
@@ -148,6 +240,12 @@ fn main() -> Result<()> {
             duration,
             sample_rate as f32,
             velocity,
+            EnvelopeParams {
+                attack,
+                decay,
+                sustain,
+                release,
+            },
         ),
 
         Commands::Scale {
@@ -157,6 +255,10 @@ fn main() -> Result<()> {
             note_duration,
             sample_rate,
             scale_type,
+            attack,
+            decay,
+            sustain,
+            release,
         } => generate_scale(
             &output,
             start_note,
@@ -164,6 +266,12 @@ fn main() -> Result<()> {
             note_duration,
             sample_rate as f32,
             &scale_type,
+            EnvelopeParams {
+                attack,
+                decay,
+                sustain,
+                release,
+            },
         ),
 
         Commands::Morph {
@@ -172,7 +280,23 @@ fn main() -> Result<()> {
             duration,
             sample_rate,
             morph_speed,
-        } => generate_morph(&output, note, duration, sample_rate as f32, morph_speed),
+            attack,
+            decay,
+            sustain,
+            release,
+        } => generate_morph(
+            &output,
+            note,
+            duration,
+            sample_rate as f32,
+            morph_speed,
+            EnvelopeParams {
+                attack,
+                decay,
+                sustain,
+                release,
+            },
+        ),
     }
 }
 
@@ -182,10 +306,11 @@ fn generate_note(
     duration: f32,
     sample_rate: f32,
     velocity: f32,
+    env: EnvelopeParams,
 ) -> Result<()> {
     println!(
-        "Generating note {} for {:.2}s at {}Hz sample rate...",
-        note, duration, sample_rate
+        "Generating note {} for {:.2}s (+ {:.2}s release) at {}Hz...",
+        note, duration, env.release, sample_rate
     );
 
     let mut synth = SynthEngine::new(sample_rate);
@@ -199,38 +324,41 @@ fn generate_note(
 
     let mut writer = WavWriter::create(output_path, spec).context("Failed to create WAV file")?;
 
-    let total_samples = (duration * sample_rate) as usize;
-    let attack_samples = (0.1 * sample_rate) as usize;
-    let release_samples = (0.1 * sample_rate) as usize;
+    // Note-on duration + release tail
+    let note_on_samples = (duration * sample_rate) as usize;
+    let release_samples = (env.release * sample_rate * 1.5) as usize; // Extra buffer for release
+    let total_samples = note_on_samples + release_samples;
 
-    // Create synthesis parameters
-    let mut params = SynthParams {
-        volume: 0.7,
-        ..Default::default()
-    };
+    // Create synthesis parameters with envelope settings
+    let params = SynthParams::from_adsr(
+        0.7,
+        0.0,
+        env.attack,
+        env.decay,
+        env.sustain,
+        env.release,
+        sample_rate,
+    );
 
-    // Start the note
-    synth.note_on(note, velocity);
+    // Start the note with configured envelope
+    synth.note_on_with_params(note, velocity, &params);
 
     for i in 0..total_samples {
-        // Simple envelope for note start/end
-        let envelope = if i < attack_samples {
-            i as f32 / attack_samples as f32
-        } else if i > total_samples - release_samples {
-            (total_samples - i) as f32 / release_samples as f32
-        } else {
-            1.0
-        };
-
-        params.volume = 0.7 * envelope;
+        // Trigger note-off at the right time
+        if i == note_on_samples {
+            synth.note_off(note);
+        }
 
         let sample = synth.process_sample(&params);
         writer
             .write_sample(sample)
             .context("Failed to write sample")?;
-    }
 
-    synth.note_off(note);
+        // Stop early if envelope completed
+        if i > note_on_samples && !synth.is_active() {
+            break;
+        }
+    }
 
     writer.finalize().context("Failed to finalize WAV file")?;
     println!("Generated: {}", output_path.display());
@@ -245,10 +373,11 @@ fn generate_chord(
     duration: f32,
     sample_rate: f32,
     velocity: f32,
+    env: EnvelopeParams,
 ) -> Result<()> {
     println!(
-        "Generating {} chord from note {} for {:.2}s...",
-        chord_type, root, duration
+        "Generating {} chord from note {} for {:.2}s (+ {:.2}s release)...",
+        chord_type, root, duration, env.release
     );
 
     let chord_intervals = match chord_type {
@@ -277,42 +406,53 @@ fn generate_chord(
 
     let mut writer = WavWriter::create(output_path, spec).context("Failed to create WAV file")?;
 
-    let total_samples = (duration * sample_rate) as usize;
-    let attack_samples = (0.1 * sample_rate) as usize;
-    let release_samples = (0.2 * sample_rate) as usize;
+    // Note-on duration + release tail
+    let note_on_samples = (duration * sample_rate) as usize;
+    let release_samples = (env.release * sample_rate * 1.5) as usize;
+    let total_samples = note_on_samples + release_samples;
 
-    let params = SynthParams::default();
+    // Create synthesis parameters with envelope settings
+    let params = SynthParams::from_adsr(
+        0.5, // Lower volume for chords
+        0.0,
+        env.attack,
+        env.decay,
+        env.sustain,
+        env.release,
+        sample_rate,
+    );
 
-    // Start all chord notes
+    // Start all chord notes (only the first note uses note_on_with_params for config)
+    let mut first = true;
     for &interval in &chord_intervals {
         if root + interval <= 127 {
-            synth.note_on(root + interval, velocity);
+            if first {
+                synth.note_on_with_params(root + interval, velocity, &params);
+                first = false;
+            } else {
+                synth.note_on(root + interval, velocity);
+            }
         }
     }
 
     for i in 0..total_samples {
-        // Simple envelope
-        let envelope = if i < attack_samples {
-            i as f32 / attack_samples as f32
-        } else if i > total_samples - release_samples {
-            (total_samples - i) as f32 / release_samples as f32
-        } else {
-            1.0
-        };
-
-        let mut params = params;
-        params.volume = 0.5 * envelope; // Lower volume for multiple notes
+        // Trigger note-off at the right time
+        if i == note_on_samples {
+            for &interval in &chord_intervals {
+                if root + interval <= 127 {
+                    synth.note_off(root + interval);
+                }
+            }
+        }
 
         let sample = synth.process_sample(&params);
         writer
             .write_sample(sample)
             .context("Failed to write sample")?;
-    }
 
-    // Stop all chord notes
-    for &interval in &chord_intervals {
-        if root + interval <= 127 {
-            synth.note_off(root + interval);
+        // Stop early if envelope completed
+        if i > note_on_samples && !synth.is_active() {
+            break;
         }
     }
 
@@ -329,6 +469,7 @@ fn generate_scale(
     note_duration: f32,
     sample_rate: f32,
     scale_type: &str,
+    env: EnvelopeParams,
 ) -> Result<()> {
     println!(
         "Generating {} scale starting from note {} for {} octaves...",
@@ -357,11 +498,21 @@ fn generate_scale(
 
     let mut writer = WavWriter::create(output_path, spec).context("Failed to create WAV file")?;
 
-    let note_samples = (note_duration * sample_rate) as usize;
-    let attack_samples = (0.05 * sample_rate) as usize;
-    let release_samples = (0.1 * sample_rate) as usize;
+    // Note-on duration + release tail per note
+    let note_on_samples = (note_duration * sample_rate) as usize;
+    let release_samples = (env.release * sample_rate * 1.5) as usize;
+    let samples_per_note = note_on_samples + release_samples;
 
-    let params = SynthParams::default();
+    // Create synthesis parameters with envelope settings
+    let params = SynthParams::from_adsr(
+        0.7,
+        0.0,
+        env.attack,
+        env.decay,
+        env.sustain,
+        env.release,
+        sample_rate,
+    );
 
     for octave in 0..octaves {
         for &interval in &scale_intervals {
@@ -370,27 +521,25 @@ fn generate_scale(
                 break;
             }
 
-            synth.note_on(note, 0.8);
+            // Start note with configured envelope
+            synth.note_on_with_params(note, 0.8, &params);
 
-            for i in 0..note_samples {
-                let envelope = if i < attack_samples {
-                    i as f32 / attack_samples as f32
-                } else if i > note_samples - release_samples {
-                    (note_samples - i) as f32 / release_samples as f32
-                } else {
-                    1.0
-                };
-
-                let mut params = params;
-                params.volume = 0.7 * envelope;
+            for i in 0..samples_per_note {
+                // Trigger note-off at the right time
+                if i == note_on_samples {
+                    synth.note_off(note);
+                }
 
                 let sample = synth.process_sample(&params);
                 writer
                     .write_sample(sample)
                     .context("Failed to write sample")?;
-            }
 
-            synth.note_off(note);
+                // Stop early if envelope completed
+                if i > note_on_samples && !synth.is_active() {
+                    break;
+                }
+            }
         }
     }
 
@@ -406,10 +555,11 @@ fn generate_morph(
     duration: f32,
     sample_rate: f32,
     morph_speed: f32,
+    env: EnvelopeParams,
 ) -> Result<()> {
     println!(
-        "Generating wavetable morph on note {} for {:.2}s at {:.2} Hz morph rate...",
-        note, duration, morph_speed
+        "Generating wavetable morph on note {} for {:.2}s (+ {:.2}s release) at {:.2} Hz morph rate...",
+        note, duration, env.release, morph_speed
     );
 
     let mut synth = SynthEngine::new(sample_rate);
@@ -423,39 +573,47 @@ fn generate_morph(
 
     let mut writer = WavWriter::create(output_path, spec).context("Failed to create WAV file")?;
 
-    let total_samples = (duration * sample_rate) as usize;
-    let attack_samples = (0.1 * sample_rate) as usize;
-    let release_samples = (0.1 * sample_rate) as usize;
+    // Note-on duration + release tail
+    let note_on_samples = (duration * sample_rate) as usize;
+    let release_samples = (env.release * sample_rate * 1.5) as usize;
+    let total_samples = note_on_samples + release_samples;
 
-    let mut params = SynthParams::default();
+    // Create synthesis parameters with envelope settings
+    let mut params = SynthParams::from_adsr(
+        0.7,
+        0.0,
+        env.attack,
+        env.decay,
+        env.sustain,
+        env.release,
+        sample_rate,
+    );
 
-    synth.note_on(note, 0.8);
+    // Start note with configured envelope
+    synth.note_on_with_params(note, 0.8, &params);
 
     for i in 0..total_samples {
+        // Trigger note-off at the right time
+        if i == note_on_samples {
+            synth.note_off(note);
+        }
+
         let time = i as f32 / sample_rate;
 
-        // For now, just modulate pitch slightly for morphing effect
+        // Modulate pitch slightly for morphing effect
         let morph_phase = 2.0 * std::f32::consts::PI * morph_speed * time;
         params.pitch_offset = morph_phase.sin() * 2.0; // ±2 semitones
-
-        // Simple envelope
-        let envelope = if i < attack_samples {
-            i as f32 / attack_samples as f32
-        } else if i > total_samples - release_samples {
-            (total_samples - i) as f32 / release_samples as f32
-        } else {
-            1.0
-        };
-
-        params.volume = 0.7 * envelope;
 
         let sample = synth.process_sample(&params);
         writer
             .write_sample(sample)
             .context("Failed to write sample")?;
-    }
 
-    synth.note_off(note);
+        // Stop early if envelope completed
+        if i > note_on_samples && !synth.is_active() {
+            break;
+        }
+    }
 
     writer.finalize().context("Failed to finalize WAV file")?;
     println!("Generated: {}", output_path.display());

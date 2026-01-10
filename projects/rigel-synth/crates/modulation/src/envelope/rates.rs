@@ -252,6 +252,88 @@ pub fn get_static_count(rate: u8, sample_rate: f32) -> u32 {
     (base_count as f32 * sample_rate / 44100.0) as u32
 }
 
+/// Convert time in seconds to DX7 rate (0-99).
+///
+/// Inverts the STATICS table to find the rate that produces
+/// approximately the target duration. Shorter time = higher rate.
+///
+/// # Arguments
+///
+/// * `time_seconds` - Target envelope segment time in seconds
+/// * `sample_rate` - Sample rate in Hz
+///
+/// # Returns
+///
+/// DX7 rate parameter (0-99) that approximates the target time
+///
+/// # Example
+///
+/// ```ignore
+/// // 10ms attack at 44.1kHz
+/// let rate = seconds_to_rate(0.01, 44100.0);
+/// assert!(rate > 70); // Fast rate for short time
+///
+/// // 2 second decay at 44.1kHz
+/// let rate = seconds_to_rate(2.0, 44100.0);
+/// assert!(rate < 30); // Slow rate for long time
+/// ```
+#[inline]
+pub fn seconds_to_rate(time_seconds: f32, sample_rate: f32) -> u8 {
+    // Handle edge cases
+    if time_seconds <= 0.0 {
+        return 99; // Instant
+    }
+
+    let target_samples = (time_seconds * sample_rate) as u32;
+
+    // For very short times (rates 77-99), use formula: samples = 20 * (99 - rate)
+    // Solving for rate: rate = 99 - samples / 20
+    if target_samples < 440 {
+        // 440 = 20 * (99 - 77), threshold where formula begins
+        let rate = 99u32.saturating_sub(target_samples / 20);
+        return rate.clamp(77, 99) as u8;
+    }
+
+    // Scale target to 44100Hz base (STATICS table is for 44100Hz)
+    let target_at_44100 = (target_samples as f32 * 44100.0 / sample_rate) as u32;
+
+    // Binary search the STATICS table (sorted in descending order)
+    // Lower rate = longer time, higher rate = shorter time
+    let mut low = 0usize;
+    let mut high = 76usize; // STATICS has 77 entries (0-76)
+
+    while low < high {
+        let mid = (low + high) / 2;
+        if STATICS[mid] > target_at_44100 {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+
+    // Clamp to valid range
+    low.min(76) as u8
+}
+
+/// Convert linear amplitude (0.0-1.0) to DX7 level parameter (0-99).
+///
+/// This is useful for converting user-friendly sustain levels
+/// to the 0-99 range expected by envelope segments.
+///
+/// # Arguments
+///
+/// * `linear` - Linear amplitude in range [0.0, 1.0]
+///
+/// # Returns
+///
+/// DX7 level parameter (0-99)
+#[inline]
+pub fn linear_to_param_level(linear: f32) -> u8 {
+    // Simple linear mapping with clamping
+    // 0.0 -> 0, 1.0 -> 99
+    libm::roundf(linear.clamp(0.0, 1.0) * 99.0) as u8
+}
+
 /// Convert DX7 level parameter (0-99) to Q8 internal level.
 ///
 /// # Arguments
@@ -415,5 +497,107 @@ mod tests {
         // Level 99 should map to high Q8
         let q8_99 = param_to_q8_level(99);
         assert!(q8_99 > LEVEL_MAX / 2);
+    }
+
+    #[test]
+    fn test_seconds_to_rate_instant() {
+        // Zero or negative time should give instant (rate 99)
+        assert_eq!(seconds_to_rate(0.0, 44100.0), 99);
+        assert_eq!(seconds_to_rate(-1.0, 44100.0), 99);
+    }
+
+    #[test]
+    fn test_seconds_to_rate_very_short() {
+        // Very short times should give high rates (77-99)
+        let rate = seconds_to_rate(0.001, 44100.0); // 1ms
+        assert!(rate >= 77, "1ms should give rate >= 77, got {}", rate);
+    }
+
+    #[test]
+    fn test_seconds_to_rate_short() {
+        // 10ms attack should give high rate
+        let rate = seconds_to_rate(0.01, 44100.0);
+        assert!(rate > 60, "10ms should give rate > 60, got {}", rate);
+    }
+
+    #[test]
+    fn test_seconds_to_rate_medium() {
+        // 500ms should give medium rate
+        let rate = seconds_to_rate(0.5, 44100.0);
+        assert!(
+            rate > 20 && rate < 60,
+            "500ms should give rate 20-60, got {}",
+            rate
+        );
+    }
+
+    #[test]
+    fn test_seconds_to_rate_long() {
+        // 5 seconds should give low rate
+        let rate = seconds_to_rate(5.0, 44100.0);
+        assert!(rate < 30, "5s should give rate < 30, got {}", rate);
+    }
+
+    #[test]
+    fn test_seconds_to_rate_very_long() {
+        // 40 seconds (max) should give rate 0
+        let rate = seconds_to_rate(40.0, 44100.0);
+        assert_eq!(rate, 0, "40s should give rate 0");
+    }
+
+    #[test]
+    fn test_seconds_to_rate_monotonic() {
+        // Longer times should give lower rates (slower envelopes)
+        let rate_short = seconds_to_rate(0.1, 44100.0);
+        let rate_medium = seconds_to_rate(1.0, 44100.0);
+        let rate_long = seconds_to_rate(5.0, 44100.0);
+
+        assert!(
+            rate_short > rate_medium,
+            "Shorter time should give higher rate: {} vs {}",
+            rate_short,
+            rate_medium
+        );
+        assert!(
+            rate_medium > rate_long,
+            "Medium time should give higher rate than long: {} vs {}",
+            rate_medium,
+            rate_long
+        );
+    }
+
+    #[test]
+    fn test_seconds_to_rate_sample_rate_scaling() {
+        // Same time at different sample rates should give similar results
+        // (the rate is relative to envelope behavior, not sample count)
+        let rate_44100 = seconds_to_rate(0.5, 44100.0);
+        let rate_48000 = seconds_to_rate(0.5, 48000.0);
+
+        // Should be within a few units of each other
+        let diff = (rate_44100 as i32 - rate_48000 as i32).abs();
+        assert!(
+            diff <= 5,
+            "Rates at different sample rates should be similar: {} vs {}, diff {}",
+            rate_44100,
+            rate_48000,
+            diff
+        );
+    }
+
+    #[test]
+    fn test_linear_to_param_level() {
+        // 0.0 -> 0
+        assert_eq!(linear_to_param_level(0.0), 0);
+
+        // 1.0 -> 99
+        assert_eq!(linear_to_param_level(1.0), 99);
+
+        // 0.5 -> ~50
+        let mid = linear_to_param_level(0.5);
+        assert!(mid >= 49 && mid <= 50, "0.5 should give ~50, got {}", mid);
+
+        // Clamping
+        assert_eq!(linear_to_param_level(-0.5), 0);
+        assert_eq!(linear_to_param_level(1.5), 99);
     }
 }

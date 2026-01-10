@@ -2947,6 +2947,7 @@ dependencies = [
  "iai-callgrind",
  "libm",
  "rigel-math",
+ "rigel-modulation",
  "rigel-simd",
  "rigel-simd-dispatch",
  "rigel-timing",

@@ -4,6 +4,7 @@
 //! - [`LoopConfig`] - Loop configuration for key-on segments
 //! - [`EnvelopeConfig`] - Immutable envelope configuration
 
+use super::rates::{linear_to_param_level, seconds_to_rate};
 use super::segment::Segment;
 
 /// Loop configuration for envelope segments.
@@ -224,6 +225,72 @@ pub type AwmEnvelopeConfig = EnvelopeConfig<5, 5>;
 pub type SevenSegEnvelopeConfig = EnvelopeConfig<5, 2>;
 
 impl FmEnvelopeConfig {
+    /// Create ADSR-style envelope from user-friendly time-based parameters.
+    ///
+    /// This builder converts familiar ADSR parameters (attack/decay/sustain/release
+    /// in seconds and linear levels) into the multi-segment FM envelope format.
+    ///
+    /// The resulting envelope has:
+    /// - Attack: Fast ramp to full level (rate based on attack_secs)
+    /// - Decay: Transition to sustain level (rate based on decay_secs)
+    /// - Sustain: Hold at sustain level (remaining key-on segments)
+    /// - Release: Fade to silence (rate based on release_secs)
+    ///
+    /// # Arguments
+    ///
+    /// * `attack_secs` - Attack time in seconds (0.001 to 40.0)
+    /// * `decay_secs` - Decay time in seconds (0.001 to 40.0)
+    /// * `sustain_linear` - Sustain level (0.0 to 1.0, linear amplitude)
+    /// * `release_secs` - Release time in seconds (0.001 to 40.0)
+    /// * `sample_rate` - Sample rate in Hz
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use rigel_modulation::envelope::FmEnvelopeConfig;
+    ///
+    /// // Create typical synth pad envelope
+    /// let config = FmEnvelopeConfig::adsr(
+    ///     0.5,    // 500ms attack
+    ///     1.0,    // 1s decay
+    ///     0.7,    // 70% sustain
+    ///     2.0,    // 2s release
+    ///     44100.0,
+    /// );
+    /// ```
+    pub fn adsr(
+        attack_secs: f32,
+        decay_secs: f32,
+        sustain_linear: f32,
+        release_secs: f32,
+        sample_rate: f32,
+    ) -> Self {
+        let attack_rate = seconds_to_rate(attack_secs, sample_rate);
+        let decay_rate = seconds_to_rate(decay_secs, sample_rate);
+        let sustain_level = linear_to_param_level(sustain_linear);
+        let release_rate = seconds_to_rate(release_secs, sample_rate);
+
+        Self {
+            key_on_segments: [
+                Segment::new(attack_rate, 99),           // Attack: ramp to full
+                Segment::new(decay_rate, sustain_level), // Decay: to sustain level
+                Segment::new(99, sustain_level),         // Hold at sustain (remaining segments)
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+            ],
+            release_segments: [
+                Segment::new(release_rate, 0), // Release: fade to silence
+                Segment::new(99, 0),           // Immediate if needed
+            ],
+            rate_scaling: 0,
+            output_level: 127,
+            delay_samples: 0,
+            loop_config: LoopConfig::disabled(),
+            sample_rate,
+        }
+    }
+
     /// Create a typical FM piano envelope.
     pub fn piano(sample_rate: f32) -> Self {
         Self {
@@ -340,5 +407,64 @@ mod tests {
         let cfg = FmEnvelopeConfig::piano(44100.0);
         assert_eq!(cfg.key_on_segments[0].rate, 99);
         assert_eq!(cfg.rate_scaling, 3);
+    }
+
+    #[test]
+    fn test_adsr_builder() {
+        let cfg = FmEnvelopeConfig::adsr(0.01, 0.3, 0.7, 0.5, 44100.0);
+
+        // Attack should be fast (high rate) for 10ms
+        assert!(
+            cfg.key_on_segments[0].rate > 60,
+            "Attack rate should be high for 10ms"
+        );
+        assert_eq!(cfg.key_on_segments[0].level, 99); // Attack to full
+
+        // Decay should target sustain level (0.7 -> ~69)
+        let sustain_level = cfg.key_on_segments[1].level;
+        assert!(
+            sustain_level >= 65 && sustain_level <= 73,
+            "Sustain level should be ~69 for 0.7, got {}",
+            sustain_level
+        );
+
+        // Remaining key-on segments should hold at sustain
+        for seg in &cfg.key_on_segments[2..] {
+            assert_eq!(seg.level, sustain_level);
+            assert_eq!(seg.rate, 99); // Instant transition to same level
+        }
+
+        // Release should fade to 0
+        assert_eq!(cfg.release_segments[0].level, 0);
+        assert_eq!(cfg.release_segments[1].level, 0);
+
+        // No advanced features
+        assert_eq!(cfg.rate_scaling, 0);
+        assert_eq!(cfg.delay_samples, 0);
+        assert!(!cfg.loop_config.enabled);
+    }
+
+    #[test]
+    fn test_adsr_fast_attack() {
+        let cfg = FmEnvelopeConfig::adsr(0.001, 0.3, 0.7, 0.5, 44100.0);
+
+        // 1ms attack should give very high rate (77-99)
+        assert!(
+            cfg.key_on_segments[0].rate >= 77,
+            "1ms attack should give rate >= 77, got {}",
+            cfg.key_on_segments[0].rate
+        );
+    }
+
+    #[test]
+    fn test_adsr_slow_release() {
+        let cfg = FmEnvelopeConfig::adsr(0.01, 0.3, 0.7, 5.0, 44100.0);
+
+        // 5s release should give low rate
+        assert!(
+            cfg.release_segments[0].rate < 30,
+            "5s release should give rate < 30, got {}",
+            cfg.release_segments[0].rate
+        );
     }
 }
