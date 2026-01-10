@@ -6,6 +6,17 @@
 //! - Increment calculation for per-sample processing
 //! - Level conversion (Q8 to linear amplitude)
 //! - Output level scaling with LEVEL_LUT
+//!
+//! ## Attribution
+//!
+//! Rate tables, timing constants, and conversion formulas in this module are
+//! derived from the Music Synthesizer for Android (MSFA) project:
+//!
+//! Copyright 2012 Google Inc.
+//! Licensed under the Apache License, Version 2.0
+//! <https://github.com/google/music-synthesizer-for-android>
+//!
+//! See THIRD_PARTY_LICENSES.md in the repository root for the full license text.
 
 // Use rigel_math's exp2 LUT for level-to-linear conversion
 use rigel_math::exp2_lut::{exp2_lut, exp2_lut_slice};
