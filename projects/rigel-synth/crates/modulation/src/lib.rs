@@ -47,6 +47,7 @@
 //! let value = lfo.sample();
 //! ```
 
+pub mod envelope;
 mod lfo;
 mod rate;
 mod simd_rng;
