@@ -594,7 +594,7 @@ mod tests {
 
         // 0.5 -> ~50
         let mid = linear_to_param_level(0.5);
-        assert!(mid >= 49 && mid <= 50, "0.5 should give ~50, got {}", mid);
+        assert!((49..=50).contains(&mid), "0.5 should give ~50, got {}", mid);
 
         // Clamping
         assert_eq!(linear_to_param_level(-0.5), 0);

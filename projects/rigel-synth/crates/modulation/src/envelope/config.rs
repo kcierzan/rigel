@@ -423,7 +423,7 @@ mod tests {
         // Decay should target sustain level (0.7 -> ~69)
         let sustain_level = cfg.key_on_segments[1].level;
         assert!(
-            sustain_level >= 65 && sustain_level <= 73,
+            (65..=73).contains(&sustain_level),
             "Sustain level should be ~69 for 0.7, got {}",
             sustain_level
         );
