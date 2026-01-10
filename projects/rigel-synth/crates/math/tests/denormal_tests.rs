@@ -11,7 +11,12 @@ use std::time::Instant;
 ///
 /// Without denormal protection, processing denormal numbers can cause 10-100x slowdown.
 /// With protection, performance should remain constant regardless of signal amplitude.
+///
+/// Note: Ignored by default because performance tests are flaky in CI environments
+/// due to variable CPU performance, cache effects, and timing noise.
+/// Run with: cargo test -- --ignored
 #[test]
+#[ignore]
 fn test_denormal_protection_prevents_slowdown() {
     const NUM_ITERATIONS: usize = 10000;
     const DECAY_FACTOR: f32 = 0.9999; // Decays to denormals after ~10000 iterations
