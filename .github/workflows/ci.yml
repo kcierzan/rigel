@@ -13,67 +13,140 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  actions: read  # Required for sccache
 
 env:
   CARGO_TERM_COLOR: always
+  # Workaround: Clear GCC_SPECS to prevent specs directory conflict
   GCC_SPECS: ""
+  # Enable sccache for faster incremental builds
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
-  rigel-pipeline:
-    name: Rigel Lint & Tests
+  # ============================================================================
+  # Rust Pipeline - Parallel linting and testing
+  # ============================================================================
+
+  rust-fmt:
+    name: Rust Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cache-prefix: rigel
-
-      - name: Cache Rust target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ github.job }}
-          restore-keys: |
-            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
-            rust-target-${{ runner.os }}-
-
-      - name: Workaround GCC specs directory conflict
-        run: test -d specs && mv specs specs.bak || true
-
-      - name: Fetch dependencies
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo fetch --locked
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Check formatting
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo fmt -- --check
+        run: cargo fmt -- --check
+
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: clippy
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev
+
+      - name: Workaround GCC specs directory
+        run: test -d specs && mv specs specs.bak || true
 
       - name: Run clippy
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo clippy --locked --all-targets -- -D warnings
-
-      - name: Run tests
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo test --locked
-
-      - name: Test AVX2 backend
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          RUSTFLAGS: "-C target-feature=+avx2,+fma"
-        run: devenv shell cargo test --locked --features avx2
+        run: cargo clippy --locked --all-targets -- -D warnings
 
       - name: Restore specs directory
         if: always()
         run: test -d specs.bak && mv specs.bak specs || true
+
+  rust-tests:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: tests
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev
+
+      - name: Workaround GCC specs directory
+        run: test -d specs && mv specs specs.bak || true
+
+      - name: Fetch dependencies
+        run: cargo fetch --locked
+
+      - name: Run tests
+        run: cargo test --locked
+
+      - name: Test AVX2 backend
+        env:
+          RUSTFLAGS: "-C target-feature=+avx2,+fma"
+        run: cargo test --locked --features avx2
+
+      - name: Restore specs directory
+        if: always()
+        run: test -d specs.bak && mv specs.bak specs || true
+
+  # ============================================================================
+  # Python Pipeline (wtgen)
+  # ============================================================================
 
   wtgen-pipeline:
     name: wtgen Lint & Tests
@@ -81,14 +154,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          devenv-path: projects/wtgen
-          cache-prefix: wtgen
+          python-version: "3.11"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -104,28 +175,26 @@ jobs:
           restore-keys: |
             uv-${{ runner.os }}-
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsndfile1-dev
+
       - name: Sync wtgen environment
         working-directory: projects/wtgen
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
-          devenv shell -- uv sync --frozen --group dev
-          devenv shell -- uv pip install --quiet -e .
-          devenv shell -- uv cache prune --ci
+          uv sync --frozen --group dev
+          uv pip install --quiet -e .
+          uv cache prune --ci
 
       - name: Ruff lint
         working-directory: projects/wtgen
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- ruff check .
+        run: uv run ruff check .
 
       - name: Run wtgen tests
         working-directory: projects/wtgen
         env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
           LC_ALL: C.UTF-8
           LANG: C.UTF-8
-        run: devenv shell -- uv run python -m pytest -n auto
+        run: uv run python -m pytest -n auto
 
       - name: Save uv cache
         if: success()
@@ -136,61 +205,60 @@ jobs:
             projects/wtgen/.venv
           key: uv-${{ runner.os }}-${{ hashFiles('projects/wtgen/uv.lock') }}
 
+  # ============================================================================
+  # Plugin Builds - Only depend on tests passing (not linting)
+  # ============================================================================
+
   build-plugin-linux:
-    name: Build Plugin (${{ matrix.name }})
+    name: Build Plugin (Linux)
     runs-on: ubuntu-latest
-    needs: [rigel-pipeline, wtgen-pipeline]
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - target: linux
-            name: Linux
-            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
-          - target: windows
-            name: Windows
-            build_command: ./ci/scripts/build-win.sh
+    needs: [rust-tests]
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cache-prefix: rigel
+          cache-on-failure: true
+          shared-key: build-linux
 
-      - name: Cache Rust target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.target }}
-          restore-keys: |
-            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
-            rust-target-${{ runner.os }}-
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            mold
 
-      - name: Cache xwin SDK
-        if: matrix.target == 'windows'
-        uses: actions/cache@v4
-        with:
-          path: |
-            target/xwin-cache
-            target/xwin
-          key: xwin-sdk-${{ runner.os }}-v1
-
-      - name: Workaround GCC specs directory conflict
+      - name: Workaround GCC specs directory
         run: test -d specs && mv specs specs.bak || true
 
       - name: Fetch dependencies
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo fetch --locked
+        run: cargo fetch --locked
 
-      - name: Build plugin (${{ matrix.target }})
+      - name: Build plugin (Linux)
         env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- ${{ matrix.build_command }}
+          # Use mold linker for faster linking
+          RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+        run: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
 
       - name: Restore specs directory
         if: always()
@@ -199,7 +267,62 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rigel-plugin-${{ matrix.target }}-${{ github.sha }}
+          name: rigel-plugin-linux-${{ github.sha }}
+          path: target/bundled/
+          retention-days: 30
+          if-no-files-found: error
+
+  build-plugin-windows:
+    name: Build Plugin (Windows)
+    runs-on: ubuntu-latest
+    needs: [rust-tests]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: build-windows
+
+      - name: Cache xwin SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/xwin-cache
+            target/xwin
+          key: xwin-sdk-${{ runner.os }}-v2
+
+      - name: Install xwin
+        run: cargo install xwin --locked
+
+      - name: Workaround GCC specs directory
+        run: test -d specs && mv specs specs.bak || true
+
+      - name: Fetch dependencies
+        run: cargo fetch --locked
+
+      - name: Build plugin (Windows)
+        run: ./ci/scripts/build-win.sh
+
+      - name: Restore specs directory
+        if: always()
+        run: test -d specs.bak && mv specs.bak specs || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigel-plugin-windows-${{ github.sha }}
           path: target/bundled/
           retention-days: 30
           if-no-files-found: error
@@ -207,41 +330,29 @@ jobs:
   build-plugin-macos:
     name: Build Plugin (macOS)
     runs-on: macos-14
-    needs: [rigel-pipeline, wtgen-pipeline]
+    needs: [rust-tests]
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cache-prefix: rigel
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust target directory
-        uses: actions/cache@v4
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: target
-          key: rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-macos
-          restore-keys: |
-            rust-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
-            rust-target-${{ runner.os }}-
+          cache-on-failure: true
+          shared-key: build-macos
 
       - name: Fetch dependencies
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo fetch --locked
-
-      - name: Test NEON backend
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell cargo test --locked --features neon
+        run: cargo fetch --locked
 
       - name: Build plugin (macOS)
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin
+        run: cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -251,11 +362,52 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  # Aggregates all CI results into a single required status check
+  # ============================================================================
+  # NEON Backend Tests - Separate from macOS build so flakiness doesn't block
+  # ============================================================================
+
+  macos-neon-tests:
+    name: macOS NEON Tests
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: neon-tests
+
+      - name: Fetch dependencies
+        run: cargo fetch --locked
+
+      - name: Test NEON backend
+        run: cargo test --locked --features neon
+
+  # ============================================================================
+  # CI Success Aggregator - Required for branch protection
+  # ============================================================================
+
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [rigel-pipeline, wtgen-pipeline, build-plugin-linux, build-plugin-macos]
+    needs:
+      - rust-fmt
+      - rust-clippy
+      - rust-tests
+      - wtgen-pipeline
+      - build-plugin-linux
+      - build-plugin-windows
+      - build-plugin-macos
+      - macos-neon-tests
     if: always()
     steps:
       - name: Check all jobs succeeded

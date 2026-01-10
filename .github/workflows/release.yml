@@ -11,50 +11,60 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read  # Required for sccache
 
 env:
   CARGO_TERM_COLOR: always
   GCC_SPECS: ""
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
-  build-linux-windows:
-    name: Build ${{ matrix.name }} Bundle
+  build-linux:
+    name: Build Linux Bundle
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: linux
-            name: Linux
-            build_command: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
-          - target: windows
-            name: Windows
-            build_command: ./ci/scripts/build-win.sh
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cache-prefix: rigel
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "."
           cache-on-failure: false
-          shared-key: ${{ matrix.target }}
+          shared-key: release-linux
 
-      - name: Workaround GCC specs directory conflict
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            mold
+
+      - name: Workaround GCC specs directory
         run: test -d specs && mv specs specs.bak || true
 
-      - name: Build plugin (${{ matrix.target }})
+      - name: Build plugin (Linux)
         env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- ${{ matrix.build_command }}
+          RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+        run: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
 
       - name: Restore specs directory
         if: always()
@@ -64,13 +74,71 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           cd target/bundled
-          tar -czf ../../rigel-plugin-${VERSION}-${{ matrix.target }}.tar.gz .
+          tar -czf ../../rigel-plugin-${VERSION}-linux.tar.gz .
           cd ../..
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
-          files: rigel-plugin-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          files: rigel-plugin-${{ github.ref_name }}-linux.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  build-windows:
+    name: Build Windows Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: false
+          shared-key: release-windows
+
+      - name: Cache xwin SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/xwin-cache
+            target/xwin
+          key: xwin-sdk-${{ runner.os }}-v2
+
+      - name: Install xwin
+        run: cargo install xwin --locked
+
+      - name: Workaround GCC specs directory
+        run: test -d specs && mv specs specs.bak || true
+
+      - name: Build plugin (Windows)
+        run: ./ci/scripts/build-win.sh
+
+      - name: Restore specs directory
+        if: always()
+        run: test -d specs.bak && mv specs.bak specs || true
+
+      - name: Create archive
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          cd target/bundled
+          tar -czf ../../rigel-plugin-${VERSION}-windows.tar.gz .
+          cd ../..
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rigel-plugin-${{ github.ref_name }}-windows.tar.gz
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -83,30 +151,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup devenv
-        uses: ./.github/actions/setup-devenv
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cache-prefix: rigel
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "."
           cache-on-failure: false
-          shared-key: macos
-
-      - name: Workaround GCC specs directory conflict
-        run: test -d specs && mv specs specs.bak || true
+          shared-key: release-macos
 
       - name: Build plugin (macOS)
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: devenv shell -- build:macos
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
+        run: cargo xtask bundle rigel-plugin --release --target aarch64-apple-darwin
 
       - name: Create archive
         run: |

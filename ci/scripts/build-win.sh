@@ -24,11 +24,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Mirror devenv's cargoScript helper so CI and containers reuse the same layout.
-state_dir="${DEVENV_STATE:-$PWD/.devenv/state}"
-export DEVENV_STATE="$state_dir"
-export CARGO_HOME="${CARGO_HOME:-$state_dir/cargo}"
-export RUSTUP_HOME="${RUSTUP_HOME:-$state_dir/rustup}"
+# Set up cargo/rustup homes. Use standard locations if not already set.
+# This works both with devenv (which sets DEVENV_STATE) and without (CI).
+if [ -n "${DEVENV_STATE:-}" ]; then
+  # devenv mode: use devenv state directory
+  export CARGO_HOME="${CARGO_HOME:-$DEVENV_STATE/cargo}"
+  export RUSTUP_HOME="${RUSTUP_HOME:-$DEVENV_STATE/rustup}"
+else
+  # CI mode: use standard home directory locations
+  export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
+  export RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
+fi
 mkdir -p "$CARGO_HOME/bin" "$RUSTUP_HOME"
 
 # Share the xwin download/splat output across invocations; this keeps the
