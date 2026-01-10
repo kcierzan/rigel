@@ -154,10 +154,11 @@ mod tests {
 
     #[test]
     fn test_phase_transitions() {
-        let mut state = EnvelopeState::default();
-
         // Idle -> KeyOn
-        state.phase = EnvelopePhase::KeyOn;
+        let mut state = EnvelopeState {
+            phase: EnvelopePhase::KeyOn,
+            ..Default::default()
+        };
         assert!(state.is_active());
         assert!(!state.is_releasing());
 

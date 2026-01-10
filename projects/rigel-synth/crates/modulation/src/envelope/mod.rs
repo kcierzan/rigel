@@ -633,13 +633,11 @@ mod tests {
     }
 
     #[test]
-    fn test_copy_clone() {
+    fn test_copy() {
         let env1 = FmEnvelope::new(44100.0);
         let env2 = env1; // Copy
-        let env3 = env1.clone(); // Clone
 
         assert_eq!(env1.phase(), env2.phase());
-        assert_eq!(env1.phase(), env3.phase());
     }
 
     #[test]

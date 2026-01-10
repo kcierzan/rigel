@@ -91,7 +91,7 @@ const fn const_exp2(x: f32) -> f32 {
     // Approximate 2^frac using minimax polynomial (frac is in [0, 1))
     // Coefficients optimized for audio range accuracy
     let c0 = 1.0;
-    let c1 = 0.6931472; // ln(2)
+    let c1 = core::f32::consts::LN_2;
     let c2 = 0.2402265; // ln(2)^2 / 2
     let c3 = 0.0555041; // ln(2)^3 / 6
     let c4 = 0.0096139; // ln(2)^4 / 24

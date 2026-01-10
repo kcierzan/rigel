@@ -93,9 +93,9 @@ mod us1_basic_envelope {
             }
         }
 
-        // Should have visited at least 2 segments (attack then decay)
+        // Should have visited at least one segment
         assert!(
-            segments_visited.len() >= 1,
+            !segments_visited.is_empty(),
             "Should visit segments, visited: {:?}",
             segments_visited
         );
@@ -386,11 +386,7 @@ mod us7_performance {
         let env2 = env1;
         assert_eq!(env1.phase(), env2.phase());
 
-        // Test Clone
-        let env3 = env1.clone();
-        assert_eq!(env1.phase(), env3.phase());
-
-        // Verify they're independent
+        // Verify copies are independent
         let mut env4 = env1;
         env4.note_on(60);
         assert_ne!(env1.phase(), env4.phase());
@@ -416,8 +412,16 @@ mod us7_performance {
 
         // Inactive envelopes are at LEVEL_MIN which gives a very small
         // but non-zero linear value due to exp2 calculation
-        assert!(output[2] < 0.001, "Inactive envelope should be near-zero, got {}", output[2]);
-        assert!(output[3] < 0.001, "Inactive envelope should be near-zero, got {}", output[3]);
+        assert!(
+            output[2] < 0.001,
+            "Inactive envelope should be near-zero, got {}",
+            output[2]
+        );
+        assert!(
+            output[3] < 0.001,
+            "Inactive envelope should be near-zero, got {}",
+            output[3]
+        );
     }
 
     #[test]
@@ -523,11 +527,7 @@ mod us5_delayed_start {
         // Should output 0 during delay
         for i in 0..1000 {
             let value = env.process();
-            assert_eq!(
-                value, 0.0,
-                "Sample {} should be silent during delay",
-                i
-            );
+            assert_eq!(value, 0.0, "Sample {} should be silent during delay", i);
         }
 
         // After delay, should start attack

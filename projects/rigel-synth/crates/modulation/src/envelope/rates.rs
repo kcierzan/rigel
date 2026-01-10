@@ -222,7 +222,10 @@ pub fn linear_to_level(linear: f32) -> i16 {
     let level = log2_val * 256.0 + super::state::LEVEL_MAX as f32;
 
     // Clamp to valid range
-    level.clamp(super::state::LEVEL_MIN as f32, super::state::LEVEL_MAX as f32) as i16
+    level.clamp(
+        super::state::LEVEL_MIN as f32,
+        super::state::LEVEL_MAX as f32,
+    ) as i16
 }
 
 /// Get static timing count for same-level transitions.

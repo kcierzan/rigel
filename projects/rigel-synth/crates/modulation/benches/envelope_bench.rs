@@ -126,7 +126,7 @@ fn bench_polyphonic_workload(c: &mut Criterion) {
         const BLOCK_SIZE: usize = 64;
 
         // Use 48 batches of 8 (= 384 = 32 * 12 envelopes)
-        const NUM_BATCHES: usize = (NUM_VOICES * ENVS_PER_VOICE + 7) / 8;
+        const NUM_BATCHES: usize = (NUM_VOICES * ENVS_PER_VOICE).div_ceil(8);
 
         let mut batches: Vec<EnvelopeBatch<8, 6, 2>> = (0..NUM_BATCHES)
             .map(|_| {
