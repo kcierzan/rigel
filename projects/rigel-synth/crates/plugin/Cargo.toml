@@ -19,7 +19,7 @@ rigel-dsp = { path = "../dsp" }
 
 # Plugin framework
 nih_plug.workspace = true
-nih_plug_iced.workspace = true
+nih_plug_vizia.workspace = true
 
 # GUI dependencies
 atomic_float = "0.1"

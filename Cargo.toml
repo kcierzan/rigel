@@ -37,8 +37,7 @@ anyhow = "1.0"
 
 # Plugin framework
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "28b149ec4d62757d0b448809148a0c3ca6e09a95" }
-nih_plug_iced = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "28b149ec4d62757d0b448809148a0c3ca6e09a95" }
-iced = { version = "0.9", features = ["canvas"] }
+nih_plug_vizia = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "28b149ec4d62757d0b448809148a0c3ca6e09a95" }
 
 [profile.release]
 lto = "thin"
