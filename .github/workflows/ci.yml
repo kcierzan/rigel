@@ -61,6 +61,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: clippy
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install system dependencies
         run: |
@@ -111,6 +112,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: tests
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install system dependencies
         run: |
@@ -235,6 +237,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: build-linux
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install system dependencies
         run: |
@@ -303,6 +306,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: build-windows
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Cache xwin SDK
         uses: actions/cache@v4
@@ -356,6 +360,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: build-macos
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Fetch dependencies
         run: cargo fetch --locked
@@ -394,6 +399,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: neon-tests
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Fetch dependencies
         run: cargo fetch --locked
