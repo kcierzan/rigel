@@ -82,6 +82,9 @@ pub mod crossfade;
 // Scalar math for control-rate operations
 pub mod scalar;
 
+// Fast exp2 lookup table for level-to-linear conversion
+pub mod exp2_lut;
+
 // ============================================================================
 // Additional re-exports for convenience
 // ============================================================================
@@ -91,3 +94,6 @@ pub use scalar::{cosf, expf, logf, sinf};
 
 // Re-export hermite_scalar for convenience (commonly used)
 pub use interpolate::hermite_scalar;
+
+// Re-export exp2 LUT functions for level-to-linear conversion
+pub use exp2_lut::{db_to_linear, exp2_lut, exp2_lut_slice};
