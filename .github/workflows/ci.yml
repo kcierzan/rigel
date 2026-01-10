@@ -71,13 +71,16 @@ jobs:
             libxkbcommon-dev \
             libwayland-dev \
             libx11-dev \
+            libx11-xcb-dev \
             libxcursor-dev \
             libxi-dev \
             libxrandr-dev \
             libxcb1-dev \
             libxcb-render0-dev \
             libxcb-shape0-dev \
-            libxcb-xfixes0-dev
+            libxcb-xfixes0-dev \
+            libxcb-icccm4-dev \
+            libxcb-dri2-0-dev
 
       - name: Workaround GCC specs directory
         run: test -d specs && mv specs specs.bak || true
@@ -118,13 +121,16 @@ jobs:
             libxkbcommon-dev \
             libwayland-dev \
             libx11-dev \
+            libx11-xcb-dev \
             libxcursor-dev \
             libxi-dev \
             libxrandr-dev \
             libxcb1-dev \
             libxcb-render0-dev \
             libxcb-shape0-dev \
-            libxcb-xfixes0-dev
+            libxcb-xfixes0-dev \
+            libxcb-icccm4-dev \
+            libxcb-dri2-0-dev
 
       - name: Workaround GCC specs directory
         run: test -d specs && mv specs specs.bak || true
@@ -239,6 +245,7 @@ jobs:
             libxkbcommon-dev \
             libwayland-dev \
             libx11-dev \
+            libx11-xcb-dev \
             libxcursor-dev \
             libxi-dev \
             libxrandr-dev \
@@ -246,6 +253,8 @@ jobs:
             libxcb-render0-dev \
             libxcb-shape0-dev \
             libxcb-xfixes0-dev \
+            libxcb-icccm4-dev \
+            libxcb-dri2-0-dev \
             mold
 
       - name: Workaround GCC specs directory
