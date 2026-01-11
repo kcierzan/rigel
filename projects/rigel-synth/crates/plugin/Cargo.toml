@@ -16,6 +16,7 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 # Internal dependencies
 rigel-dsp = { path = "../dsp" }
+rigel-modulation = { path = "../modulation" }
 
 # Plugin framework
 nih_plug.workspace = true

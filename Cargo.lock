@@ -2983,6 +2983,7 @@ dependencies = [
  "nih_plug",
  "nih_plug_vizia",
  "rigel-dsp",
+ "rigel-modulation",
 ]
 
 [[package]]

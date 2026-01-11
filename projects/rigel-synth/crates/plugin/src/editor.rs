@@ -1,7 +1,7 @@
 use nih_plug::prelude::Editor;
 use nih_plug_vizia::vizia::prelude::*;
 use nih_plug_vizia::widgets::*;
-use nih_plug_vizia::{create_vizia_editor, ViziaState, ViziaTheming};
+use nih_plug_vizia::{assets, create_vizia_editor, ViziaState, ViziaTheming};
 use std::sync::Arc;
 
 use crate::RigelPluginParams;
@@ -24,6 +24,11 @@ pub(crate) fn create(
     editor_state: Arc<ViziaState>,
 ) -> Option<Box<dyn Editor>> {
     create_vizia_editor(editor_state, ViziaTheming::default(), move |cx, _| {
+        // Register required Noto Sans font variants
+        // Light variant is required because nih_plug_vizia's theme.css sets font-weight: light
+        assets::register_noto_sans_regular(cx);
+        assets::register_noto_sans_light(cx);
+
         Data {
             params: params.clone(),
         }

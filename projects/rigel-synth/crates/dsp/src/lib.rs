@@ -19,8 +19,15 @@ pub use rigel_timing::{
 
 // Re-export envelope types for users who want direct access
 pub use rigel_modulation::envelope::{
-    EnvelopePhase, FmEnvelopeConfig as EnvelopeConfig, Segment as EnvelopeSegment,
+    EnvelopePhase, FmEnvelopeConfig as EnvelopeConfig, Segment, Segment as EnvelopeSegment,
 };
+
+// Backward compatibility alias - SegmentParams is now Segment from rigel-modulation
+#[deprecated(
+    since = "0.2.0",
+    note = "Use Segment from rigel_modulation::envelope instead"
+)]
+pub type SegmentParams = Segment;
 
 /// Sample rate type
 pub type SampleRate = f32;
@@ -34,42 +41,13 @@ pub type NoteNumber = u8;
 /// MIDI velocity (0.0 to 1.0)
 pub type Velocity = f32;
 
-/// FM Envelope segment parameters (rate and level, 0-99 each)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SegmentParams {
-    /// Rate parameter (0-99, higher = faster)
-    pub rate: u8,
-    /// Level parameter (0-99, 99 = full)
-    pub level: u8,
-}
-
-impl Default for SegmentParams {
-    fn default() -> Self {
-        Self {
-            rate: 99,
-            level: 99,
-        }
-    }
-}
-
-impl SegmentParams {
-    /// Create new segment params
-    #[inline]
-    pub const fn new(rate: u8, level: u8) -> Self {
-        Self {
-            rate: if rate > 99 { 99 } else { rate },
-            level: if level > 99 { 99 } else { level },
-        }
-    }
-}
-
 /// Full FM envelope parameters (6 key-on + 2 release segments)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FmEnvelopeParams {
     /// Key-on segments (6 segments: attack through sustain)
-    pub key_on: [SegmentParams; 6],
+    pub key_on: [Segment; 6],
     /// Release segments (2 segments)
-    pub release: [SegmentParams; 2],
+    pub release: [Segment; 2],
     /// Rate scaling sensitivity (0-7, higher = more keyboard tracking)
     pub rate_scaling: u8,
 }
@@ -79,16 +57,16 @@ impl Default for FmEnvelopeParams {
         // Default to a typical ADSR-style envelope
         Self {
             key_on: [
-                SegmentParams::new(85, 99), // Attack: fast to full
-                SegmentParams::new(50, 69), // Decay: medium to sustain (~70%)
-                SegmentParams::new(99, 69), // Hold at sustain
-                SegmentParams::new(99, 69),
-                SegmentParams::new(99, 69),
-                SegmentParams::new(99, 69),
+                Segment::new(85, 99), // Attack: fast to full
+                Segment::new(50, 69), // Decay: medium to sustain (~70%)
+                Segment::new(99, 69), // Hold at sustain
+                Segment::new(99, 69),
+                Segment::new(99, 69),
+                Segment::new(99, 69),
             ],
             release: [
-                SegmentParams::new(45, 0), // Release: medium to silence
-                SegmentParams::new(99, 0), // Immediate if needed
+                Segment::new(45, 0), // Release: medium to silence
+                Segment::new(99, 0), // Immediate if needed
             ],
             rate_scaling: 0,
         }
@@ -113,17 +91,14 @@ impl FmEnvelopeParams {
 
         Self {
             key_on: [
-                SegmentParams::new(attack_rate, 99),
-                SegmentParams::new(decay_rate, sustain_level),
-                SegmentParams::new(99, sustain_level),
-                SegmentParams::new(99, sustain_level),
-                SegmentParams::new(99, sustain_level),
-                SegmentParams::new(99, sustain_level),
+                Segment::new(attack_rate, 99),
+                Segment::new(decay_rate, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
             ],
-            release: [
-                SegmentParams::new(release_rate, 0),
-                SegmentParams::new(99, 0),
-            ],
+            release: [Segment::new(release_rate, 0), Segment::new(99, 0)],
             rate_scaling: 0,
         }
     }

@@ -4,7 +4,7 @@
 
 use nih_plug::prelude::*;
 use nih_plug_vizia::ViziaState;
-use rigel_dsp::{FmEnvelopeParams, SegmentParams, SynthEngine, SynthParams};
+use rigel_dsp::{FmEnvelopeParams, Segment, SynthEngine, SynthParams};
 use std::sync::Arc;
 
 mod editor;
@@ -265,37 +265,37 @@ impl Plugin for RigelPlugin {
             // Build FM envelope params from plugin parameters
             let envelope = FmEnvelopeParams {
                 key_on: [
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.seg1_rate.value() as u8,
                         self.params.seg1_level.value() as u8,
                     ),
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.seg2_rate.value() as u8,
                         self.params.seg2_level.value() as u8,
                     ),
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.seg3_rate.value() as u8,
                         self.params.seg3_level.value() as u8,
                     ),
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.seg4_rate.value() as u8,
                         self.params.seg4_level.value() as u8,
                     ),
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.seg5_rate.value() as u8,
                         self.params.seg5_level.value() as u8,
                     ),
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.seg6_rate.value() as u8,
                         self.params.seg6_level.value() as u8,
                     ),
                 ],
                 release: [
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.rel1_rate.value() as u8,
                         self.params.rel1_level.value() as u8,
                     ),
-                    SegmentParams::new(
+                    Segment::new(
                         self.params.rel2_rate.value() as u8,
                         self.params.rel2_level.value() as u8,
                     ),
@@ -530,37 +530,37 @@ mod tests {
         // Build FM envelope params from plugin parameters
         let envelope = FmEnvelopeParams {
             key_on: [
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.seg1_rate.value() as u8,
                     plugin.params.seg1_level.value() as u8,
                 ),
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.seg2_rate.value() as u8,
                     plugin.params.seg2_level.value() as u8,
                 ),
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.seg3_rate.value() as u8,
                     plugin.params.seg3_level.value() as u8,
                 ),
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.seg4_rate.value() as u8,
                     plugin.params.seg4_level.value() as u8,
                 ),
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.seg5_rate.value() as u8,
                     plugin.params.seg5_level.value() as u8,
                 ),
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.seg6_rate.value() as u8,
                     plugin.params.seg6_level.value() as u8,
                 ),
             ],
             release: [
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.rel1_rate.value() as u8,
                     plugin.params.rel1_level.value() as u8,
                 ),
-                SegmentParams::new(
+                Segment::new(
                     plugin.params.rel2_rate.value() as u8,
                     plugin.params.rel2_level.value() as u8,
                 ),
