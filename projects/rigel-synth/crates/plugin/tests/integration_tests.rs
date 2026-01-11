@@ -101,16 +101,16 @@ fn test_parameter_access() {
         .iter()
         .any(|name| name.to_lowercase().contains("pitch"));
 
-    // FM envelope segment parameters
-    let has_seg1_rate = param_names
+    // FM envelope segment parameters (time-based)
+    let has_seg1_time = param_names
         .iter()
-        .any(|name| name.to_lowercase().contains("seg1_rate"));
+        .any(|name| name.to_lowercase().contains("seg1_time"));
     let has_seg1_level = param_names
         .iter()
         .any(|name| name.to_lowercase().contains("seg1_level"));
-    let has_rel1_rate = param_names
+    let has_rel1_time = param_names
         .iter()
-        .any(|name| name.to_lowercase().contains("rel1_rate"));
+        .any(|name| name.to_lowercase().contains("rel1_time"));
     let has_rate_scaling = param_names
         .iter()
         .any(|name| name.to_lowercase().contains("rate_scaling"));
@@ -126,8 +126,8 @@ fn test_parameter_access() {
         param_names
     );
     assert!(
-        has_seg1_rate,
-        "Should have seg1_rate parameter, found: {:?}",
+        has_seg1_time,
+        "Should have seg1_time parameter, found: {:?}",
         param_names
     );
     assert!(
@@ -136,8 +136,8 @@ fn test_parameter_access() {
         param_names
     );
     assert!(
-        has_rel1_rate,
-        "Should have rel1_rate parameter, found: {:?}",
+        has_rel1_time,
+        "Should have rel1_time parameter, found: {:?}",
         param_names
     );
     assert!(

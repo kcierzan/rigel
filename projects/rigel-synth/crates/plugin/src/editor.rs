@@ -68,8 +68,8 @@ pub(crate) fn create(
                 // Segment 1 (Attack)
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Seg 1 (Attack)");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.seg1_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg1_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg1_level);
                 })
@@ -78,8 +78,8 @@ pub(crate) fn create(
                 // Segment 2 (Decay 1)
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Seg 2 (Decay)");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.seg2_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg2_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg2_level);
                 })
@@ -88,8 +88,8 @@ pub(crate) fn create(
                 // Segment 3
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Seg 3");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.seg3_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg3_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg3_level);
                 })
@@ -102,8 +102,8 @@ pub(crate) fn create(
                 // Segment 4
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Seg 4");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.seg4_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg4_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg4_level);
                 })
@@ -112,8 +112,8 @@ pub(crate) fn create(
                 // Segment 5
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Seg 5");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.seg5_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg5_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg5_level);
                 })
@@ -122,8 +122,8 @@ pub(crate) fn create(
                 // Segment 6 (Sustain)
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Seg 6 (Sustain)");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.seg6_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.seg6_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg6_level);
                 })
@@ -143,8 +143,8 @@ pub(crate) fn create(
                 // Release 1
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Release 1");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.rel1_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.rel1_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.rel1_level);
                 })
@@ -153,8 +153,8 @@ pub(crate) fn create(
                 // Release 2
                 VStack::new(cx, |cx| {
                     Label::new(cx, "Release 2");
-                    Label::new(cx, "Rate");
-                    ParamSlider::new(cx, Data::params, |params| &params.rel2_rate);
+                    Label::new(cx, "Time");
+                    ParamSlider::new(cx, Data::params, |params| &params.rel2_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.rel2_level);
                 })
