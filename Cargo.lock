@@ -2947,6 +2947,7 @@ dependencies = [
  "iai-callgrind",
  "libm",
  "rigel-math",
+ "rigel-modulation",
  "rigel-simd",
  "rigel-simd-dispatch",
  "rigel-timing",
@@ -2982,6 +2983,7 @@ dependencies = [
  "nih_plug",
  "nih_plug_vizia",
  "rigel-dsp",
+ "rigel-modulation",
 ]
 
 [[package]]

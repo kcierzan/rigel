@@ -93,24 +93,27 @@ fn test_parameter_access() {
     let param_names: Vec<String> = param_map.iter().map(|(name, _, _)| name.clone()).collect();
 
     // Test that expected parameters exist by name (case insensitive)
+    // Master controls
     let has_volume = param_names
         .iter()
         .any(|name| name.to_lowercase().contains("volume"));
     let has_pitch = param_names
         .iter()
         .any(|name| name.to_lowercase().contains("pitch"));
-    let has_attack = param_names
+
+    // FM envelope segment parameters (time-based)
+    let has_seg1_time = param_names
         .iter()
-        .any(|name| name.to_lowercase().contains("attack"));
-    let has_decay = param_names
+        .any(|name| name.to_lowercase().contains("seg1_time"));
+    let has_seg1_level = param_names
         .iter()
-        .any(|name| name.to_lowercase().contains("decay"));
-    let has_sustain = param_names
+        .any(|name| name.to_lowercase().contains("seg1_level"));
+    let has_rel1_time = param_names
         .iter()
-        .any(|name| name.to_lowercase().contains("sustain"));
-    let has_release = param_names
+        .any(|name| name.to_lowercase().contains("rel1_time"));
+    let has_rate_scaling = param_names
         .iter()
-        .any(|name| name.to_lowercase().contains("release"));
+        .any(|name| name.to_lowercase().contains("rate_scaling"));
 
     assert!(
         has_volume,
@@ -123,23 +126,23 @@ fn test_parameter_access() {
         param_names
     );
     assert!(
-        has_attack,
-        "Should have attack parameter, found: {:?}",
+        has_seg1_time,
+        "Should have seg1_time parameter, found: {:?}",
         param_names
     );
     assert!(
-        has_decay,
-        "Should have decay parameter, found: {:?}",
+        has_seg1_level,
+        "Should have seg1_level parameter, found: {:?}",
         param_names
     );
     assert!(
-        has_sustain,
-        "Should have sustain parameter, found: {:?}",
+        has_rel1_time,
+        "Should have rel1_time parameter, found: {:?}",
         param_names
     );
     assert!(
-        has_release,
-        "Should have release parameter, found: {:?}",
+        has_rate_scaling,
+        "Should have rate_scaling parameter, found: {:?}",
         param_names
     );
 }

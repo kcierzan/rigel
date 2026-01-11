@@ -7,6 +7,7 @@
 
 use core::f32::consts::TAU;
 use rigel_math::expf;
+use rigel_modulation::envelope::{FmEnvelope, FmEnvelopeConfig};
 use rigel_simd::DenormalGuard;
 use rigel_simd_dispatch::SimdContext;
 
@@ -15,6 +16,18 @@ pub use rigel_timing::{
     ControlRateClock, ControlRateUpdates, Smoother, SmoothingMode, Timebase, DEFAULT_SAMPLE_RATE,
     DEFAULT_SMOOTHING_TIME_MS,
 };
+
+// Re-export envelope types for users who want direct access
+pub use rigel_modulation::envelope::{
+    EnvelopePhase, FmEnvelopeConfig as EnvelopeConfig, Segment, Segment as EnvelopeSegment,
+};
+
+// Backward compatibility alias - SegmentParams is now Segment from rigel-modulation
+#[deprecated(
+    since = "0.2.0",
+    note = "Use Segment from rigel_modulation::envelope instead"
+)]
+pub type SegmentParams = Segment;
 
 /// Sample rate type
 pub type SampleRate = f32;
@@ -28,21 +41,78 @@ pub type NoteNumber = u8;
 /// MIDI velocity (0.0 to 1.0)
 pub type Velocity = f32;
 
-/// Simple synthesis parameters
+/// Full FM envelope parameters (6 key-on + 2 release segments)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FmEnvelopeParams {
+    /// Key-on segments (6 segments: attack through sustain)
+    pub key_on: [Segment; 6],
+    /// Release segments (2 segments)
+    pub release: [Segment; 2],
+    /// Rate scaling sensitivity (0-7, higher = more keyboard tracking)
+    pub rate_scaling: u8,
+}
+
+impl Default for FmEnvelopeParams {
+    fn default() -> Self {
+        // Default to a typical ADSR-style envelope
+        Self {
+            key_on: [
+                Segment::new(85, 99), // Attack: fast to full
+                Segment::new(50, 69), // Decay: medium to sustain (~70%)
+                Segment::new(99, 69), // Hold at sustain
+                Segment::new(99, 69),
+                Segment::new(99, 69),
+                Segment::new(99, 69),
+            ],
+            release: [
+                Segment::new(45, 0), // Release: medium to silence
+                Segment::new(99, 0), // Immediate if needed
+            ],
+            rate_scaling: 0,
+        }
+    }
+}
+
+impl FmEnvelopeParams {
+    /// Create from ADSR time-based parameters
+    pub fn from_adsr(
+        attack_secs: f32,
+        decay_secs: f32,
+        sustain_linear: f32,
+        release_secs: f32,
+        sample_rate: f32,
+    ) -> Self {
+        use rigel_modulation::envelope::{linear_to_param_level, seconds_to_rate};
+
+        let attack_rate = seconds_to_rate(attack_secs, sample_rate);
+        let decay_rate = seconds_to_rate(decay_secs, sample_rate);
+        let sustain_level = linear_to_param_level(sustain_linear);
+        let release_rate = seconds_to_rate(release_secs, sample_rate);
+
+        Self {
+            key_on: [
+                Segment::new(attack_rate, 99),
+                Segment::new(decay_rate, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+                Segment::new(99, sustain_level),
+            ],
+            release: [Segment::new(release_rate, 0), Segment::new(99, 0)],
+            rate_scaling: 0,
+        }
+    }
+}
+
+/// Synthesis parameters with full FM envelope control
 #[derive(Debug, Clone, Copy)]
 pub struct SynthParams {
     /// Master volume (0.0 to 1.0)
     pub volume: f32,
     /// Pitch offset in semitones (-24.0 to 24.0)
     pub pitch_offset: f32,
-    /// Envelope attack time in seconds
-    pub env_attack: f32,
-    /// Envelope decay time in seconds
-    pub env_decay: f32,
-    /// Envelope sustain level (0.0 to 1.0)
-    pub env_sustain: f32,
-    /// Envelope release time in seconds
-    pub env_release: f32,
+    /// FM envelope parameters
+    pub envelope: FmEnvelopeParams,
 }
 
 impl Default for SynthParams {
@@ -50,10 +120,34 @@ impl Default for SynthParams {
         Self {
             volume: 0.7,
             pitch_offset: 0.0,
-            env_attack: 0.01,
-            env_decay: 0.3,
-            env_sustain: 0.7,
-            env_release: 0.5,
+            envelope: FmEnvelopeParams::default(),
+        }
+    }
+}
+
+impl SynthParams {
+    /// Create SynthParams from simple ADSR values (for backward compatibility)
+    ///
+    /// Converts time-based ADSR to FM envelope format.
+    pub fn from_adsr(
+        volume: f32,
+        pitch_offset: f32,
+        attack_secs: f32,
+        decay_secs: f32,
+        sustain_linear: f32,
+        release_secs: f32,
+        sample_rate: f32,
+    ) -> Self {
+        Self {
+            volume,
+            pitch_offset,
+            envelope: FmEnvelopeParams::from_adsr(
+                attack_secs,
+                decay_secs,
+                sustain_linear,
+                release_secs,
+                sample_rate,
+            ),
         }
     }
 }
@@ -133,148 +227,14 @@ impl Default for SimpleOscillator {
     }
 }
 
-/// Envelope stages
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum EnvelopeStage {
-    Idle,
-    Attack,
-    Decay,
-    Sustain,
-    Release,
-}
-
-/// Simple ADSR envelope
-#[derive(Debug, Clone, Copy)]
-pub struct Envelope {
-    stage: EnvelopeStage,
-    current_value: f32,
-    samples_in_stage: u32,
-    sample_rate: f32,
-    /// Value captured at release start for smooth release from any level
-    release_start_value: f32,
-}
-
-impl Envelope {
-    /// Create new envelope
-    pub fn new(sample_rate: f32) -> Self {
-        Self {
-            stage: EnvelopeStage::Idle,
-            current_value: 0.0,
-            samples_in_stage: 0,
-            sample_rate,
-            release_start_value: 0.0,
-        }
-    }
-
-    /// Trigger note on
-    pub fn note_on(&mut self) {
-        self.stage = EnvelopeStage::Attack;
-        self.samples_in_stage = 0;
-    }
-
-    /// Trigger note off
-    pub fn note_off(&mut self) {
-        if self.stage != EnvelopeStage::Idle {
-            // Capture current value for smooth release from any level
-            self.release_start_value = self.current_value;
-            self.stage = EnvelopeStage::Release;
-            self.samples_in_stage = 0;
-        }
-    }
-
-    /// Process one sample
-    pub fn process_sample(&mut self, params: &SynthParams) -> f32 {
-        match self.stage {
-            EnvelopeStage::Idle => {
-                self.current_value = 0.0;
-            }
-            EnvelopeStage::Attack => {
-                let attack_samples = (params.env_attack * self.sample_rate) as u32;
-                if attack_samples > 0 {
-                    let progress = self.samples_in_stage as f32 / attack_samples as f32;
-                    self.current_value = progress.min(1.0);
-
-                    if self.samples_in_stage >= attack_samples {
-                        self.stage = EnvelopeStage::Decay;
-                        self.samples_in_stage = 0;
-                    } else {
-                        self.samples_in_stage += 1;
-                    }
-                } else {
-                    self.current_value = 1.0;
-                    self.stage = EnvelopeStage::Decay;
-                    self.samples_in_stage = 0;
-                }
-            }
-            EnvelopeStage::Decay => {
-                let decay_samples = (params.env_decay * self.sample_rate) as u32;
-                if decay_samples > 0 {
-                    let progress = self.samples_in_stage as f32 / decay_samples as f32;
-                    self.current_value = lerp(1.0, params.env_sustain, progress.min(1.0));
-
-                    if self.samples_in_stage >= decay_samples {
-                        self.stage = EnvelopeStage::Sustain;
-                        self.samples_in_stage = 0;
-                    } else {
-                        self.samples_in_stage += 1;
-                    }
-                } else {
-                    self.current_value = params.env_sustain;
-                    self.stage = EnvelopeStage::Sustain;
-                    self.samples_in_stage = 0;
-                }
-            }
-            EnvelopeStage::Sustain => {
-                self.current_value = params.env_sustain;
-            }
-            EnvelopeStage::Release => {
-                let release_samples = (params.env_release * self.sample_rate) as u32;
-                if release_samples > 0 {
-                    let progress = self.samples_in_stage as f32 / release_samples as f32;
-                    // Use the captured release_start_value for smooth release from any level
-                    self.current_value = lerp(self.release_start_value, 0.0, progress.min(1.0));
-
-                    if self.samples_in_stage >= release_samples || self.current_value <= 0.001 {
-                        self.stage = EnvelopeStage::Idle;
-                        self.current_value = 0.0;
-                        self.samples_in_stage = 0;
-                    } else {
-                        self.samples_in_stage += 1;
-                    }
-                } else {
-                    self.stage = EnvelopeStage::Idle;
-                    self.current_value = 0.0;
-                }
-            }
-        }
-
-        self.current_value
-    }
-
-    /// Reset envelope
-    pub fn reset(&mut self) {
-        self.stage = EnvelopeStage::Idle;
-        self.current_value = 0.0;
-        self.samples_in_stage = 0;
-        self.release_start_value = 0.0;
-    }
-
-    /// Get current stage
-    pub fn current_stage(&self) -> EnvelopeStage {
-        self.stage
-    }
-
-    /// Check if envelope is active
-    pub fn is_active(&self) -> bool {
-        self.stage != EnvelopeStage::Idle
-    }
-}
+// Note: The old simple Envelope has been replaced by FmEnvelope from rigel-modulation.
+// Use EnvelopePhase (re-exported above) instead of the old EnvelopeStage.
 
 /// Monophonic synthesis engine
 #[derive(Debug, Clone)]
 pub struct SynthEngine {
     oscillator: SimpleOscillator,
-    envelope: Envelope,
+    envelope: FmEnvelope,
     sample_rate: f32,
     current_note: Option<NoteNumber>,
     current_velocity: f32,
@@ -289,6 +249,8 @@ pub struct SynthEngine {
     cached_frequency: f32,
     /// Sample-accurate timing infrastructure
     timebase: Timebase,
+    /// Last envelope params for detecting changes
+    last_env_params: FmEnvelopeParams,
 }
 
 impl SynthEngine {
@@ -306,9 +268,16 @@ impl SynthEngine {
             let _backend_name = simd_ctx.backend_name();
         }
 
+        // Default envelope params
+        let default_env_params = FmEnvelopeParams::default();
+
+        // Create envelope with default config
+        let envelope_config = Self::fm_params_to_config(&default_env_params, sample_rate);
+        let envelope = FmEnvelope::with_config(envelope_config);
+
         Self {
             oscillator: SimpleOscillator::new(),
-            envelope: Envelope::new(sample_rate),
+            envelope,
             sample_rate,
             current_note: None,
             current_velocity: 0.0,
@@ -318,7 +287,33 @@ impl SynthEngine {
             last_pitch_offset: 0.0,
             cached_frequency: 440.0,
             timebase: Timebase::new(sample_rate),
+            last_env_params: default_env_params,
         }
+    }
+
+    /// Convert FmEnvelopeParams to FmEnvelopeConfig
+    fn fm_params_to_config(params: &FmEnvelopeParams, sample_rate: f32) -> FmEnvelopeConfig {
+        use rigel_modulation::envelope::{LoopConfig, Segment};
+
+        FmEnvelopeConfig::new(
+            [
+                Segment::new(params.key_on[0].rate, params.key_on[0].level),
+                Segment::new(params.key_on[1].rate, params.key_on[1].level),
+                Segment::new(params.key_on[2].rate, params.key_on[2].level),
+                Segment::new(params.key_on[3].rate, params.key_on[3].level),
+                Segment::new(params.key_on[4].rate, params.key_on[4].level),
+                Segment::new(params.key_on[5].rate, params.key_on[5].level),
+            ],
+            [
+                Segment::new(params.release[0].rate, params.release[0].level),
+                Segment::new(params.release[1].rate, params.release[1].level),
+            ],
+            params.rate_scaling,
+            127, // Output level (full)
+            0,   // No delay
+            LoopConfig::disabled(),
+            sample_rate,
+        )
     }
 
     /// Get the SIMD backend name (for debugging/logging)
@@ -338,7 +333,41 @@ impl SynthEngine {
 
         self.oscillator
             .set_frequency(self.cached_frequency, self.sample_rate);
-        self.envelope.note_on();
+
+        // Trigger envelope with MIDI note for rate scaling
+        self.envelope.note_on(note);
+    }
+
+    /// Start playing a note with specific envelope parameters
+    ///
+    /// This variant allows configuring the envelope at note-on time,
+    /// which is more efficient than updating params every sample.
+    pub fn note_on_with_params(
+        &mut self,
+        note: NoteNumber,
+        velocity: Velocity,
+        params: &SynthParams,
+    ) {
+        self.current_note = Some(note);
+        self.current_velocity = velocity;
+
+        // Cache base frequency
+        self.cached_base_freq = midi_to_freq(note);
+        self.cached_frequency = self.cached_base_freq;
+        self.last_pitch_offset = 0.0;
+
+        self.oscillator
+            .set_frequency(self.cached_frequency, self.sample_rate);
+
+        // Update envelope config if params changed
+        if params.envelope != self.last_env_params {
+            let config = Self::fm_params_to_config(&params.envelope, self.sample_rate);
+            self.envelope.set_config(config);
+            self.last_env_params = params.envelope;
+        }
+
+        // Trigger envelope with MIDI note for rate scaling
+        self.envelope.note_on(note);
     }
 
     /// Stop playing the current note
@@ -360,9 +389,18 @@ impl SynthEngine {
                 .set_frequency(self.cached_frequency, self.sample_rate);
         }
 
+        // Check if envelope params changed and update config
+        // Note: This is less efficient than note_on_with_params, but provides
+        // real-time parameter updates during playback
+        if params.envelope != self.last_env_params {
+            let config = Self::fm_params_to_config(&params.envelope, self.sample_rate);
+            self.envelope.set_config(config);
+            self.last_env_params = params.envelope;
+        }
+
         // Generate audio
         let osc_output = self.oscillator.process_sample();
-        let env_value = self.envelope.process_sample(params);
+        let env_value = self.envelope.process();
 
         // If envelope finished, clear current note
         if !self.envelope.is_active() {
@@ -390,6 +428,8 @@ impl SynthEngine {
         self.last_pitch_offset = 0.0;
         self.cached_frequency = 440.0;
         self.timebase.reset();
+        // Reset to default envelope params
+        self.last_env_params = FmEnvelopeParams::default();
     }
 
     /// Check if any note is currently playing
@@ -456,6 +496,13 @@ impl SynthEngine {
     /// Allows direct modification of timebase (e.g., for reset or sample rate changes).
     pub fn timebase_mut(&mut self) -> &mut Timebase {
         &mut self.timebase
+    }
+
+    /// Get the current envelope phase
+    ///
+    /// Useful for UI display or debugging envelope behavior.
+    pub fn envelope_phase(&self) -> EnvelopePhase {
+        self.envelope.phase()
     }
 }
 

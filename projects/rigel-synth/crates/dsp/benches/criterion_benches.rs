@@ -1,8 +1,9 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use rigel_dsp::{
-    clamp, lerp, midi_to_freq, soft_clip, ControlRateClock, Envelope, NoteNumber, SimpleOscillator,
-    Smoother, SmoothingMode, SynthEngine, SynthParams, Timebase,
+    clamp, lerp, midi_to_freq, soft_clip, ControlRateClock, NoteNumber, SimpleOscillator, Smoother,
+    SmoothingMode, SynthEngine, SynthParams, Timebase,
 };
+use rigel_modulation::envelope::{FmEnvelope, FmEnvelopeConfig};
 use std::hint::black_box;
 use std::time::Duration;
 
@@ -239,129 +240,97 @@ fn bench_envelope(c: &mut Criterion) {
     // Single sample processing in each stage
     group.throughput(Throughput::Elements(1));
 
-    // Attack stage
+    // Attack stage - using ADSR config for simplicity
     group.bench_function("attack_stage", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.1,
-            ..Default::default()
-        };
-        env.note_on();
-        b.iter(|| black_box(env.process_sample(black_box(&params))))
+        let config = FmEnvelopeConfig::adsr(0.1, 0.1, 0.7, 0.1, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
+        env.note_on(60);
+        b.iter(|| black_box(env.process()))
     });
 
     // Decay stage
     group.bench_function("decay_stage", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.0,
-            env_decay: 0.1,
-            env_sustain: 0.5,
-            ..Default::default()
-        };
-        env.note_on();
+        let config = FmEnvelopeConfig::adsr(0.001, 0.1, 0.5, 0.1, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
+        env.note_on(60);
         // Process through attack instantly
-        for _ in 0..10 {
-            env.process_sample(&params);
+        for _ in 0..50 {
+            env.process();
         }
-        b.iter(|| black_box(env.process_sample(black_box(&params))))
+        b.iter(|| black_box(env.process()))
     });
 
     // Sustain stage
     group.bench_function("sustain_stage", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.0,
-            env_decay: 0.0,
-            env_sustain: 0.7,
-            ..Default::default()
-        };
-        env.note_on();
+        let config = FmEnvelopeConfig::adsr(0.001, 0.001, 0.7, 0.1, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
+        env.note_on(60);
         // Process through attack and decay
-        for _ in 0..100 {
-            env.process_sample(&params);
+        for _ in 0..500 {
+            env.process();
         }
-        b.iter(|| black_box(env.process_sample(black_box(&params))))
+        b.iter(|| black_box(env.process()))
     });
 
     // Release stage
     group.bench_function("release_stage", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.0,
-            env_release: 0.1,
-            ..Default::default()
-        };
-        env.note_on();
+        let config = FmEnvelopeConfig::adsr(0.001, 0.1, 0.7, 0.1, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
+        env.note_on(60);
+        for _ in 0..100 {
+            env.process();
+        }
         env.note_off();
-        b.iter(|| black_box(env.process_sample(black_box(&params))))
+        b.iter(|| black_box(env.process()))
     });
 
     // Full ADSR cycle
     group.bench_function("full_adsr_cycle", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.01,
-            env_decay: 0.1,
-            env_sustain: 0.7,
-            env_release: 0.2,
-            ..Default::default()
-        };
+        let config = FmEnvelopeConfig::adsr(0.01, 0.1, 0.7, 0.2, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
 
         b.iter(|| {
-            env.note_on();
+            env.note_on(60);
             // Attack + Decay
             for _ in 0..(sample_rate as usize / 10) {
-                black_box(env.process_sample(&params));
+                black_box(env.process());
             }
             // Sustain
             for _ in 0..1000 {
-                black_box(env.process_sample(&params));
+                black_box(env.process());
             }
             // Release
             env.note_off();
             for _ in 0..(sample_rate as usize / 5) {
-                black_box(env.process_sample(&params));
+                black_box(env.process());
             }
         })
     });
 
     // Fast envelope (percussive)
     group.bench_function("percussive_envelope", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.001,
-            env_decay: 0.05,
-            env_sustain: 0.0,
-            env_release: 0.1,
-            ..Default::default()
-        };
+        let config = FmEnvelopeConfig::adsr(0.001, 0.05, 0.0, 0.1, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
 
         b.iter(|| {
-            env.note_on();
+            env.note_on(60);
             for _ in 0..4410 {
                 // 0.1 seconds
-                black_box(env.process_sample(&params));
+                black_box(env.process());
             }
         })
     });
 
     // Slow envelope (pad)
     group.bench_function("pad_envelope", |b| {
-        let mut env = Envelope::new(sample_rate);
-        let params = SynthParams {
-            env_attack: 0.5,
-            env_decay: 0.5,
-            env_sustain: 0.8,
-            env_release: 1.0,
-            ..Default::default()
-        };
+        let config = FmEnvelopeConfig::adsr(0.5, 0.5, 0.8, 1.0, sample_rate);
+        let mut env = FmEnvelope::with_config(config);
 
         b.iter(|| {
-            env.note_on();
+            env.note_on(60);
             for _ in 0..22050 {
                 // 0.5 seconds
-                black_box(env.process_sample(&params));
+                black_box(env.process());
             }
         })
     });
@@ -490,19 +459,14 @@ fn bench_synth_engine_buffers(c: &mut Criterion) {
             },
         );
 
-        // Percussive note (fast attack/release)
+        // Percussive note (fast attack/release) - uses default params
+        // Note: FM envelope params are configured in SynthEngine, not SynthParams
         group.bench_with_input(
             BenchmarkId::new("percussive_note", size),
             size,
             |b, &size| {
                 let mut engine = SynthEngine::new(sample_rate);
-                let params = SynthParams {
-                    env_attack: 0.001,
-                    env_decay: 0.05,
-                    env_sustain: 0.0,
-                    env_release: 0.1,
-                    ..Default::default()
-                };
+                let params = SynthParams::default();
 
                 b.iter(|| {
                     engine.note_on(60, 0.8);
