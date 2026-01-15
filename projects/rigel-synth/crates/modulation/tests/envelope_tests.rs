@@ -4,7 +4,7 @@
 
 use rigel_modulation::envelope::{
     AwmEnvelope, EnvelopePhase, FmEnvelope, FmEnvelopeBatch8, FmEnvelopeConfig, LoopConfig,
-    Segment, SevenSegEnvelope, JUMP_TARGET_Q8, LEVEL_MAX,
+    Segment, SevenSegEnvelope, JUMP_TARGET,
 };
 
 // =============================================================================
@@ -141,9 +141,12 @@ mod us1_basic_envelope {
 
         assert_eq!(env.phase(), EnvelopePhase::Idle);
         assert!(!env.is_active());
-        // At level 0 (LEVEL_MIN), the linear value is very small but not exactly 0
-        // due to exp2 calculation
-        assert!(env.value() < 0.001, "Reset should give near-zero value");
+        // At LEVEL_MIN (0.0), the value should be exactly 0
+        assert!(
+            env.value() < f32::EPSILON,
+            "Reset should give zero value, got {}",
+            env.value()
+        );
     }
 
     #[test]
@@ -250,6 +253,61 @@ mod us2_rate_scaling {
             samples_low
         );
     }
+
+    #[test]
+    fn test_rate_scaling_no_instant_transitions() {
+        // Fast envelope with max rate scaling at high note should still ramp
+        let mut config = FmEnvelopeConfig::default_with_sample_rate(44100.0);
+        config.rate_scaling = 7;
+        config.key_on_segments[0] = Segment::new(95, 99);
+
+        let mut env = FmEnvelope::with_config(config);
+        env.note_on(127);
+
+        // Process several samples and verify we're ramping, not jumping
+        let first_value = env.value();
+        for _ in 0..10 {
+            env.process();
+        }
+        let tenth_value = env.value();
+
+        // Should see gradual increase - the 10th value should be different from the first
+        assert!(
+            (tenth_value - first_value).abs() > f32::EPSILON,
+            "Envelope should ramp, not stay constant: first={}, tenth={}",
+            first_value,
+            tenth_value
+        );
+    }
+
+    #[test]
+    fn test_rate_scaling_sample_rate_independent() {
+        // Test that minimum time is consistent across sample rates
+        for &sr in &[22050.0, 44100.0, 48000.0, 96000.0] {
+            let mut config = FmEnvelopeConfig::default_with_sample_rate(sr);
+            config.rate_scaling = 7;
+            config.key_on_segments[0] = Segment::new(99, 99);
+
+            let mut env = FmEnvelope::with_config(config);
+            env.note_on(127);
+
+            // Count samples to reach 90%
+            let mut samples = 0;
+            while env.value() < 0.9 && samples < 10000 {
+                env.process();
+                samples += 1;
+            }
+
+            let time_ms = samples as f32 / sr * 1000.0;
+            assert!(
+                time_ms >= 1.0,
+                "At {}Hz: attack should take >= 1ms, took {}ms ({} samples)",
+                sr,
+                time_ms,
+                samples
+            );
+        }
+    }
 }
 
 // =============================================================================
@@ -258,15 +316,7 @@ mod us2_rate_scaling {
 
 mod us3_msfa_rates {
     use super::*;
-    use rigel_modulation::envelope::{calculate_increment_q8, rate_to_qrate};
-
-    #[test]
-    fn test_msfa_rate_formula() {
-        // qrate = (rate * 41) >> 6
-        assert_eq!(rate_to_qrate(0), 0);
-        assert_eq!(rate_to_qrate(50), 32); // (50 * 41) >> 6 = 2050 >> 6 = 32
-        assert_eq!(rate_to_qrate(99), 63); // (99 * 41) >> 6 = 4059 >> 6 = 63
-    }
+    use rigel_modulation::envelope::{calculate_increment_f32, seconds_to_rate};
 
     #[test]
     fn test_distance_dependent_timing() {
@@ -308,47 +358,59 @@ mod us3_msfa_rates {
     }
 
     #[test]
-    fn test_tolerance_against_reference() {
-        // Verify level conversion accuracy
-        use rigel_modulation::envelope::level_to_linear;
+    fn test_increment_increases_with_rate() {
+        // Higher rate should give higher increment (faster envelope)
+        let inc_20 = calculate_increment_f32(20, 44100.0);
+        let inc_50 = calculate_increment_f32(50, 44100.0);
+        let inc_80 = calculate_increment_f32(80, 44100.0);
+        let inc_99 = calculate_increment_f32(99, 44100.0);
 
-        // At LEVEL_MAX, should get ~1.0
-        let max_linear = level_to_linear(LEVEL_MAX);
-        let error_db = 20.0 * libm::log10f((max_linear - 1.0).abs().max(0.00001));
-
-        // Error should be well within 0.1 dB
         assert!(
-            error_db < -60.0,
-            "Max level error should be < 0.1 dB, got {} dB",
-            error_db
+            inc_50 > inc_20,
+            "Rate 50 ({}) should be > rate 20 ({})",
+            inc_50,
+            inc_20
+        );
+        assert!(
+            inc_80 > inc_50,
+            "Rate 80 ({}) should be > rate 50 ({})",
+            inc_80,
+            inc_50
+        );
+        assert!(
+            inc_99 > inc_80,
+            "Rate 99 ({}) should be > rate 80 ({})",
+            inc_99,
+            inc_80
         );
     }
 
     #[test]
-    fn test_increment_increases_with_qrate() {
-        // Higher qRate should give higher increment
-        let inc_10 = calculate_increment_q8(10);
-        let inc_30 = calculate_increment_q8(30);
-        let inc_50 = calculate_increment_q8(50);
-        let inc_63 = calculate_increment_q8(63);
+    fn test_seconds_to_rate_roundtrip() {
+        // Verify that seconds_to_rate produces reasonable rates
+        let rate_10ms = seconds_to_rate(0.01, 44100.0);
+        let rate_100ms = seconds_to_rate(0.1, 44100.0);
+        let rate_1s = seconds_to_rate(1.0, 44100.0);
+        let rate_10s = seconds_to_rate(10.0, 44100.0);
 
+        // Shorter times should give higher rates
         assert!(
-            inc_30 >= inc_10,
-            "qRate 30 ({}) should be >= qRate 10 ({})",
-            inc_30,
-            inc_10
+            rate_10ms > rate_100ms,
+            "10ms rate ({}) should be > 100ms rate ({})",
+            rate_10ms,
+            rate_100ms
         );
         assert!(
-            inc_50 >= inc_30,
-            "qRate 50 ({}) should be >= qRate 30 ({})",
-            inc_50,
-            inc_30
+            rate_100ms > rate_1s,
+            "100ms rate ({}) should be > 1s rate ({})",
+            rate_100ms,
+            rate_1s
         );
         assert!(
-            inc_63 >= inc_50,
-            "qRate 63 ({}) should be >= qRate 50 ({})",
-            inc_63,
-            inc_50
+            rate_1s > rate_10s,
+            "1s rate ({}) should be > 10s rate ({})",
+            rate_1s,
+            rate_10s
         );
     }
 }
@@ -410,16 +472,15 @@ mod us7_performance {
         assert!(output[1] > 0.0, "Envelope 1 should produce output");
         assert!(output[4] > 0.0, "Envelope 4 should produce output");
 
-        // Inactive envelopes are at LEVEL_MIN which gives a very small
-        // but non-zero linear value due to exp2 calculation
+        // Inactive envelopes are at LEVEL_MIN (0.0)
         assert!(
-            output[2] < 0.001,
-            "Inactive envelope should be near-zero, got {}",
+            output[2] < f32::EPSILON,
+            "Inactive envelope should be zero, got {}",
             output[2]
         );
         assert!(
-            output[3] < 0.001,
-            "Inactive envelope should be near-zero, got {}",
+            output[3] < f32::EPSILON,
+            "Inactive envelope should be zero, got {}",
             output[3]
         );
     }
@@ -466,17 +527,17 @@ mod us4_attack_jump {
         let mut env = FmEnvelope::new(44100.0);
         env.note_on(60);
 
-        // After first process, level should jump to JUMP_TARGET
+        // After first process, level should jump to JUMP_TARGET (~0.5)
         env.process();
 
-        // Get raw level
-        let level = env.state().level_q8();
+        // Get linear level
+        let level = env.state().level();
 
         assert!(
-            level >= JUMP_TARGET_Q8,
+            level >= JUMP_TARGET,
             "Level {} should jump to at least {} on attack",
             level,
-            JUMP_TARGET_Q8
+            JUMP_TARGET
         );
     }
 
@@ -486,10 +547,10 @@ mod us4_attack_jump {
         env.note_on(60);
 
         // Process through attack
-        let mut last_level = 0i16;
+        let mut last_level = 0.0f32;
         for i in 0..1000 {
             env.process();
-            let current = env.state().level_q8();
+            let current = env.state().level();
 
             // After the initial jump, level should generally increase
             // (or stay same if we're at target)

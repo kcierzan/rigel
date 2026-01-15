@@ -156,29 +156,29 @@ fn bench_polyphonic_workload(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_level_conversion(c: &mut Criterion) {
-    use rigel_modulation::envelope::{level_to_linear, linear_to_level, LEVEL_MAX};
+    use rigel_modulation::envelope::{linear_to_param_level, param_to_level_f32};
 
     let mut group = c.benchmark_group("level_conversion");
 
-    group.bench_function("level_to_linear", |b| {
-        let levels: Vec<i16> = (0..LEVEL_MAX).step_by(16).collect();
+    group.bench_function("param_to_level_f32", |b| {
+        let params: Vec<u8> = (0..100).collect();
         let mut idx = 0;
 
         b.iter(|| {
-            let level = levels[idx % levels.len()];
+            let param = params[idx % params.len()];
             idx += 1;
-            black_box(level_to_linear(black_box(level)))
+            black_box(param_to_level_f32(black_box(param)))
         })
     });
 
-    group.bench_function("linear_to_level", |b| {
+    group.bench_function("linear_to_param_level", |b| {
         let linears: Vec<f32> = (0..100).map(|i| i as f32 / 100.0).collect();
         let mut idx = 0;
 
         b.iter(|| {
             let linear = linears[idx % linears.len()];
             idx += 1;
-            black_box(linear_to_level(black_box(linear)))
+            black_box(linear_to_param_level(black_box(linear)))
         })
     });
 
@@ -190,20 +190,9 @@ fn bench_level_conversion(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_rate_calculations(c: &mut Criterion) {
-    use rigel_modulation::envelope::{calculate_increment_q8, rate_to_qrate, scale_rate};
+    use rigel_modulation::envelope::{calculate_increment_f32, scale_rate, seconds_to_rate};
 
     let mut group = c.benchmark_group("rate_calculations");
-
-    group.bench_function("rate_to_qrate", |b| {
-        let rates: Vec<u8> = (0..100).collect();
-        let mut idx = 0;
-
-        b.iter(|| {
-            let rate = rates[idx % rates.len()];
-            idx += 1;
-            black_box(rate_to_qrate(black_box(rate)))
-        })
-    });
 
     group.bench_function("scale_rate", |b| {
         let notes: Vec<u8> = (21..108).collect();
@@ -216,14 +205,27 @@ fn bench_rate_calculations(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("calculate_increment_q8", |b| {
-        let qrates: Vec<u8> = (0..64).collect();
+    group.bench_function("calculate_increment_f32", |b| {
+        let rates: Vec<u8> = (0..100).collect();
         let mut idx = 0;
 
         b.iter(|| {
-            let qrate = qrates[idx % qrates.len()];
+            let rate = rates[idx % rates.len()];
             idx += 1;
-            black_box(calculate_increment_q8(black_box(qrate)))
+            black_box(calculate_increment_f32(black_box(rate), 44100.0))
+        })
+    });
+
+    group.bench_function("seconds_to_rate", |b| {
+        let times: Vec<f32> = [0.01, 0.05, 0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0]
+            .into_iter()
+            .collect();
+        let mut idx = 0;
+
+        b.iter(|| {
+            let time = times[idx % times.len()];
+            idx += 1;
+            black_box(seconds_to_rate(black_box(time), 44100.0))
         })
     });
 

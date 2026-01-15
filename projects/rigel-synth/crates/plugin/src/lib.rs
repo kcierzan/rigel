@@ -263,29 +263,8 @@ impl Plugin for RigelPlugin {
 
         // Process each sample
         for (sample_id, channel_samples) in buffer.iter_samples().enumerate() {
-            // Handle MIDI events at this sample
-            while let Some(event) = next_event {
-                if event.timing() != sample_id as u32 {
-                    break;
-                }
-
-                match event {
-                    NoteEvent::NoteOn { note, velocity, .. } => {
-                        self.synth_engine.note_on(note, velocity);
-                    }
-                    NoteEvent::NoteOff { note, .. } => {
-                        self.synth_engine.note_off(note);
-                    }
-                    NoteEvent::Choke { note, .. } => {
-                        self.synth_engine.note_off(note);
-                    }
-                    _ => {}
-                }
-
-                next_event = context.next_event();
-            }
-
-            // Build FM envelope params from plugin parameters
+            // Build FM envelope params FIRST (before MIDI handling)
+            // so that note_on uses the correct GUI parameters
             // Convert time values (seconds) to DX7 rates (0-99)
             let envelope = FmEnvelopeParams {
                 key_on: [
@@ -357,6 +336,32 @@ impl Plugin for RigelPlugin {
                 pitch_offset: self.params.pitch_offset.smoothed.next(),
                 envelope,
             };
+
+            // Handle MIDI events at this sample
+            // NOTE: synth_params must be built BEFORE this so note_on_with_params
+            // uses the correct envelope configuration from GUI
+            while let Some(event) = next_event {
+                if event.timing() != sample_id as u32 {
+                    break;
+                }
+
+                match event {
+                    NoteEvent::NoteOn { note, velocity, .. } => {
+                        // Use note_on_with_params to ensure envelope uses GUI params
+                        self.synth_engine
+                            .note_on_with_params(note, velocity, &synth_params);
+                    }
+                    NoteEvent::NoteOff { note, .. } => {
+                        self.synth_engine.note_off(note);
+                    }
+                    NoteEvent::Choke { note, .. } => {
+                        self.synth_engine.note_off(note);
+                    }
+                    _ => {}
+                }
+
+                next_event = context.next_event();
+            }
 
             // Process one sample
             let output_sample = self.synth_engine.process_sample(&synth_params);
