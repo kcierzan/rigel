@@ -7,6 +7,7 @@
 
 use core::f32::consts::TAU;
 use rigel_math::expf;
+use rigel_math::scalar::polyblep_sawtooth;
 use rigel_modulation::envelope::{FmEnvelope, FmEnvelopeConfig};
 use rigel_simd::DenormalGuard;
 use rigel_simd_dispatch::SimdContext;
@@ -239,13 +240,59 @@ impl Default for SimpleOscillator {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct BandlimitedSawOscillator {
+    phase: f32,
+    phase_increment: f32,
+}
+
+impl BandlimitedSawOscillator {
+    /// Create new bandlimited sawtooth oscillator
+    pub fn new() -> Self {
+        Self {
+            phase: 0.0,
+            phase_increment: 0.0,
+        }
+    }
+
+    /// Set frequency and sample rate
+    pub fn set_frequency(&mut self, frequency: f32, sample_rate: f32) {
+        self.phase_increment = frequency / sample_rate;
+    }
+
+    /// Process one sample (bandlimited sawtooth wave)
+    pub fn process_sample(&mut self) -> f32 {
+        // Naive bandlimited sawtooth using PolyBLEP
+        let output = polyblep_sawtooth(self.phase, self.phase_increment);
+
+        // Advance phase
+        self.phase += self.phase_increment;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+        }
+
+        output
+    }
+
+    /// Reset phase
+    pub fn reset(&mut self) {
+        self.phase = 0.0;
+    }
+}
+
+impl Default for BandlimitedSawOscillator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Note: The old simple Envelope has been replaced by FmEnvelope from rigel-modulation.
 // Use EnvelopePhase (re-exported above) instead of the old EnvelopeStage.
 
 /// Monophonic synthesis engine
 #[derive(Debug, Clone)]
 pub struct SynthEngine {
-    oscillator: SimpleOscillator,
+    oscillator: BandlimitedSawOscillator,
     envelope: FmEnvelope,
     sample_rate: f32,
     current_note: Option<NoteNumber>,
@@ -288,7 +335,7 @@ impl SynthEngine {
         let envelope = FmEnvelope::with_config(envelope_config);
 
         Self {
-            oscillator: SimpleOscillator::new(),
+            oscillator: BandlimitedSawOscillator::new(),
             envelope,
             sample_rate,
             current_note: None,
@@ -352,6 +399,9 @@ impl SynthEngine {
 
         self.oscillator
             .set_frequency(self.cached_frequency, self.sample_rate);
+
+        // opinionated oscillator phase reset for now
+        self.oscillator.reset();
 
         // Trigger envelope with MIDI note for rate scaling
         self.envelope.note_on(note);

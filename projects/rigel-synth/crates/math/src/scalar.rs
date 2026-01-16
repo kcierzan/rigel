@@ -302,6 +302,100 @@ pub fn cosf(x: f32) -> f32 {
     sinf(x + core::f32::consts::FRAC_PI_2)
 }
 
+/// Scalar PolyBLEP residual function for anti-aliasing
+///
+/// Computes the polynomial correction for a step discontinuity.
+/// This is the scalar version of the SIMD `polyblep` function in `antialias.rs`.
+///
+/// # Parameters
+///
+/// - `t`: Phase position in [0, 1)
+/// - `dt`: Phase increment per sample (frequency / sample_rate)
+///
+/// # Returns
+///
+/// Correction value to add to the naive waveform. Returns 0.0 when far from
+/// discontinuities.
+///
+/// # Algorithm
+///
+/// For a discontinuity at phase=0:
+/// - If phase < dt (just after crossing): correction = 2t - t² - 1
+/// - If phase > 1-dt (just before crossing): correction = t² + 2t + 1
+/// - Otherwise: no correction needed
+///
+/// # Example
+///
+/// ```rust
+/// use rigel_math::scalar::polyblep;
+///
+/// let phase = 0.001; // Just after discontinuity
+/// let dt = 0.01;     // ~440 Hz at 44.1kHz
+/// let correction = polyblep(phase, dt);
+/// // correction is non-zero near discontinuities
+/// ```
+#[inline(always)]
+pub fn polyblep(t: f32, dt: f32) -> f32 {
+    if t < dt {
+        // Just after crossing (phase < dt)
+        // Normalize: t_norm = t / dt, in range [0, 1)
+        let t_norm = t / dt;
+        // Correction: 2*t_norm - t_norm² - 1
+        2.0 * t_norm - t_norm * t_norm - 1.0
+    } else if t > 1.0 - dt {
+        // Just before wrap (phase > 1-dt)
+        // Normalize: t_norm = (t - 1) / dt, in range (-1, 0]
+        let t_norm = (t - 1.0) / dt;
+        // Correction: t_norm² + 2*t_norm + 1
+        t_norm * t_norm + 2.0 * t_norm + 1.0
+    } else {
+        // Far from discontinuity, no correction needed
+        0.0
+    }
+}
+
+/// Scalar PolyBLEP-corrected sawtooth wave
+///
+/// Generates a band-limited sawtooth wave using PolyBLEP correction.
+/// This is the scalar version of the SIMD `polyblep_sawtooth` function.
+///
+/// The sawtooth has one discontinuity per cycle at phase=0/1 where it
+/// drops from +1 to -1.
+///
+/// # Parameters
+///
+/// - `phase`: Phase in [0, 1)
+/// - `phase_increment`: Phase increment per sample (frequency / sample_rate)
+///
+/// # Output Range
+///
+/// Returns values in approximately [-1, 1] (slight overshoot possible
+/// due to band-limiting correction)
+///
+/// # Example
+///
+/// ```rust
+/// use rigel_math::scalar::polyblep_sawtooth;
+///
+/// // Generate sawtooth at 440 Hz (sample rate 44100)
+/// let phase = 0.5;
+/// let phase_inc = 440.0 / 44100.0;
+/// let result = polyblep_sawtooth(phase, phase_inc);
+/// // result ≈ 0.0 (midpoint of sawtooth)
+/// ```
+#[inline(always)]
+pub fn polyblep_sawtooth(phase: f32, phase_increment: f32) -> f32 {
+    // Naive sawtooth: rises linearly from -1 to 1
+    // naive = 2 * phase - 1
+    let naive = 2.0 * phase - 1.0;
+
+    // Apply PolyBLEP correction at the discontinuity (phase ≈ 0 or ≈ 1)
+    // Sawtooth drops from +1 to -1 at wrap, so we subtract the correction
+    let correction = polyblep(phase, phase_increment);
+
+    naive - correction
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -601,6 +695,165 @@ mod tests {
                 x,
                 identity,
                 error
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // polyblep tests
+    // ─────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_polyblep_zero_far_from_discontinuity() {
+        // When far from discontinuities, correction should be zero
+        let result = polyblep(0.5, 0.01);
+        assert!(
+            result.abs() < 1e-6,
+            "polyblep far from discontinuity should be 0, got {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_polyblep_near_start() {
+        // Just after phase=0, should have non-zero correction
+        let result = polyblep(0.005, 0.01);
+        // Should be non-zero and in reasonable range
+        assert!(
+            result.abs() < 2.0,
+            "polyblep near start should be bounded, got {}",
+            result
+        );
+        // At t_norm = 0.5: 2*0.5 - 0.25 - 1 = 1 - 0.25 - 1 = -0.25
+        let expected = -0.25;
+        assert!(
+            (result - expected).abs() < 1e-6,
+            "polyblep at t_norm=0.5 should be {}, got {}",
+            expected,
+            result
+        );
+    }
+
+    #[test]
+    fn test_polyblep_near_end() {
+        // Just before phase=1, should have non-zero correction
+        let result = polyblep(0.995, 0.01);
+        // At t_norm = (0.995 - 1) / 0.01 = -0.5
+        // t_norm² + 2*t_norm + 1 = 0.25 - 1 + 1 = 0.25
+        let expected = 0.25;
+        assert!(
+            (result - expected).abs() < 1e-6,
+            "polyblep near end should be {}, got {}",
+            expected,
+            result
+        );
+    }
+
+    #[test]
+    fn test_polyblep_boundary_values() {
+        let dt = 0.01;
+
+        // At exactly t=0 (t_norm=0): 2*0 - 0 - 1 = -1
+        let at_zero = polyblep(0.0, dt);
+        assert!(
+            (at_zero - (-1.0)).abs() < 1e-6,
+            "polyblep at t=0 should be -1, got {}",
+            at_zero
+        );
+
+        // At exactly t=dt (t_norm=1): 2*1 - 1 - 1 = 0
+        // But t >= dt falls outside the correction region, so should be 0
+        let at_dt = polyblep(dt, dt);
+        assert!(
+            at_dt.abs() < 1e-6,
+            "polyblep at t=dt should be 0 (outside region), got {}",
+            at_dt
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // polyblep_sawtooth tests
+    // ─────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_polyblep_sawtooth_midpoint() {
+        let result = polyblep_sawtooth(0.5, 0.01);
+        // At midpoint, sawtooth should be ~0
+        assert!(
+            result.abs() < 0.1,
+            "sawtooth at phase=0.5 should be ~0, got {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_polyblep_sawtooth_range() {
+        // Test multiple phase values
+        for i in 0..10 {
+            let phase = i as f32 / 10.0;
+            let result = polyblep_sawtooth(phase, 0.01);
+            assert!(
+                (-1.5..=1.5).contains(&result),
+                "sawtooth at phase={} should be in [-1.5, 1.5], got {}",
+                phase,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn test_polyblep_sawtooth_monotonic_rising() {
+        // In the middle of the cycle (away from discontinuity), sawtooth should rise
+        let phase_inc = 0.01;
+        let mut prev = polyblep_sawtooth(0.1, phase_inc);
+        for i in 2..9 {
+            let phase = i as f32 / 10.0;
+            let curr = polyblep_sawtooth(phase, phase_inc);
+            assert!(
+                curr > prev,
+                "sawtooth should be rising: phase={}, prev={}, curr={}",
+                phase,
+                prev,
+                curr
+            );
+            prev = curr;
+        }
+    }
+
+    #[test]
+    fn test_polyblep_sawtooth_matches_simd_at_midpoint() {
+        // At phase=0.5, far from discontinuity, naive sawtooth = 2*0.5 - 1 = 0
+        // correction = 0, so result should be exactly 0
+        let result = polyblep_sawtooth(0.5, 0.01);
+        let expected = 0.0;
+        assert!(
+            (result - expected).abs() < 1e-6,
+            "sawtooth at phase=0.5 should be exactly {}, got {}",
+            expected,
+            result
+        );
+    }
+
+    #[test]
+    fn test_polyblep_sawtooth_typical_frequency() {
+        // 440 Hz at 44100 Hz sample rate
+        let phase_inc = 440.0 / 44100.0;
+
+        // Test a few phases
+        let phases = [0.0, 0.25, 0.5, 0.75];
+        for &phase in &phases {
+            let result = polyblep_sawtooth(phase, phase_inc);
+            assert!(
+                result.is_finite(),
+                "sawtooth at phase={} should be finite, got {}",
+                phase,
+                result
+            );
+            assert!(
+                (-1.5..=1.5).contains(&result),
+                "sawtooth at phase={} should be in [-1.5, 1.5], got {}",
+                phase,
+                result
             );
         }
     }
