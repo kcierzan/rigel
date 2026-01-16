@@ -7,6 +7,7 @@
 
 use core::f32::consts::TAU;
 use rigel_math::expf;
+use rigel_math::scalar::polyblep_sawtooth;
 use rigel_modulation::envelope::{FmEnvelope, FmEnvelopeConfig};
 use rigel_simd::DenormalGuard;
 use rigel_simd_dispatch::SimdContext;
@@ -50,6 +51,12 @@ pub struct FmEnvelopeParams {
     pub release: [Segment; 2],
     /// Rate scaling sensitivity (0-7, higher = more keyboard tracking)
     pub rate_scaling: u8,
+    /// Whether envelope looping is enabled
+    pub loop_enabled: bool,
+    /// Start segment index for loop (0-5)
+    pub loop_start: u8,
+    /// End segment index for loop (0-5)
+    pub loop_end: u8,
 }
 
 impl Default for FmEnvelopeParams {
@@ -69,6 +76,9 @@ impl Default for FmEnvelopeParams {
                 Segment::new(99, 0), // Immediate if needed
             ],
             rate_scaling: 0,
+            loop_enabled: false,
+            loop_start: 0,
+            loop_end: 1,
         }
     }
 }
@@ -100,6 +110,9 @@ impl FmEnvelopeParams {
             ],
             release: [Segment::new(release_rate, 0), Segment::new(99, 0)],
             rate_scaling: 0,
+            loop_enabled: false,
+            loop_start: 0,
+            loop_end: 1,
         }
     }
 }
@@ -227,13 +240,59 @@ impl Default for SimpleOscillator {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct BandlimitedSawOscillator {
+    phase: f32,
+    phase_increment: f32,
+}
+
+impl BandlimitedSawOscillator {
+    /// Create new bandlimited sawtooth oscillator
+    pub fn new() -> Self {
+        Self {
+            phase: 0.0,
+            phase_increment: 0.0,
+        }
+    }
+
+    /// Set frequency and sample rate
+    pub fn set_frequency(&mut self, frequency: f32, sample_rate: f32) {
+        self.phase_increment = frequency / sample_rate;
+    }
+
+    /// Process one sample (bandlimited sawtooth wave)
+    pub fn process_sample(&mut self) -> f32 {
+        // Naive bandlimited sawtooth using PolyBLEP
+        let output = polyblep_sawtooth(self.phase, self.phase_increment);
+
+        // Advance phase
+        self.phase += self.phase_increment;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+        }
+
+        output
+    }
+
+    /// Reset phase
+    pub fn reset(&mut self) {
+        self.phase = 0.0;
+    }
+}
+
+impl Default for BandlimitedSawOscillator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // Note: The old simple Envelope has been replaced by FmEnvelope from rigel-modulation.
 // Use EnvelopePhase (re-exported above) instead of the old EnvelopeStage.
 
 /// Monophonic synthesis engine
 #[derive(Debug, Clone)]
 pub struct SynthEngine {
-    oscillator: SimpleOscillator,
+    oscillator: BandlimitedSawOscillator,
     envelope: FmEnvelope,
     sample_rate: f32,
     current_note: Option<NoteNumber>,
@@ -276,7 +335,7 @@ impl SynthEngine {
         let envelope = FmEnvelope::with_config(envelope_config);
 
         Self {
-            oscillator: SimpleOscillator::new(),
+            oscillator: BandlimitedSawOscillator::new(),
             envelope,
             sample_rate,
             current_note: None,
@@ -295,6 +354,13 @@ impl SynthEngine {
     fn fm_params_to_config(params: &FmEnvelopeParams, sample_rate: f32) -> FmEnvelopeConfig {
         use rigel_modulation::envelope::{LoopConfig, Segment};
 
+        // Build loop config from params
+        let loop_config = if params.loop_enabled && params.loop_start < params.loop_end {
+            LoopConfig::new(params.loop_start, params.loop_end).unwrap_or_else(LoopConfig::disabled)
+        } else {
+            LoopConfig::disabled()
+        };
+
         FmEnvelopeConfig::new(
             [
                 Segment::new(params.key_on[0].rate, params.key_on[0].level),
@@ -311,7 +377,7 @@ impl SynthEngine {
             params.rate_scaling,
             127, // Output level (full)
             0,   // No delay
-            LoopConfig::disabled(),
+            loop_config,
             sample_rate,
         )
     }
@@ -333,6 +399,9 @@ impl SynthEngine {
 
         self.oscillator
             .set_frequency(self.cached_frequency, self.sample_rate);
+
+        // opinionated oscillator phase reset for now
+        self.oscillator.reset();
 
         // Trigger envelope with MIDI note for rate scaling
         self.envelope.note_on(note);

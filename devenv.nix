@@ -344,6 +344,14 @@ in
 
       exec cargo instruments --bench criterion_benches --template time
     '';
+
+    "run:avx2:reaper".exec = ''
+      set -euo pipefail
+      export GDK_SCALE=2
+      build:avx2
+      sudo cp target/bundled/rigel-plugin.clap /usr/local/lib/clap
+      reaper ~/Documents/rigel-test.RPP
+    '';
   };
 
   enterShell = ''

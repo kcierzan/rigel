@@ -1,8 +1,8 @@
-//! SIMD-accelerated batch envelope processor.
+//! Batch envelope processor for polyphonic efficiency.
 //!
-//! Processes multiple envelopes in parallel for polyphonic efficiency.
+//! Processes multiple envelopes in parallel.
 
-use super::{levels_to_linear_simd, Envelope, EnvelopeConfig};
+use super::{Envelope, EnvelopeConfig};
 
 /// SIMD-accelerated batch envelope processor.
 ///
@@ -97,22 +97,11 @@ impl<const N: usize, const K: usize, const R: usize> EnvelopeBatch<N, K, R> {
     /// # Arguments
     ///
     /// * `output` - Array to receive N linear amplitude values
-    ///
-    /// # Performance
-    ///
-    /// Uses SIMD for level-to-linear conversion when available.
     pub fn process(&mut self, output: &mut [f32; N]) {
-        // Process each envelope and collect Q8 levels
-        let mut levels = [0i16; N];
         for (i, env) in self.envelopes.iter_mut().enumerate() {
-            // Process envelope state (updates internal level)
-            env.process();
-            // Get the raw Q8 level
-            levels[i] = env.state().level_q8();
+            // Process envelope state and get linear amplitude directly
+            output[i] = env.process();
         }
-
-        // Convert levels to linear using batch conversion
-        levels_to_linear_batch(&levels, output);
     }
 
     /// Process block of samples for all envelopes.
@@ -157,16 +146,7 @@ impl<const N: usize, const K: usize, const R: usize> EnvelopeBatch<N, K, R> {
     }
 }
 
-/// Convert Q8 levels to linear amplitudes using SIMD.
-///
-/// This is the hot path for batch envelope processing.
-/// Uses SIMD-accelerated conversion for optimal performance.
-#[inline]
-fn levels_to_linear_batch<const N: usize>(levels: &[i16; N], output: &mut [f32; N]) {
-    levels_to_linear_simd(levels.as_slice(), output.as_mut_slice());
-}
-
-/// Type alias for 8-envelope FM batch (AVX2 optimal).
+/// Type alias for 8-envelope FM batch.
 pub type FmEnvelopeBatch8 = EnvelopeBatch<8, 6, 2>;
 
 /// Type alias for 4-envelope FM batch (NEON optimal).
@@ -238,33 +218,5 @@ mod tests {
         batch.reset_all();
 
         assert!(!batch.any_active());
-    }
-
-    #[test]
-    fn test_levels_to_linear_batch() {
-        let levels = [4095i16; 8]; // Max level
-        let mut output = [0.0f32; 8];
-
-        levels_to_linear_batch(&levels, &mut output);
-
-        for &val in output.iter() {
-            assert!(
-                (val - 1.0).abs() < 0.01,
-                "Max level should give ~1.0, got {}",
-                val
-            );
-        }
-    }
-
-    #[test]
-    fn test_levels_to_linear_batch_min() {
-        let levels = [0i16; 8]; // Min level
-        let mut output = [0.0f32; 8];
-
-        levels_to_linear_batch(&levels, &mut output);
-
-        for &val in output.iter() {
-            assert!(val < 0.001, "Min level should give near-zero, got {}", val);
-        }
     }
 }

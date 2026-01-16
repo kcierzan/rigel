@@ -1,11 +1,10 @@
 //! MSFA-compatible rate calculations and lookup tables.
 //!
 //! This module implements the DX7/MSFA envelope rate system:
-//! - Rate (0-99) to qRate (0-63) conversion
+//! - Rate (0-99) to sample count conversion via STATICS table
 //! - Rate scaling by MIDI note position
-//! - Increment calculation for per-sample processing
-//! - Level conversion (Q8 to linear amplitude)
-//! - Output level scaling with LEVEL_LUT
+//! - Increment calculation for per-sample processing (f32)
+//! - Level conversion functions
 //!
 //! ## Attribution
 //!
@@ -18,29 +17,35 @@
 //!
 //! See THIRD_PARTY_LICENSES.md in the repository root for the full license text.
 
-// Use rigel_math's exp2 LUT for level-to-linear conversion
-use rigel_math::exp2_lut::{exp2_lut, exp2_lut_slice};
-
-/// Attack jump threshold (Q8 format, ~40dB above minimum).
+/// Attack jump threshold in linear amplitude (0.0-1.0).
 ///
-/// The envelope immediately jumps to this level at attack start
-/// to provide the characteristic FM "punch".
-pub const JUMP_TARGET_Q8: i16 = 1716;
-
-/// Level lookup table for output levels 0-19.
+/// The DX7 envelope immediately jumps to 1716 in Q8 format at attack start,
+/// which is ~40dB above minimum (~-56dB from full scale). This gets the
+/// envelope out of the sub-perceptual range quickly while preserving the
+/// exponential approach character for the rest of the attack.
 ///
-/// Creates a non-linear curve with faster falloff at low levels,
-/// matching original DX7 behavior. Without this, level 0 would
-/// only be -74.5dB instead of -95.5dB.
-pub const LEVEL_LUT: [u8; 20] = [
-    0, 5, 9, 13, 17, 20, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 42, 43, 45, 46,
-];
-
-/// Static timing table for same-level transitions (44100Hz base).
+/// Calculation: 1716 Q8 steps = 40.2dB above minimum = -55.8dB from 0dB
+/// Linear amplitude: 10^(-55.8/20) ≈ 0.00163 (0.16%)
 ///
-/// When target equals current level, the standard increment calculation
-/// doesn't apply. MSFA uses this lookup table for these cases.
-/// Values are sample counts at 44100Hz.
+/// Reference: MSFA/Dexed `const int jumptarget = 1716`
+// TODO: this seems pretty high for long envelopes. Tweak this by ear later.
+pub const JUMP_TARGET: f32 = 0.00163;
+
+/// Minimum envelope segment transition time in seconds.
+///
+/// This prevents rate scaling from producing instant (clicking) transitions
+/// when high notes are combined with fast base rates and high sensitivity.
+/// 1.5ms is within the safe range to avoid audible clicks (1-2ms recommended).
+///
+/// This is enforced as a time value rather than a fixed rate to ensure
+/// consistent behavior across all sample rates.
+pub const MIN_SEGMENT_TIME_SECONDS: f32 = 0.0015; // 1.5ms
+
+/// Static timing table for DX7 rates (44100Hz base).
+///
+/// Maps DX7 rate parameter (0-76) to sample counts at 44100Hz.
+/// Lower rate = longer time (more samples).
+/// Rates 77-99 use formula: samples = 20 * (99 - rate).
 pub const STATICS: [u32; 77] = [
     1764000, 1764000, 1411200, 1411200, 1190700, 1014300, 992250, 882000, 705600, 705600, 584325,
     507150, 502740, 441000, 418950, 352800, 308700, 286650, 253575, 220500, 220500, 176400, 145530,
@@ -49,43 +54,6 @@ pub const STATICS: [u32; 77] = [
     6615, 6615, 5512, 5512, 4410, 3969, 3969, 3439, 2866, 2690, 2249, 1984, 1896, 1808, 1411, 1367,
     1234, 1146, 926, 837, 837, 705, 573, 573, 529, 441, 441,
 ];
-
-/// Convert DX7 rate (0-99) to internal qRate (0-63).
-///
-/// Uses MSFA formula: `qrate = (rate * 41) >> 6`
-///
-/// # Arguments
-///
-/// * `rate` - DX7 rate parameter (0-99)
-///
-/// # Returns
-///
-/// Internal quantized rate (0-63)
-#[inline]
-pub fn rate_to_qrate(rate: u8) -> u8 {
-    ((rate as u32 * 41) >> 6) as u8
-}
-
-/// Scale output level using MSFA lookup table.
-///
-/// Levels 0-19 use the non-linear LEVEL_LUT, levels 20-99 use
-/// linear formula (28 + level).
-///
-/// # Arguments
-///
-/// * `outlevel` - Output level (0-99)
-///
-/// # Returns
-///
-/// Scaled level in internal units (~0.75dB per step)
-#[inline]
-pub fn scale_output_level(outlevel: u8) -> u8 {
-    if outlevel >= 20 {
-        28 + outlevel
-    } else {
-        LEVEL_LUT[outlevel as usize]
-    }
-}
 
 /// Calculate rate scaling adjustment for MIDI note.
 ///
@@ -99,16 +67,15 @@ pub fn scale_output_level(outlevel: u8) -> u8 {
 ///
 /// # Returns
 ///
-/// qRate delta to add to base qRate (0-31 typical range)
+/// Rate delta to add to base rate (0-31 typical range)
 ///
 /// # Example
 ///
 /// ```ignore
 /// // At sensitivity 7:
-/// // C1 (MIDI 24) -> +1 qRate
-/// // C3 (MIDI 48) -> +9 qRate
-/// // C5 (MIDI 72) -> +17 qRate
-/// // C7 (MIDI 96) -> +25 qRate
+/// // C1 (MIDI 24) -> small adjustment
+/// // C4 (MIDI 60) -> moderate adjustment
+/// // C7 (MIDI 96) -> large adjustment (faster envelope)
 /// ```
 #[inline]
 pub fn scale_rate(midi_note: u8, sensitivity: u8) -> u8 {
@@ -120,128 +87,141 @@ pub fn scale_rate(midi_note: u8, sensitivity: u8) -> u8 {
     ((sensitivity as u32 * x as u32) >> 3) as u8
 }
 
-/// Calculate increment from qRate in Q8 format.
+/// Calculate per-sample increment from rate using STATICS table.
 ///
-/// Scaled for per-sample processing with i16 level representation.
-/// The increment determines how fast the envelope moves per sample.
+/// Uses the STATICS timing table to determine the correct increment
+/// for accurate envelope timing.
 ///
 /// # Arguments
 ///
-/// * `qrate` - Internal quantized rate (0-63)
+/// * `rate` - DX7 rate parameter (0-99)
+/// * `sample_rate` - Sample rate in Hz
 ///
 /// # Returns
 ///
-/// Level increment per sample (Q8 format)
+/// Per-sample increment (f32) to traverse full 0.0-1.0 range
+///
+/// # Example
+///
+/// ```ignore
+/// // 300ms release at 44.1kHz
+/// let rate = seconds_to_rate(0.3, 44100.0); // ~rate 40
+/// let inc = calculate_increment_f32(rate, 44100.0);
+/// // inc ≈ 1.0 / 13230 ≈ 0.0000756
+/// // Full transition takes 13230 samples = 300ms
+/// ```
 #[inline]
-pub fn calculate_increment_q8(qrate: u8) -> i16 {
-    // The qrate maps to how fast the envelope moves.
-    // Higher qrate = larger increment per sample.
-    //
-    // We use a simple exponential mapping:
-    // Each increment in qrate doubles the speed every 4 units.
-    //
-    // At 44.1kHz with Q8 levels (4096 range):
-    // - qrate 0: very slow (~1 per 1000 samples)
-    // - qrate 32: moderate
-    // - qrate 63: very fast (~full range in <100 samples)
-
-    if qrate == 0 {
-        return 0;
+pub fn calculate_increment_f32(rate: u8, sample_rate: f32) -> f32 {
+    let samples = get_static_count(rate, sample_rate);
+    if samples == 0 {
+        return 1.0; // Instant transition
     }
-
-    // Use bit shifting to create exponential curve
-    // integer_part = qrate >> 2 (0-15)
-    // fractional_part = qrate & 3 (0-3)
-    // increment = (4 + fractional) << (integer - 2)
-    //
-    // For small qrates, ensure minimum increment of 1
-    let int_part = (qrate >> 2) as i32;
-    let frac_part = (qrate & 3) as i32;
-
-    let base = 4 + frac_part;
-
-    // Shift amount: int_part - 2, clamped to valid range
-    let shift = (int_part - 2).max(0);
-
-    if shift > 0 {
-        (base << shift).min(4096) as i16
-    } else {
-        // For low qrates, use fractional approach
-        (base >> (2 - int_part).max(0)).max(1) as i16
-    }
+    1.0 / samples as f32
 }
 
-/// Convert Q8 level (0-4095) to linear amplitude (0.0 to 1.0).
+/// Calculate per-sample increment with rate scaling applied.
 ///
-/// Uses pre-computed lookup table from rigel_math for maximum performance.
-/// Q8 format: 256 steps = 6dB (one octave)
+/// Applies MIDI note-based rate scaling before calculating increment.
+/// Higher notes produce faster envelopes when rate_scaling > 0.
 ///
-/// Formula: `linear = 2^((level - LEVEL_MAX) / 256)`
+/// The scaled rate is clamped to ensure a minimum transition time
+/// (see [`MIN_SEGMENT_TIME_SECONDS`]) to prevent audible clicks when
+/// rate scaling pushes envelope rates toward instant transitions.
 ///
 /// # Arguments
 ///
-/// * `level_q8` - Level in Q8 format (0-4095)
+/// * `rate` - Base DX7 rate parameter (0-99)
+/// * `midi_note` - MIDI note number (0-127)
+/// * `rate_scaling` - Rate scaling sensitivity (0-7)
+/// * `sample_rate` - Sample rate in Hz
 ///
 /// # Returns
 ///
-/// Linear amplitude in range [0.0, 1.0]
+/// Per-sample increment (f32) with rate scaling applied
 #[inline]
-pub fn level_to_linear(level_q8: i16) -> f32 {
-    // Delegate to rigel_math's exp2 LUT
-    exp2_lut(level_q8)
+pub fn calculate_increment_f32_scaled(
+    rate: u8,
+    midi_note: u8,
+    rate_scaling: u8,
+    sample_rate: f32,
+) -> f32 {
+    // Apply rate scaling: higher notes get faster rates
+    let rate_adjustment = scale_rate(midi_note, rate_scaling);
+
+    // Clamp to max rate that ensures minimum segment time (sample-rate independent)
+    let max_rate = max_rate_for_sample_rate(sample_rate);
+    let scaled_rate = (rate as u16 + rate_adjustment as u16).min(max_rate as u16) as u8;
+
+    calculate_increment_f32(scaled_rate, sample_rate)
 }
 
-/// Convert multiple Q8 levels to linear amplitudes using LUT.
+/// Calculate per-sample increment with rate scaling and pre-computed max rate.
 ///
-/// Uses pre-computed lookup table from rigel_math for O(1) conversion per level.
-/// This is the fastest method for batch conversion.
+/// Same as [`calculate_increment_f32_scaled`] but takes a pre-computed `max_rate`
+/// parameter to avoid the O(100) search in [`max_rate_for_sample_rate`].
+/// Use this in hot paths where the max rate has been cached at configuration time.
 ///
 /// # Arguments
 ///
-/// * `levels` - Slice of Q8 levels (0-4095)
-/// * `output` - Output slice for linear amplitudes (must be same length)
-///
-/// # Panics
-///
-/// Panics if `levels` and `output` have different lengths.
-#[inline]
-pub fn levels_to_linear_simd(levels: &[i16], output: &mut [f32]) {
-    // Delegate to rigel_math's batch exp2 LUT
-    exp2_lut_slice(levels, output);
-}
-
-/// Convert linear amplitude (0.0 to 1.0) to Q8 level.
-///
-/// Inverse of `level_to_linear`.
-///
-/// # Arguments
-///
-/// * `linear` - Linear amplitude (0.0 to 1.0)
+/// * `rate` - Base DX7 rate parameter (0-99)
+/// * `midi_note` - MIDI note number (0-127)
+/// * `rate_scaling` - Rate scaling sensitivity (0-7)
+/// * `sample_rate` - Sample rate in Hz
+/// * `max_rate` - Pre-computed maximum rate from [`max_rate_for_sample_rate`]
 ///
 /// # Returns
 ///
-/// Level in Q8 format (0-4095)
+/// Per-sample increment (f32) with rate scaling applied
 #[inline]
-pub fn linear_to_level(linear: f32) -> i16 {
-    // level = log2(linear) * 256 + LEVEL_MAX
-    // Handle zero/negative to prevent log of zero
-    if linear <= 0.0 {
-        return super::state::LEVEL_MIN;
-    }
+pub fn calculate_increment_f32_with_max_rate(
+    rate: u8,
+    midi_note: u8,
+    rate_scaling: u8,
+    sample_rate: f32,
+    max_rate: u8,
+) -> f32 {
+    // Apply rate scaling: higher notes get faster rates
+    let rate_adjustment = scale_rate(midi_note, rate_scaling);
 
-    let log2_val = libm::log2f(linear);
-    let level = log2_val * 256.0 + super::state::LEVEL_MAX as f32;
+    // Clamp to provided max rate (pre-computed at config time)
+    let scaled_rate = (rate as u16 + rate_adjustment as u16).min(max_rate as u16) as u8;
 
-    // Clamp to valid range
-    level.clamp(
-        super::state::LEVEL_MIN as f32,
-        super::state::LEVEL_MAX as f32,
-    ) as i16
+    calculate_increment_f32(scaled_rate, sample_rate)
 }
 
-/// Get static timing count for same-level transitions.
+/// Get the maximum rate that ensures minimum segment time.
 ///
-/// For rates >= 77: samples = 20 * (99 - rate)
+/// Returns the highest rate that still provides at least [`MIN_SEGMENT_TIME_SECONDS`]
+/// transition time at the given sample rate. This is used to prevent rate scaling
+/// from producing instant (clicking) transitions.
+///
+/// Note: This searches from high to low rates to find the first rate that meets
+/// the minimum time requirement, ensuring we never return a rate that's too fast.
+///
+/// # Arguments
+///
+/// * `sample_rate` - Sample rate in Hz
+///
+/// # Returns
+///
+/// Maximum rate parameter (0-99) that provides minimum transition time
+#[inline]
+pub fn max_rate_for_sample_rate(sample_rate: f32) -> u8 {
+    let min_samples = (MIN_SEGMENT_TIME_SECONDS * sample_rate) as u32;
+
+    // Search from fastest to slowest, return first rate that meets minimum time
+    for rate in (0..=99).rev() {
+        if get_static_count(rate, sample_rate) >= min_samples {
+            return rate;
+        }
+    }
+    0 // Fallback to slowest rate (should never happen with reasonable sample rates)
+}
+
+/// Get static timing count for a rate.
+///
+/// For rates 0-76: uses STATICS table lookup.
+/// For rates 77-99: samples = 20 * (99 - rate).
 ///
 /// # Arguments
 ///
@@ -345,7 +325,9 @@ pub fn linear_to_param_level(linear: f32) -> u8 {
     libm::roundf(linear.clamp(0.0, 1.0) * 99.0) as u8
 }
 
-/// Convert DX7 level parameter (0-99) to Q8 internal level.
+/// Convert DX7 level parameter (0-99) to linear amplitude (0.0-1.0).
+///
+/// Simple linear mapping for envelope levels.
 ///
 /// # Arguments
 ///
@@ -353,43 +335,15 @@ pub fn linear_to_param_level(linear: f32) -> u8 {
 ///
 /// # Returns
 ///
-/// Internal Q8 level (0-4095)
+/// Linear amplitude in range [0.0, 1.0]
 #[inline]
-pub fn param_to_q8_level(param_level: u8) -> i16 {
-    // Scale 0-99 to roughly 0-4095
-    // Using similar curve to output level scaling
-    let scaled = scale_output_level(param_level) as i32;
-
-    // The scaled value is in ~0.75dB units, convert to Q8
-    // Q8 has 256 steps per 6dB, so ~42.67 steps per dB
-    // 0.75dB * 42.67 ≈ 32 Q8 steps per scaled unit
-    (scaled * 32).clamp(0, super::state::LEVEL_MAX as i32) as i16
+pub fn param_to_level_f32(param_level: u8) -> f32 {
+    param_level as f32 / 99.0
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::envelope::state::{LEVEL_MAX, LEVEL_MIN};
-
-    #[test]
-    fn test_rate_to_qrate() {
-        assert_eq!(rate_to_qrate(0), 0);
-        assert_eq!(rate_to_qrate(50), 32);
-        assert_eq!(rate_to_qrate(99), 63);
-    }
-
-    #[test]
-    fn test_scale_output_level() {
-        // Low levels use lookup table
-        assert_eq!(scale_output_level(0), 0);
-        assert_eq!(scale_output_level(10), 31);
-        assert_eq!(scale_output_level(19), 46);
-
-        // High levels use linear formula
-        assert_eq!(scale_output_level(20), 48);
-        assert_eq!(scale_output_level(50), 78);
-        assert_eq!(scale_output_level(99), 127);
-    }
 
     #[test]
     fn test_scale_rate() {
@@ -405,82 +359,6 @@ mod tests {
         // Higher notes should have higher rate adjustment
         assert!(rate_c4 > rate_c1);
         assert!(rate_c7 > rate_c4);
-    }
-
-    #[test]
-    fn test_level_to_linear() {
-        // Maximum level should give ~1.0
-        let max_linear = level_to_linear(LEVEL_MAX);
-        assert!(
-            (max_linear - 1.0).abs() < 0.01,
-            "LEVEL_MAX should give ~1.0, got {}",
-            max_linear
-        );
-
-        // Minimum level should give very small value
-        let min_linear = level_to_linear(LEVEL_MIN);
-        assert!(
-            min_linear < 0.001,
-            "LEVEL_MIN should give very small value, got {}",
-            min_linear
-        );
-
-        // Middle value should give reasonable result
-        let mid_linear = level_to_linear(LEVEL_MAX / 2);
-        assert!(mid_linear > 0.0 && mid_linear < 1.0);
-    }
-
-    #[test]
-    fn test_linear_to_level() {
-        // 1.0 should give LEVEL_MAX
-        let level_1 = linear_to_level(1.0);
-        assert!(
-            (level_1 - LEVEL_MAX).abs() < 10,
-            "1.0 should give ~LEVEL_MAX, got {}",
-            level_1
-        );
-
-        // Very small value should give near LEVEL_MIN
-        let level_small = linear_to_level(0.00001);
-        assert!(level_small < LEVEL_MAX / 4);
-
-        // 0.0 should give LEVEL_MIN
-        let level_0 = linear_to_level(0.0);
-        assert_eq!(level_0, LEVEL_MIN);
-    }
-
-    #[test]
-    fn test_roundtrip_level_conversion() {
-        // Test roundtrip conversion for various levels
-        for level in [0, 1000, 2000, 3000, LEVEL_MAX].iter() {
-            let linear = level_to_linear(*level);
-            let back = linear_to_level(linear);
-
-            // Allow some tolerance due to precision
-            let diff = (back - *level).abs();
-            assert!(
-                diff < 50,
-                "Roundtrip failed for level {}: got back {}, diff {}",
-                level,
-                back,
-                diff
-            );
-        }
-    }
-
-    #[test]
-    fn test_calculate_increment_q8() {
-        // Higher qrate should give higher increment
-        let inc_low = calculate_increment_q8(10);
-        let inc_high = calculate_increment_q8(50);
-        assert!(
-            inc_high > inc_low,
-            "Higher qrate should give higher increment"
-        );
-
-        // Maximum rate should give substantial increment
-        let inc_max = calculate_increment_q8(63);
-        assert!(inc_max > 0);
     }
 
     #[test]
@@ -500,14 +378,75 @@ mod tests {
     }
 
     #[test]
-    fn test_param_to_q8_level() {
-        // Level 0 should map to low Q8
-        let q8_0 = param_to_q8_level(0);
-        assert_eq!(q8_0, 0);
+    fn test_calculate_increment_f32() {
+        // Rate 99 should give instant transition
+        let inc_99 = calculate_increment_f32(99, 44100.0);
+        assert_eq!(inc_99, 1.0, "Rate 99 should be instant");
 
-        // Level 99 should map to high Q8
-        let q8_99 = param_to_q8_level(99);
-        assert!(q8_99 > LEVEL_MAX / 2);
+        // Rate 0 should give very slow transition
+        let inc_0 = calculate_increment_f32(0, 44100.0);
+        let expected_samples = STATICS[0] as f32;
+        let expected_inc = 1.0 / expected_samples;
+        assert!(
+            (inc_0 - expected_inc).abs() < 1e-10,
+            "Rate 0 increment mismatch: {} vs {}",
+            inc_0,
+            expected_inc
+        );
+
+        // Higher rate = higher increment (faster envelope)
+        let inc_low = calculate_increment_f32(20, 44100.0);
+        let inc_high = calculate_increment_f32(60, 44100.0);
+        assert!(
+            inc_high > inc_low,
+            "Higher rate should give higher increment: {} vs {}",
+            inc_high,
+            inc_low
+        );
+    }
+
+    #[test]
+    fn test_calculate_increment_f32_timing() {
+        // Test that increment produces correct timing
+        let sample_rate = 44100.0;
+
+        // 300ms release should take ~13230 samples
+        let rate = seconds_to_rate(0.3, sample_rate);
+        let inc = calculate_increment_f32(rate, sample_rate);
+
+        // Simulate envelope from 1.0 to 0.0
+        let mut level = 1.0f32;
+        let mut samples = 0u32;
+        while level > 0.0 && samples < 100000 {
+            level -= inc;
+            samples += 1;
+        }
+
+        let actual_time = samples as f32 / sample_rate;
+        let tolerance = 0.3; // 30% tolerance
+
+        assert!(
+            (actual_time - 0.3).abs() < 0.3 * tolerance,
+            "300ms timing mismatch: expected ~300ms, got {}ms",
+            actual_time * 1000.0
+        );
+    }
+
+    #[test]
+    fn test_param_to_level_f32() {
+        // Level 0 -> 0.0
+        assert!((param_to_level_f32(0) - 0.0).abs() < f32::EPSILON);
+
+        // Level 99 -> 1.0
+        assert!((param_to_level_f32(99) - 1.0).abs() < f32::EPSILON);
+
+        // Level 50 -> ~0.505
+        let mid = param_to_level_f32(50);
+        assert!(
+            (mid - 0.505).abs() < 0.01,
+            "Level 50 should give ~0.505, got {}",
+            mid
+        );
     }
 
     #[test]
@@ -580,7 +519,6 @@ mod tests {
     #[test]
     fn test_seconds_to_rate_sample_rate_scaling() {
         // Same time at different sample rates should give similar results
-        // (the rate is relative to envelope behavior, not sample count)
         let rate_44100 = seconds_to_rate(0.5, 44100.0);
         let rate_48000 = seconds_to_rate(0.5, 48000.0);
 
@@ -610,5 +548,119 @@ mod tests {
         // Clamping
         assert_eq!(linear_to_param_level(-0.5), 0);
         assert_eq!(linear_to_param_level(1.5), 99);
+    }
+
+    #[test]
+    fn test_jump_target_constant() {
+        // JUMP_TARGET should be approximately -56dB from full scale
+        // (40dB above minimum in DX7 terms, where minimum is ~-96dB)
+        // Linear amplitude: 10^(-55.8/20) ≈ 0.00163
+        assert!(
+            (JUMP_TARGET - 0.00163).abs() < 0.0001,
+            "JUMP_TARGET should be ~0.00163, got {}",
+            JUMP_TARGET
+        );
+
+        // Verify dB level
+        let db = 20.0 * libm::log10f(JUMP_TARGET);
+        assert!(
+            (db - (-55.8)).abs() < 1.0,
+            "JUMP_TARGET should be ~-56dB, got {}dB",
+            db
+        );
+    }
+
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn test_min_segment_time_constant() {
+        // 1.5ms is within the safe range (1-2ms)
+        // These assertions validate the constant is in a reasonable range
+        assert!(
+            MIN_SEGMENT_TIME_SECONDS >= 0.001,
+            "Min time should be >= 1ms"
+        );
+        assert!(
+            MIN_SEGMENT_TIME_SECONDS <= 0.003,
+            "Min time should be <= 3ms"
+        );
+    }
+
+    #[test]
+    fn test_max_rate_sample_rate_independent() {
+        // The actual minimum time should be consistent across sample rates
+        let sample_rates = [22050.0, 44100.0, 48000.0, 96000.0];
+
+        for &sr in &sample_rates {
+            let max_rate = max_rate_for_sample_rate(sr);
+            let samples = get_static_count(max_rate, sr);
+            let actual_time = samples as f32 / sr;
+
+            // Should be within 20% of target (due to rate quantization)
+            assert!(
+                actual_time >= MIN_SEGMENT_TIME_SECONDS * 0.8,
+                "At {}Hz: rate {} gives {}ms, should be >= {}ms",
+                sr,
+                max_rate,
+                actual_time * 1000.0,
+                MIN_SEGMENT_TIME_SECONDS * 800.0
+            );
+        }
+    }
+
+    #[test]
+    fn test_rate_scaling_respects_min_time() {
+        // Even with maximum scaling, should not produce instant transition
+        let sample_rate = 44100.0;
+        let inc = calculate_increment_f32_scaled(99, 127, 7, sample_rate);
+
+        // Calculate expected minimum samples
+        let max_rate = max_rate_for_sample_rate(sample_rate);
+        let min_samples = get_static_count(max_rate, sample_rate);
+        let max_inc = 1.0 / min_samples as f32;
+
+        assert!(
+            inc <= max_inc + f32::EPSILON,
+            "Increment {} should be <= {} (from min samples {})",
+            inc,
+            max_inc,
+            min_samples
+        );
+    }
+
+    #[test]
+    fn test_rate_scaling_extreme_no_instant() {
+        // Various sample rates should never produce instant (inc=1.0)
+        for &sr in &[22050.0, 44100.0, 48000.0, 96000.0] {
+            let inc = calculate_increment_f32_scaled(99, 127, 7, sr);
+            assert!(
+                inc < 1.0,
+                "At {}Hz: rate 99 + max scaling should not be instant, got inc={}",
+                sr,
+                inc
+            );
+        }
+    }
+
+    #[test]
+    fn test_rate_scaling_below_max_unchanged() {
+        // When scaled rate is below the max, behavior is unchanged
+        let sample_rate = 44100.0;
+        let max_rate = max_rate_for_sample_rate(sample_rate);
+
+        // Low note + low rate + low scaling = well under max
+        let inc = calculate_increment_f32_scaled(50, 36, 3, sample_rate);
+        let adj = scale_rate(36, 3);
+        let expected_rate = 50 + adj;
+
+        assert!(
+            expected_rate < max_rate,
+            "Test setup: should be under max rate"
+        );
+
+        let expected_inc = calculate_increment_f32(expected_rate, sample_rate);
+        assert!(
+            (inc - expected_inc).abs() < f32::EPSILON,
+            "Below-max scaling should behave normally"
+        );
     }
 }

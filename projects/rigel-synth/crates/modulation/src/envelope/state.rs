@@ -3,22 +3,19 @@
 //! This module defines:
 //! - [`EnvelopePhase`] - Operational phases of the envelope
 //! - [`EnvelopeState`] - Runtime mutable state
-//! - [`EnvelopeLevel`] - Q8 fixed-point level type
+//! - [`EnvelopeLevel`] - Linear amplitude level type (f32)
 
-/// Envelope level type in Q8 fixed-point format (matches DX7 hardware).
+/// Envelope level type in linear amplitude format.
 ///
-/// Range: 0 to 4095 (12 bits used, ~96dB dynamic range)
-/// Conversion to linear: `2^(level / 256.0)`
-///
-/// Q8 format means 256 steps = 6dB (one amplitude doubling).
-/// This provides ~0.0234 dB per step resolution.
-pub type EnvelopeLevel = i16;
+/// Range: 0.0 to 1.0 (full dynamic range)
+/// This provides arbitrary precision for envelope timing.
+pub type EnvelopeLevel = f32;
 
-/// Maximum envelope level (0dB, full amplitude)
-pub const LEVEL_MAX: i16 = 4095;
+/// Maximum envelope level (full amplitude)
+pub const LEVEL_MAX: f32 = 1.0;
 
-/// Minimum envelope level (silence, ~-96dB)
-pub const LEVEL_MIN: i16 = 0;
+/// Minimum envelope level (silence)
+pub const LEVEL_MIN: f32 = 0.0;
 
 /// Envelope operational phases.
 ///
@@ -46,27 +43,38 @@ pub enum EnvelopePhase {
 /// Runtime state for envelope processing.
 ///
 /// Contains all mutable state that changes during envelope operation.
-/// Uses i16/Q8 fixed-point format for hardware-authentic behavior.
+/// Uses f32 floating-point format for precise timing at any duration.
 ///
 /// # Memory Layout
 ///
-/// Designed to be compact (16 bytes) for cache efficiency when
-/// processing 1536+ concurrent envelopes.
+/// Slightly larger than Q8 version but provides much better timing accuracy.
 #[derive(Debug, Clone, Copy)]
 pub struct EnvelopeState {
-    /// Current level in Q8 fixed-point format (0-4095).
-    /// Represents log2 amplitude (256 units = 6dB).
-    pub(crate) level: i16,
+    /// Current level in linear amplitude (0.0-1.0).
+    pub(crate) level: f32,
 
-    /// Target level for current segment (Q8).
-    pub(crate) target_level: i16,
+    /// Target level for current segment (0.0-1.0).
+    pub(crate) target_level: f32,
 
-    /// Level change per sample (Q8, signed).
+    /// Level change per sample (signed).
     /// Positive for rising, negative for falling.
-    pub(crate) increment: i16,
+    /// For attack phases only; decay uses decay_factor.
+    pub(crate) increment: f32,
+
+    /// Multiplicative decay factor for exponential decay.
+    /// Each sample: level *= decay_factor (where 0 < decay_factor < 1).
+    /// This produces linear-in-dB decay (exponential in linear amplitude),
+    /// matching authentic DX7/SY99 behavior.
+    /// Only meaningful when `rising` is false.
+    pub(crate) decay_factor: f32,
+
+    /// Starting level for current attack segment.
+    /// Used to calculate exponential approach factor.
+    /// Only meaningful when `rising` is true.
+    pub(crate) attack_base_level: f32,
 
     /// Current segment index.
-    /// 0..(K-1) for key-on, K..(K+R-1) for release.
+    /// 0..(K-1) for key-on, 0..(R-1) for release.
     pub(crate) segment_index: u8,
 
     /// Current envelope phase.
@@ -78,9 +86,6 @@ pub struct EnvelopeState {
     /// Remaining delay samples (counts down to 0).
     pub(crate) delay_remaining: u32,
 
-    /// Scaled qRate for current segment (with rate scaling applied).
-    pub(crate) current_qrate: u8,
-
     /// MIDI note for rate scaling (cached from note_on).
     pub(crate) midi_note: u8,
 }
@@ -90,21 +95,22 @@ impl Default for EnvelopeState {
         Self {
             level: LEVEL_MIN,
             target_level: LEVEL_MIN,
-            increment: 0,
+            increment: 0.0,
+            decay_factor: 1.0, // No decay by default
+            attack_base_level: LEVEL_MIN,
             segment_index: 0,
             phase: EnvelopePhase::Idle,
             rising: false,
             delay_remaining: 0,
-            current_qrate: 0,
             midi_note: 60, // Middle C default
         }
     }
 }
 
 impl EnvelopeState {
-    /// Get current level in Q8 format (0-4095).
+    /// Get current level in linear amplitude (0.0-1.0).
     #[inline]
-    pub fn level_q8(&self) -> i16 {
+    pub fn level(&self) -> f32 {
         self.level
     }
 
@@ -146,7 +152,7 @@ mod tests {
     #[test]
     fn test_default_state() {
         let state = EnvelopeState::default();
-        assert_eq!(state.level, LEVEL_MIN);
+        assert!((state.level - LEVEL_MIN).abs() < f32::EPSILON);
         assert_eq!(state.phase, EnvelopePhase::Idle);
         assert!(!state.is_active());
         assert!(!state.is_releasing());
@@ -179,8 +185,7 @@ mod tests {
 
     #[test]
     fn test_level_constants() {
-        assert_eq!(LEVEL_MIN, 0);
-        assert_eq!(LEVEL_MAX, 4095);
-        // 4095 / 256 = ~16 octaves of range (~96dB)
+        assert!((LEVEL_MIN - 0.0).abs() < f32::EPSILON);
+        assert!((LEVEL_MAX - 1.0).abs() < f32::EPSILON);
     }
 }
