@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use crate::RigelPluginParams;
 
-/// Default editor state - 600x700 window size for FM envelope controls
+/// Default editor state - 600x800 window size for FM envelope controls with loop settings
 pub(crate) fn default_state() -> Arc<ViziaState> {
-    ViziaState::new(|| (600, 700))
+    ViziaState::new(|| (600, 800))
 }
 
 /// Data struct for reactive binding via Lens derive
@@ -126,6 +126,38 @@ pub(crate) fn create(
                     ParamSlider::new(cx, Data::params, |params| &params.seg6_time);
                     Label::new(cx, "Level");
                     ParamSlider::new(cx, Data::params, |params| &params.seg6_level);
+                })
+                .width(Stretch(1.0));
+            })
+            .col_between(Pixels(10.0));
+
+            // Separator
+            Element::new(cx)
+                .height(Pixels(1.0))
+                .background_color(Color::gray());
+
+            // Loop Settings Header
+            Label::new(cx, "Loop Settings").font_size(16.0);
+
+            HStack::new(cx, |cx| {
+                // Loop Enable
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Enable");
+                    ParamSlider::new(cx, Data::params, |params| &params.loop_enabled);
+                })
+                .width(Stretch(1.0));
+
+                // Loop Start
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "Start");
+                    ParamSlider::new(cx, Data::params, |params| &params.loop_start);
+                })
+                .width(Stretch(1.0));
+
+                // Loop End
+                VStack::new(cx, |cx| {
+                    Label::new(cx, "End");
+                    ParamSlider::new(cx, Data::params, |params| &params.loop_end);
                 })
                 .width(Stretch(1.0));
             })

@@ -114,6 +114,19 @@ pub struct RigelPluginParams {
     /// Rate scaling (keyboard tracking for envelope speed)
     #[id = "rate_scaling"]
     pub rate_scaling: IntParam,
+
+    // ===== Loop Settings =====
+    /// Enable envelope looping
+    #[id = "loop_enabled"]
+    pub loop_enabled: BoolParam,
+
+    /// Loop start segment (0-5, displayed as Seg 1-6)
+    #[id = "loop_start"]
+    pub loop_start: IntParam,
+
+    /// Loop end segment (0-5, displayed as Seg 1-6)
+    #[id = "loop_end"]
+    pub loop_end: IntParam,
 }
 
 impl Default for RigelPlugin {
@@ -203,6 +216,13 @@ impl Default for RigelPluginParams {
 
             // Rate scaling: 0 = no keyboard tracking
             rate_scaling: IntParam::new("Rate Scaling", 0, IntRange::Linear { min: 0, max: 7 }),
+
+            // Loop settings: disabled by default
+            loop_enabled: BoolParam::new("Loop Enable", false),
+            loop_start: IntParam::new("Loop Start", 0, IntRange::Linear { min: 0, max: 5 })
+                .with_value_to_string(Arc::new(|v| format!("Seg {}", v + 1))),
+            loop_end: IntParam::new("Loop End", 1, IntRange::Linear { min: 0, max: 5 })
+                .with_value_to_string(Arc::new(|v| format!("Seg {}", v + 1))),
         }
     }
 }
@@ -328,6 +348,9 @@ impl Plugin for RigelPlugin {
                     ),
                 ],
                 rate_scaling: self.params.rate_scaling.value() as u8,
+                loop_enabled: self.params.loop_enabled.value(),
+                loop_start: self.params.loop_start.value() as u8,
+                loop_end: self.params.loop_end.value() as u8,
             };
 
             // Get current synth parameters from plugin parameters
@@ -629,6 +652,9 @@ mod tests {
                 ),
             ],
             rate_scaling: plugin.params.rate_scaling.value() as u8,
+            loop_enabled: plugin.params.loop_enabled.value(),
+            loop_start: plugin.params.loop_start.value() as u8,
+            loop_end: plugin.params.loop_end.value() as u8,
         };
 
         // Test that plugin parameters map to synth parameters correctly
