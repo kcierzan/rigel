@@ -4,44 +4,114 @@
 //! - Single envelope: <50ns per sample
 //! - 1536 envelopes × 64 samples: <100µs
 //! - SIMD batch: 2x+ speedup over scalar
+//!
+//! Benchmarks process realistic 1-second envelope lifecycles to capture
+//! the full attack/decay/release behavior including exponential decay phases.
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use rigel_modulation::envelope::{EnvelopeBatch, FmEnvelope, FmEnvelopeBatch8};
+use rigel_modulation::envelope::{EnvelopeBatch, FmEnvelope, FmEnvelopeBatch8, FmEnvelopeConfig};
 use std::hint::black_box;
 
+/// Sample rate for all benchmarks
+const SAMPLE_RATE: f32 = 44100.0;
+
+/// Block size for block processing benchmarks
+const BLOCK_SIZE: usize = 64;
+
+/// Number of blocks per second at 44100Hz with 64-sample blocks
+const BLOCKS_PER_SECOND: usize = (SAMPLE_RATE as usize) / BLOCK_SIZE; // ~689 blocks
+
+/// Samples for ~1 second of audio
+const SAMPLES_PER_SECOND: usize = SAMPLE_RATE as usize;
+
 // =============================================================================
-// Single Envelope Benchmarks
+// Single Envelope Benchmarks (Realistic 1-Second Lifecycle)
 // =============================================================================
 
 fn bench_single_envelope_process(c: &mut Criterion) {
     let mut group = c.benchmark_group("single_envelope");
-    group.throughput(Throughput::Elements(1));
 
-    group.bench_function("process_sample", |b| {
-        let mut env = FmEnvelope::new(44100.0);
-        env.note_on(60);
+    // Per-sample throughput for 1 second of audio
+    group.throughput(Throughput::Elements(SAMPLES_PER_SECOND as u64));
 
-        b.iter(|| black_box(env.process()))
-    });
-
-    group.bench_function("process_block_64", |b| {
-        let mut env = FmEnvelope::new(44100.0);
-        env.note_on(60);
-        let mut output = [0.0f32; 64];
+    // Benchmark processing 1 second of samples (attack + decay + release)
+    group.bench_function("1_second_lifecycle", |b| {
+        // Configure realistic ADSR: 100ms attack, 200ms decay, sustain, 500ms release
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = FmEnvelope::with_config(config);
 
         b.iter(|| {
-            env.process_block(&mut output);
+            env.reset();
+            env.note_on(60);
+
+            // Process ~500ms of key-on (attack + decay + sustain)
+            for _ in 0..22050 {
+                black_box(env.process());
+            }
+
+            // Trigger release
+            env.note_off();
+
+            // Process ~500ms of release
+            for _ in 0..22050 {
+                black_box(env.process());
+            }
+
+            env.value()
+        })
+    });
+
+    // Block processing: 1 second in 64-sample blocks
+    group.throughput(Throughput::Elements(
+        (BLOCKS_PER_SECOND * BLOCK_SIZE) as u64,
+    ));
+
+    group.bench_function("1_second_block_64", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = FmEnvelope::with_config(config);
+        let mut output = [0.0f32; BLOCK_SIZE];
+
+        b.iter(|| {
+            env.reset();
+            env.note_on(60);
+
+            // Process ~500ms in blocks (attack + decay + sustain)
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                env.process_block(&mut output);
+            }
+
+            env.note_off();
+
+            // Process ~500ms of release in blocks
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                env.process_block(&mut output);
+            }
+
             black_box(output[0])
         })
     });
 
-    group.bench_function("process_block_128", |b| {
-        let mut env = FmEnvelope::new(44100.0);
-        env.note_on(60);
+    // 128-sample blocks for comparison
+    group.bench_function("1_second_block_128", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = FmEnvelope::with_config(config);
         let mut output = [0.0f32; 128];
+        let blocks_per_second_128 = SAMPLES_PER_SECOND / 128;
 
         b.iter(|| {
-            env.process_block(&mut output);
+            env.reset();
+            env.note_on(60);
+
+            for _ in 0..(blocks_per_second_128 / 2) {
+                env.process_block(&mut output);
+            }
+
+            env.note_off();
+
+            for _ in 0..(blocks_per_second_128 / 2) {
+                env.process_block(&mut output);
+            }
+
             black_box(output[0])
         })
     });
@@ -50,35 +120,86 @@ fn bench_single_envelope_process(c: &mut Criterion) {
 }
 
 // =============================================================================
-// Batch Envelope Benchmarks
+// Batch Envelope Benchmarks (Realistic 1-Second Lifecycle)
 // =============================================================================
 
 fn bench_batch_envelope(c: &mut Criterion) {
     let mut group = c.benchmark_group("batch_envelope");
 
-    // Batch of 8 envelopes (AVX2 optimal)
-    group.bench_function("batch_8_process", |b| {
-        let mut batch = FmEnvelopeBatch8::new(44100.0);
-        for i in 0..8 {
-            batch.note_on(i, 60 + i as u8);
-        }
-        let mut output = [0.0f32; 8];
+    // 8 envelopes × 1 second = 8 × 44100 samples
+    group.throughput(Throughput::Elements((8 * SAMPLES_PER_SECOND) as u64));
+
+    // Batch of 8 envelopes processing full 1-second lifecycle
+    group.bench_function("batch_8_1_second", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut batch = FmEnvelopeBatch8::with_config(config);
+        let mut output = [[0.0f32; 8]; BLOCK_SIZE];
 
         b.iter(|| {
-            batch.process(&mut output);
-            black_box(output[0])
+            // Reset and trigger all 8 envelopes
+            batch.reset_all();
+            for i in 0..8 {
+                batch.note_on(i, 60 + i as u8);
+            }
+
+            // Process ~500ms in blocks (attack + decay + sustain)
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                batch.process_block(&mut output);
+            }
+
+            // Release all envelopes
+            for i in 0..8 {
+                batch.note_off(i);
+            }
+
+            // Process ~500ms of release
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                batch.process_block(&mut output);
+            }
+
+            black_box(output[0][0])
         })
     });
 
-    group.bench_function("batch_8_block_64", |b| {
-        let mut batch = FmEnvelopeBatch8::new(44100.0);
-        for i in 0..8 {
-            batch.note_on(i, 60 + i as u8);
-        }
-        let mut output = [[0.0f32; 8]; 64];
+    // Staggered note-on/off to stress segment transition branch prediction
+    group.bench_function("batch_8_staggered_notes", |b| {
+        let config = FmEnvelopeConfig::adsr(0.05, 0.1, 0.8, 0.3, SAMPLE_RATE);
+        let mut batch = FmEnvelopeBatch8::with_config(config);
+        let mut output = [[0.0f32; 8]; BLOCK_SIZE];
 
         b.iter(|| {
-            batch.process_block(&mut output);
+            batch.reset_all();
+
+            // Stagger note-on events across 8 voices
+            for voice in 0..8 {
+                batch.note_on(voice, 60 + voice as u8);
+
+                // Process some blocks between each note-on
+                for _ in 0..50 {
+                    batch.process_block(&mut output);
+                }
+            }
+
+            // Process through decay phases
+            for _ in 0..200 {
+                batch.process_block(&mut output);
+            }
+
+            // Stagger note-off events
+            for voice in 0..8 {
+                batch.note_off(voice);
+
+                // Process between each note-off
+                for _ in 0..50 {
+                    batch.process_block(&mut output);
+                }
+            }
+
+            // Process remaining release
+            for _ in 0..100 {
+                batch.process_block(&mut output);
+            }
+
             black_box(output[0][0])
         })
     });
@@ -87,21 +208,25 @@ fn bench_batch_envelope(c: &mut Criterion) {
 }
 
 // =============================================================================
-// Polyphonic Workload Benchmarks
+// Polyphonic Workload Benchmarks (Realistic 1-Second Lifecycle)
 // =============================================================================
 
 fn bench_polyphonic_workload(c: &mut Criterion) {
     let mut group = c.benchmark_group("polyphonic_workload");
 
-    // 1536 envelopes × 64 samples (spec target: <100µs)
-    // Using 192 batches of 8 envelopes each
-    group.bench_function("1536_envelopes_64_samples", |b| {
-        const NUM_BATCHES: usize = 192; // 192 * 8 = 1536 envelopes
-        const BLOCK_SIZE: usize = 64;
+    // 1536 envelopes × 1 second lifecycle
+    // Throughput: 1536 × 44100 = ~67.7M samples
+    const NUM_BATCHES_1536: usize = 192; // 192 * 8 = 1536 envelopes
+    group.throughput(Throughput::Elements(
+        (NUM_BATCHES_1536 * 8 * SAMPLES_PER_SECOND) as u64,
+    ));
 
-        let mut batches: Vec<EnvelopeBatch<8, 6, 2>> = (0..NUM_BATCHES)
+    group.bench_function("1536_envelopes_1_second", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+
+        let mut batches: Vec<EnvelopeBatch<8, 6, 2>> = (0..NUM_BATCHES_1536)
             .map(|_| {
-                let mut batch = FmEnvelopeBatch8::new(44100.0);
+                let mut batch = FmEnvelopeBatch8::with_config(config);
                 for i in 0..8 {
                     batch.note_on(i, 60 + (i % 12) as u8);
                 }
@@ -112,25 +237,54 @@ fn bench_polyphonic_workload(c: &mut Criterion) {
         let mut output = [[0.0f32; 8]; BLOCK_SIZE];
 
         b.iter(|| {
+            // Reset all envelopes
             for batch in batches.iter_mut() {
-                batch.process_block(&mut output);
+                batch.reset_all();
+                for i in 0..8 {
+                    batch.note_on(i, 60 + (i % 12) as u8);
+                }
             }
+
+            // Process ~500ms (attack + decay + sustain)
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                for batch in batches.iter_mut() {
+                    batch.process_block(&mut output);
+                }
+            }
+
+            // Release all envelopes
+            for batch in batches.iter_mut() {
+                for i in 0..8 {
+                    batch.note_off(i);
+                }
+            }
+
+            // Process ~500ms of release
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                for batch in batches.iter_mut() {
+                    batch.process_block(&mut output);
+                }
+            }
+
             black_box(output[0][0])
         })
     });
 
-    // 32 voices × 12 envelopes × 64 samples
-    group.bench_function("32_voices_12_env_64_samples", |b| {
-        const NUM_VOICES: usize = 32;
-        const ENVS_PER_VOICE: usize = 12;
-        const BLOCK_SIZE: usize = 64;
+    // 32 voices × 12 envelopes × 1 second = 384 envelopes
+    const NUM_VOICES: usize = 32;
+    const ENVS_PER_VOICE: usize = 12;
+    const NUM_BATCHES_384: usize = (NUM_VOICES * ENVS_PER_VOICE).div_ceil(8); // 48 batches
 
-        // Use 48 batches of 8 (= 384 = 32 * 12 envelopes)
-        const NUM_BATCHES: usize = (NUM_VOICES * ENVS_PER_VOICE).div_ceil(8);
+    group.throughput(Throughput::Elements(
+        (NUM_BATCHES_384 * 8 * SAMPLES_PER_SECOND) as u64,
+    ));
 
-        let mut batches: Vec<EnvelopeBatch<8, 6, 2>> = (0..NUM_BATCHES)
+    group.bench_function("32_voices_12_env_1_second", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+
+        let mut batches: Vec<EnvelopeBatch<8, 6, 2>> = (0..NUM_BATCHES_384)
             .map(|_| {
-                let mut batch = FmEnvelopeBatch8::new(44100.0);
+                let mut batch = FmEnvelopeBatch8::with_config(config);
                 for i in 0..8 {
                     batch.note_on(i, 60);
                 }
@@ -141,9 +295,82 @@ fn bench_polyphonic_workload(c: &mut Criterion) {
         let mut output = [[0.0f32; 8]; BLOCK_SIZE];
 
         b.iter(|| {
+            // Reset and trigger
             for batch in batches.iter_mut() {
-                batch.process_block(&mut output);
+                batch.reset_all();
+                for i in 0..8 {
+                    batch.note_on(i, 60);
+                }
             }
+
+            // Process ~500ms
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                for batch in batches.iter_mut() {
+                    batch.process_block(&mut output);
+                }
+            }
+
+            // Release
+            for batch in batches.iter_mut() {
+                for i in 0..8 {
+                    batch.note_off(i);
+                }
+            }
+
+            // Process ~500ms release
+            for _ in 0..(BLOCKS_PER_SECOND / 2) {
+                for batch in batches.iter_mut() {
+                    batch.process_block(&mut output);
+                }
+            }
+
+            black_box(output[0][0])
+        })
+    });
+
+    // Segment transition stress test - many rapid segment changes
+    group.bench_function("segment_transition_stress", |b| {
+        // Very short ADSR to force rapid segment transitions
+        let config = FmEnvelopeConfig::adsr(0.02, 0.03, 0.5, 0.05, SAMPLE_RATE);
+
+        let mut batches: Vec<EnvelopeBatch<8, 6, 2>> = (0..48)
+            .map(|_| FmEnvelopeBatch8::with_config(config))
+            .collect();
+
+        let mut output = [[0.0f32; 8]; BLOCK_SIZE];
+
+        b.iter(|| {
+            // Multiple note-on/off cycles to stress segment transitions
+            for _cycle in 0..10 {
+                // Trigger all
+                for batch in batches.iter_mut() {
+                    for i in 0..8 {
+                        batch.note_on(i, 60);
+                    }
+                }
+
+                // Process through attack/decay (short ~50ms)
+                for _ in 0..35 {
+                    for batch in batches.iter_mut() {
+                        batch.process_block(&mut output);
+                    }
+                }
+
+                // Release
+                for batch in batches.iter_mut() {
+                    for i in 0..8 {
+                        batch.note_off(i);
+                    }
+                }
+
+                // Process release (short ~50ms)
+                for _ in 0..35 {
+                    for batch in batches.iter_mut() {
+                        batch.process_block(&mut output);
+                    }
+                }
+            }
+
             black_box(output[0][0])
         })
     });

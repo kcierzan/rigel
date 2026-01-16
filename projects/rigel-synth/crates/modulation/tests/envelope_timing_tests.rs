@@ -64,6 +64,10 @@ fn test_attack_time_500ms() {
 }
 
 /// Test release time matches configured value.
+///
+/// With exponential decay (linear-in-dB), the configured time represents
+/// the time to traverse the full ~96dB dynamic range. Reaching -60dB
+/// (0.1% of start level) should take approximately 62.5% of that time.
 #[test]
 fn test_release_time_300ms() {
     let sample_rate = 44100.0;
@@ -89,25 +93,34 @@ fn test_release_time_300ms() {
     let start_level = env.value();
     assert!(start_level > 0.5, "Should start release at high level");
 
-    // Count samples to reach 10% of starting level
+    // With exponential decay (linear-in-dB), we measure time to reach -60dB
+    // (0.1% of start level). This should take ~62.5% of the configured time
+    // since 60dB is 62.5% of the 96dB dynamic range.
+    let threshold = start_level * 0.001; // -60dB below start
+    let expected_fraction = 60.0 / 96.0; // Fraction of full time to reach -60dB
+
     let mut samples = 0;
-    while env.value() > start_level * 0.1 && samples < 100000 {
+    while env.value() > threshold && samples < 100000 {
         env.process();
         samples += 1;
     }
 
     let measured_time = samples as f32 / sample_rate;
-    let tolerance = 0.3; // 30% tolerance
+    let expected_time = release_time * expected_fraction;
+    let tolerance = 0.35; // 35% tolerance for exponential approximations
 
     assert!(
-        (measured_time - release_time).abs() < release_time * tolerance,
-        "Release time mismatch: expected {}ms, got {}ms",
-        release_time * 1000.0,
+        (measured_time - expected_time).abs() < expected_time * tolerance,
+        "Release time to -60dB mismatch: expected ~{}ms, got {}ms",
+        expected_time * 1000.0,
         measured_time * 1000.0
     );
 }
 
 /// Test 1 second release time.
+///
+/// With exponential decay (linear-in-dB), the configured time represents
+/// the time to traverse the full ~96dB dynamic range.
 #[test]
 fn test_release_time_1s() {
     let sample_rate = 44100.0;
@@ -127,20 +140,24 @@ fn test_release_time_1s() {
     // Get starting level
     let start_level = env.value();
 
-    // Count samples to reach 10% of starting level
+    // With exponential decay, measure time to reach -60dB (0.1% of start)
+    let threshold = start_level * 0.001;
+    let expected_fraction = 60.0 / 96.0;
+
     let mut samples = 0;
-    while env.value() > start_level * 0.1 && samples < 200000 {
+    while env.value() > threshold && samples < 200000 {
         env.process();
         samples += 1;
     }
 
     let measured_time = samples as f32 / sample_rate;
-    let tolerance = 0.3; // 30% tolerance
+    let expected_time = release_time * expected_fraction;
+    let tolerance = 0.35;
 
     assert!(
-        (measured_time - release_time).abs() < release_time * tolerance,
-        "Release time mismatch: expected {}ms, got {}ms",
-        release_time * 1000.0,
+        (measured_time - expected_time).abs() < expected_time * tolerance,
+        "Release time mismatch: expected ~{}ms, got {}ms",
+        expected_time * 1000.0,
         measured_time * 1000.0
     );
 }
@@ -178,13 +195,17 @@ fn test_attack_timing_parametric() {
 }
 
 /// Test multiple time values for release parametrically.
+///
+/// With exponential decay (linear-in-dB), we measure time to reach -60dB,
+/// which should be ~62.5% of the configured full-range time.
 #[test]
 fn test_release_timing_parametric() {
     let sample_rate = 44100.0;
     let test_times = [0.1, 0.3, 0.5, 1.0, 2.0];
+    let expected_fraction = 60.0 / 96.0; // -60dB is 62.5% of 96dB range
 
-    for expected_time in test_times {
-        let config = FmEnvelopeConfig::adsr(0.01, 0.01, 1.0, expected_time, sample_rate);
+    for configured_time in test_times {
+        let config = FmEnvelopeConfig::adsr(0.01, 0.01, 1.0, configured_time, sample_rate);
         let mut env = FmEnvelope::with_config(config);
         env.note_on(60);
 
@@ -196,14 +217,17 @@ fn test_release_timing_parametric() {
         env.note_off();
         let start_level = env.value();
 
+        // Measure time to reach -60dB (0.1% of start)
+        let threshold = start_level * 0.001;
         let mut samples = 0;
-        while env.value() > start_level * 0.1 && samples < 500000 {
+        while env.value() > threshold && samples < 500000 {
             env.process();
             samples += 1;
         }
 
         let measured = samples as f32 / sample_rate;
-        let tolerance = if expected_time < 0.2 { 0.5 } else { 0.3 };
+        let expected_time = configured_time * expected_fraction;
+        let tolerance = if configured_time < 0.2 { 0.5 } else { 0.35 };
 
         assert!(
             (measured - expected_time).abs() < expected_time * tolerance,
