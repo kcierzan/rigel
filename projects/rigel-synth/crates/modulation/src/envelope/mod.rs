@@ -57,9 +57,9 @@ pub use config::{
     AwmEnvelopeConfig, EnvelopeConfig, FmEnvelopeConfig, LoopConfig, SevenSegEnvelopeConfig,
 };
 pub use rates::{
-    calculate_increment_f32, calculate_increment_f32_scaled, get_static_count,
-    linear_to_param_level, max_rate_for_sample_rate, param_to_level_f32, scale_rate,
-    seconds_to_rate, JUMP_TARGET, MIN_SEGMENT_TIME_SECONDS, STATICS,
+    calculate_increment_f32, calculate_increment_f32_scaled, calculate_increment_f32_with_max_rate,
+    get_static_count, linear_to_param_level, max_rate_for_sample_rate, param_to_level_f32,
+    scale_rate, seconds_to_rate, JUMP_TARGET, MIN_SEGMENT_TIME_SECONDS, STATICS,
 };
 pub use segment::Segment;
 pub use state::{EnvelopeLevel, EnvelopePhase, EnvelopeState, LEVEL_MAX, LEVEL_MIN};
@@ -419,6 +419,7 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
         // If already at target, no movement needed
         if distance < f32::EPSILON {
             self.state.increment = 0.0;
+            self.state.decay_factor = 1.0;
             self.state.rising = false;
             return;
         }
@@ -426,11 +427,13 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
         // Calculate per-sample increment with rate scaling applied.
         // The raw increment is for full 0.0-1.0 range; scale by actual distance
         // so that the configured time matches the actual transition time.
-        let full_range_increment = calculate_increment_f32_scaled(
+        // Uses pre-computed max_rate to avoid O(100) search per segment change.
+        let full_range_increment = calculate_increment_f32_with_max_rate(
             segment.rate,
             self.state.midi_note,
             self.config.rate_scaling,
             self.config.sample_rate,
+            self.config.max_rate(),
         );
 
         // Scale increment by distance to maintain correct timing
@@ -445,8 +448,34 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
             // so we divide the increment by 9 to maintain correct timing.
             self.state.attack_base_level = self.state.level;
             self.state.increment = scaled_increment / 9.0;
+            self.state.decay_factor = 1.0; // Not used for attack
         } else {
-            // For decay (falling) segments, use linear decrement
+            // For decay (falling) segments, use exponential decay (linear-in-dB).
+            // This matches authentic DX7/SY99 behavior where decay is constant dB/second.
+            //
+            // Calculate decay factor: level *= decay_factor each sample
+            // To go from current_level to target_level in N samples:
+            //   target = current * decay_factor^N
+            //   decay_factor = (target / current)^(1/N)
+            //
+            // N samples = distance / scaled_increment (since increment covers full distance)
+            let samples = if scaled_increment > f32::EPSILON {
+                distance / scaled_increment
+            } else {
+                1.0
+            };
+
+            // Handle target = 0 case: use a small minimum to avoid log(0)
+            // -120dB is well below audible threshold
+            const MIN_TARGET: f32 = 1e-6;
+            let effective_target = self.state.target_level.max(MIN_TARGET);
+            let current = self.state.level.max(MIN_TARGET);
+
+            // decay_factor = (target / current)^(1/samples)
+            let ratio = effective_target / current;
+            self.state.decay_factor = libm::powf(ratio, 1.0 / samples);
+
+            // Store increment for timing reference (used by reached_target check)
             self.state.increment = -scaled_increment;
         }
     }
@@ -530,23 +559,42 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
         self.state.level = self.state.level.min(self.state.target_level);
     }
 
-    /// Linear decrement for decay (falling) phases.
+    /// Exponential decay for falling phases (linear-in-dB).
     ///
-    /// MSFA uses linear decrement in log domain for decays.
-    /// In linear domain, this is simple subtraction.
+    /// The DX7/SY99/MSFA operates internally in dB domain where decay is
+    /// linear subtraction in dB. In linear amplitude domain, this translates
+    /// to multiplicative decay: level *= decay_factor each sample.
+    ///
+    /// This produces the characteristic where "slope increases as level
+    /// approaches zero" - faster decay through quiet regions, matching
+    /// authentic FM synth behavior.
     #[inline]
     fn apply_decay_increment(&mut self) {
-        self.state.level += self.state.increment;
-        self.state.level = self.state.level.clamp(LEVEL_MIN, LEVEL_MAX);
+        // Exponential decay: multiply by factor each sample
+        self.state.level *= self.state.decay_factor;
+
+        // Clamp to valid range and snap to minimum when very small
+        // to avoid denormal numbers and infinite asymptotic approach
+        if self.state.level < LEVEL_MIN + 1e-7 {
+            self.state.level = LEVEL_MIN;
+        }
     }
 
     /// Check if we've reached the target level.
+    ///
+    /// For decay (exponential), we check if we're within a small tolerance
+    /// of the target to handle floating-point precision and ensure we don't
+    /// get stuck in asymptotic approach.
     #[inline]
     fn reached_target(&self) -> bool {
         if self.state.rising {
             self.state.level >= self.state.target_level
         } else {
+            // For decay, check if we've reached or slightly passed target,
+            // or if we're within 0.1% of target (handles exponential asymptotic approach)
             self.state.level <= self.state.target_level
+                || (self.state.target_level > 0.0
+                    && self.state.level <= self.state.target_level * 1.001)
         }
     }
 }

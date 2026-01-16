@@ -4,7 +4,7 @@
 //! - [`LoopConfig`] - Loop configuration for key-on segments
 //! - [`EnvelopeConfig`] - Immutable envelope configuration
 
-use super::rates::{linear_to_param_level, seconds_to_rate};
+use super::rates::{linear_to_param_level, max_rate_for_sample_rate, seconds_to_rate};
 use super::segment::Segment;
 
 /// Loop configuration for envelope segments.
@@ -125,6 +125,13 @@ pub struct EnvelopeConfig<const KEY_ON_SEGS: usize, const RELEASE_SEGS: usize> {
 
     /// Sample rate for timing calculations.
     pub sample_rate: f32,
+
+    /// Pre-computed maximum rate that ensures minimum segment time.
+    ///
+    /// This is cached at config creation to avoid O(100) search at every
+    /// segment transition when rate scaling is applied. The value depends
+    /// only on sample rate and is computed via [`max_rate_for_sample_rate`].
+    cached_max_rate: u8,
 }
 
 impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
@@ -150,6 +157,7 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
+            cached_max_rate: max_rate_for_sample_rate(sample_rate),
         }
     }
 
@@ -164,7 +172,7 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
     /// * `delay_samples` - Delay before attack (in samples)
     /// * `loop_config` - Loop configuration
     /// * `sample_rate` - Sample rate in Hz
-    pub const fn new(
+    pub fn new(
         key_on_segments: [Segment; K],
         release_segments: [Segment; R],
         rate_scaling: u8,
@@ -181,6 +189,7 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
             delay_samples,
             loop_config,
             sample_rate,
+            cached_max_rate: max_rate_for_sample_rate(sample_rate),
         }
     }
 
@@ -212,6 +221,15 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
     #[inline]
     pub fn set_delay_ms(&mut self, ms: f32) {
         self.delay_samples = ((ms / 1000.0) * self.sample_rate) as u32;
+    }
+
+    /// Get cached maximum rate for this sample rate.
+    ///
+    /// This is the highest rate that still ensures minimum segment time
+    /// (1.5ms) to prevent audible clicks from rate scaling.
+    #[inline]
+    pub fn max_rate(&self) -> u8 {
+        self.cached_max_rate
     }
 }
 
@@ -288,6 +306,7 @@ impl FmEnvelopeConfig {
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
+            cached_max_rate: max_rate_for_sample_rate(sample_rate),
         }
     }
 
@@ -311,6 +330,7 @@ impl FmEnvelopeConfig {
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
+            cached_max_rate: max_rate_for_sample_rate(sample_rate),
         }
     }
 
@@ -334,6 +354,7 @@ impl FmEnvelopeConfig {
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
+            cached_max_rate: max_rate_for_sample_rate(sample_rate),
         }
     }
 }
@@ -466,5 +487,39 @@ mod tests {
             "5s release should give rate < 30, got {}",
             cfg.release_segments[0].rate
         );
+    }
+
+    #[test]
+    fn test_cached_max_rate_matches_computed() {
+        // Verify cached max_rate matches what max_rate_for_sample_rate computes
+        for &sr in &[22050.0, 44100.0, 48000.0, 96000.0] {
+            let cfg = FmEnvelopeConfig::default_with_sample_rate(sr);
+            let computed = max_rate_for_sample_rate(sr);
+            assert_eq!(
+                cfg.max_rate(),
+                computed,
+                "Cached max_rate should match computed for sample rate {}",
+                sr
+            );
+        }
+    }
+
+    #[test]
+    fn test_cached_max_rate_in_presets() {
+        // Verify all preset constructors correctly cache max_rate
+        let sr = 44100.0;
+        let expected = max_rate_for_sample_rate(sr);
+
+        let default_cfg = FmEnvelopeConfig::default_with_sample_rate(sr);
+        assert_eq!(default_cfg.max_rate(), expected);
+
+        let adsr_cfg = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, sr);
+        assert_eq!(adsr_cfg.max_rate(), expected);
+
+        let piano_cfg = FmEnvelopeConfig::piano(sr);
+        assert_eq!(piano_cfg.max_rate(), expected);
+
+        let organ_cfg = FmEnvelopeConfig::organ(sr);
+        assert_eq!(organ_cfg.max_rate(), expected);
     }
 }

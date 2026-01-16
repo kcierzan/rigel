@@ -50,6 +50,12 @@ pub struct FmEnvelopeParams {
     pub release: [Segment; 2],
     /// Rate scaling sensitivity (0-7, higher = more keyboard tracking)
     pub rate_scaling: u8,
+    /// Whether envelope looping is enabled
+    pub loop_enabled: bool,
+    /// Start segment index for loop (0-5)
+    pub loop_start: u8,
+    /// End segment index for loop (0-5)
+    pub loop_end: u8,
 }
 
 impl Default for FmEnvelopeParams {
@@ -69,6 +75,9 @@ impl Default for FmEnvelopeParams {
                 Segment::new(99, 0), // Immediate if needed
             ],
             rate_scaling: 0,
+            loop_enabled: false,
+            loop_start: 0,
+            loop_end: 1,
         }
     }
 }
@@ -100,6 +109,9 @@ impl FmEnvelopeParams {
             ],
             release: [Segment::new(release_rate, 0), Segment::new(99, 0)],
             rate_scaling: 0,
+            loop_enabled: false,
+            loop_start: 0,
+            loop_end: 1,
         }
     }
 }
@@ -295,6 +307,13 @@ impl SynthEngine {
     fn fm_params_to_config(params: &FmEnvelopeParams, sample_rate: f32) -> FmEnvelopeConfig {
         use rigel_modulation::envelope::{LoopConfig, Segment};
 
+        // Build loop config from params
+        let loop_config = if params.loop_enabled && params.loop_start < params.loop_end {
+            LoopConfig::new(params.loop_start, params.loop_end).unwrap_or_else(LoopConfig::disabled)
+        } else {
+            LoopConfig::disabled()
+        };
+
         FmEnvelopeConfig::new(
             [
                 Segment::new(params.key_on[0].rate, params.key_on[0].level),
@@ -311,7 +330,7 @@ impl SynthEngine {
             params.rate_scaling,
             127, // Output level (full)
             0,   // No delay
-            LoopConfig::disabled(),
+            loop_config,
             sample_rate,
         )
     }

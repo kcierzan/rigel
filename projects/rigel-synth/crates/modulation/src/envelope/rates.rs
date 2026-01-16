@@ -28,6 +28,7 @@
 /// Linear amplitude: 10^(-55.8/20) ≈ 0.00163 (0.16%)
 ///
 /// Reference: MSFA/Dexed `const int jumptarget = 1716`
+// TODO: this seems pretty high for long envelopes. Tweak this by ear later.
 pub const JUMP_TARGET: f32 = 0.00163;
 
 /// Minimum envelope segment transition time in seconds.
@@ -149,6 +150,40 @@ pub fn calculate_increment_f32_scaled(
 
     // Clamp to max rate that ensures minimum segment time (sample-rate independent)
     let max_rate = max_rate_for_sample_rate(sample_rate);
+    let scaled_rate = (rate as u16 + rate_adjustment as u16).min(max_rate as u16) as u8;
+
+    calculate_increment_f32(scaled_rate, sample_rate)
+}
+
+/// Calculate per-sample increment with rate scaling and pre-computed max rate.
+///
+/// Same as [`calculate_increment_f32_scaled`] but takes a pre-computed `max_rate`
+/// parameter to avoid the O(100) search in [`max_rate_for_sample_rate`].
+/// Use this in hot paths where the max rate has been cached at configuration time.
+///
+/// # Arguments
+///
+/// * `rate` - Base DX7 rate parameter (0-99)
+/// * `midi_note` - MIDI note number (0-127)
+/// * `rate_scaling` - Rate scaling sensitivity (0-7)
+/// * `sample_rate` - Sample rate in Hz
+/// * `max_rate` - Pre-computed maximum rate from [`max_rate_for_sample_rate`]
+///
+/// # Returns
+///
+/// Per-sample increment (f32) with rate scaling applied
+#[inline]
+pub fn calculate_increment_f32_with_max_rate(
+    rate: u8,
+    midi_note: u8,
+    rate_scaling: u8,
+    sample_rate: f32,
+    max_rate: u8,
+) -> f32 {
+    // Apply rate scaling: higher notes get faster rates
+    let rate_adjustment = scale_rate(midi_note, rate_scaling);
+
+    // Clamp to provided max rate (pre-computed at config time)
     let scaled_rate = (rate as u16 + rate_adjustment as u16).min(max_rate as u16) as u8;
 
     calculate_increment_f32(scaled_rate, sample_rate)
@@ -536,8 +571,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_min_segment_time_constant() {
         // 1.5ms is within the safe range (1-2ms)
+        // These assertions validate the constant is in a reasonable range
         assert!(
             MIN_SEGMENT_TIME_SECONDS >= 0.001,
             "Min time should be >= 1ms"
@@ -613,7 +650,7 @@ mod tests {
         // Low note + low rate + low scaling = well under max
         let inc = calculate_increment_f32_scaled(50, 36, 3, sample_rate);
         let adj = scale_rate(36, 3);
-        let expected_rate = 50 + adj as u8;
+        let expected_rate = 50 + adj;
 
         assert!(
             expected_rate < max_rate,

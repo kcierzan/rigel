@@ -58,7 +58,15 @@ pub struct EnvelopeState {
 
     /// Level change per sample (signed).
     /// Positive for rising, negative for falling.
+    /// For attack phases only; decay uses decay_factor.
     pub(crate) increment: f32,
+
+    /// Multiplicative decay factor for exponential decay.
+    /// Each sample: level *= decay_factor (where 0 < decay_factor < 1).
+    /// This produces linear-in-dB decay (exponential in linear amplitude),
+    /// matching authentic DX7/SY99 behavior.
+    /// Only meaningful when `rising` is false.
+    pub(crate) decay_factor: f32,
 
     /// Starting level for current attack segment.
     /// Used to calculate exponential approach factor.
@@ -88,6 +96,7 @@ impl Default for EnvelopeState {
             level: LEVEL_MIN,
             target_level: LEVEL_MIN,
             increment: 0.0,
+            decay_factor: 1.0, // No decay by default
             attack_base_level: LEVEL_MIN,
             segment_index: 0,
             phase: EnvelopePhase::Idle,
