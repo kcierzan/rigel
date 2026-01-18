@@ -113,10 +113,6 @@ pub struct EnvelopeConfig<const KEY_ON_SEGS: usize, const RELEASE_SEGS: usize> {
     /// Higher = more rate variation across keyboard.
     pub rate_scaling: u8,
 
-    /// Output level scaling (pre-computed from operator level).
-    /// In internal units (~0.75dB per step).
-    pub output_level: u8,
-
     /// Delay before attack begins (in samples).
     pub delay_samples: u32,
 
@@ -153,7 +149,6 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
             key_on_segments: [Segment::new(99, 99); K],
             release_segments: [Segment::new(50, 0); R],
             rate_scaling: 0,
-            output_level: 127, // Full output
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
@@ -168,7 +163,6 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
     /// * `key_on_segments` - Key-on segment configuration
     /// * `release_segments` - Release segment configuration
     /// * `rate_scaling` - Rate scaling sensitivity (0-7)
-    /// * `output_level` - Output level (0-127)
     /// * `delay_samples` - Delay before attack (in samples)
     /// * `loop_config` - Loop configuration
     /// * `sample_rate` - Sample rate in Hz
@@ -176,7 +170,6 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
         key_on_segments: [Segment; K],
         release_segments: [Segment; R],
         rate_scaling: u8,
-        output_level: u8,
         delay_samples: u32,
         loop_config: LoopConfig,
         sample_rate: f32,
@@ -185,7 +178,6 @@ impl<const K: usize, const R: usize> EnvelopeConfig<K, R> {
             key_on_segments,
             release_segments,
             rate_scaling: if rate_scaling > 7 { 7 } else { rate_scaling },
-            output_level,
             delay_samples,
             loop_config,
             sample_rate,
@@ -302,7 +294,6 @@ impl FmEnvelopeConfig {
                 Segment::new(99, 0),           // Immediate if needed
             ],
             rate_scaling: 0,
-            output_level: 127,
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
@@ -326,7 +317,6 @@ impl FmEnvelopeConfig {
                 Segment::new(35, 0),  // Release 2: slow to silence
             ],
             rate_scaling: 3,
-            output_level: 127,
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
@@ -350,7 +340,6 @@ impl FmEnvelopeConfig {
                 Segment::new(99, 0),
             ],
             rate_scaling: 0,
-            output_level: 127,
             delay_samples: 0,
             loop_config: LoopConfig::disabled(),
             sample_rate,
@@ -407,7 +396,6 @@ mod tests {
             [Segment::default(); 6],
             [Segment::default(); 2],
             15, // Should be clamped to 7
-            127,
             0,
             LoopConfig::disabled(),
             44100.0,

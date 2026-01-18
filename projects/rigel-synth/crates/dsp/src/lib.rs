@@ -375,8 +375,7 @@ impl SynthEngine {
                 Segment::new(params.release[1].rate, params.release[1].level),
             ],
             params.rate_scaling,
-            127, // Output level (full)
-            0,   // No delay
+            0, // No delay
             loop_config,
             sample_rate,
         )
