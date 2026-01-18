@@ -65,8 +65,8 @@ pub use config::{
 pub use rates::{
     calculate_increment_f32, calculate_increment_f32_scaled, calculate_increment_f32_with_max_rate,
     get_static_count, level_to_linear, linear_to_param_level, max_rate_for_sample_rate,
-    param_to_level_q8, scale_rate, seconds_to_rate, JUMP_TARGET, JUMP_TARGET_Q8,
-    MIN_SEGMENT_TIME_SECONDS, STATICS,
+    param_to_level_q8, scale_rate, seconds_to_rate, JUMP_TARGET_Q8, MIN_SEGMENT_TIME_SECONDS,
+    STATICS,
 };
 pub use segment::Segment;
 pub use state::{EnvelopeLevel, EnvelopePhase, EnvelopeState, LEVEL_MAX, LEVEL_MIN};

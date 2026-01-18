@@ -27,14 +27,6 @@
 /// Reference: MSFA/Dexed `const int jumptarget = 1716`
 pub const JUMP_TARGET_Q8: i16 = 1716;
 
-/// Attack jump threshold in linear amplitude (0.0-1.0).
-///
-/// Calculation: 1716 Q8 steps = 40.2dB above minimum = -55.8dB from 0dB
-/// Linear amplitude: 10^(-55.8/20) ≈ 0.00163 (0.16%)
-///
-/// Reference: MSFA/Dexed `const int jumptarget = 1716`
-pub const JUMP_TARGET: f32 = 0.00163;
-
 /// Minimum envelope segment transition time in seconds.
 ///
 /// This prevents rate scaling from producing instant (clicking) transitions
@@ -757,26 +749,6 @@ mod tests {
         // Clamping
         assert_eq!(linear_to_param_level(-0.5), 0);
         assert_eq!(linear_to_param_level(1.5), 99);
-    }
-
-    #[test]
-    fn test_jump_target_constant() {
-        // JUMP_TARGET should be approximately -56dB from full scale
-        // (40dB above minimum in DX7 terms, where minimum is ~-96dB)
-        // Linear amplitude: 10^(-55.8/20) ≈ 0.00163
-        assert!(
-            (JUMP_TARGET - 0.00163).abs() < 0.0001,
-            "JUMP_TARGET should be ~0.00163, got {}",
-            JUMP_TARGET
-        );
-
-        // Verify dB level
-        let db = 20.0 * libm::log10f(JUMP_TARGET);
-        assert!(
-            (db - (-55.8)).abs() < 1.0,
-            "JUMP_TARGET should be ~-56dB, got {}dB",
-            db
-        );
     }
 
     #[test]

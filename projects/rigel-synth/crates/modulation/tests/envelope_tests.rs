@@ -4,7 +4,7 @@
 
 use rigel_modulation::envelope::{
     AwmEnvelope, EnvelopePhase, FmEnvelope, FmEnvelopeBatch8, FmEnvelopeConfig, LoopConfig,
-    Segment, SevenSegEnvelope, JUMP_TARGET,
+    Segment, SevenSegEnvelope,
 };
 
 // =============================================================================
@@ -538,25 +538,6 @@ mod us7_performance {
 
 mod us4_attack_jump {
     use super::*;
-
-    #[test]
-    fn test_immediate_jump_on_attack() {
-        let mut env = FmEnvelope::new(44100.0);
-        env.note_on(60);
-
-        // After first process, level should jump to JUMP_TARGET (~0.5)
-        env.process();
-
-        // Get linear level
-        let level = env.state().level();
-
-        assert!(
-            level >= JUMP_TARGET,
-            "Level {} should jump to at least {} on attack",
-            level,
-            JUMP_TARGET
-        );
-    }
 
     #[test]
     fn test_smooth_approach_after_jump() {

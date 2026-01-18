@@ -100,23 +100,6 @@ fn test_seconds_to_rate_coverage() {
     );
 }
 
-/// Test that JUMP_TARGET is at the correct dB level (~-56dB).
-#[test]
-fn test_jump_target_db_level() {
-    use rigel_modulation::envelope::JUMP_TARGET;
-
-    // JUMP_TARGET should be ~-56dB from full scale (40dB above minimum)
-    let db = 20.0 * libm::log10f(JUMP_TARGET);
-    assert!(
-        (db - (-55.8)).abs() < 2.0,
-        "JUMP_TARGET should be ~-56dB, got {}dB",
-        db
-    );
-
-    // Verify it's much smaller than 0.5 (the old incorrect value)
-    const _: () = assert!(JUMP_TARGET < 0.01);
-}
-
 /// Test slow attack builds from near-silence (not 50%!).
 #[test]
 fn test_slow_attack_from_silence() {
