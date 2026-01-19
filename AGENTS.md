@@ -1,116 +1,169 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-- `projects/rigel-synth/crates/dsp`: `no_std` DSP core; keep all real-time code
-  allocation-free.
-- `projects/rigel-synth/crates/cli`: CLI entry point (`rigel`) for rendering
-  audio and exercising DSP paths.
-- `projects/rigel-synth/crates/plugin`: NIH-plug wrapper for building VST3/CLAP
-  binaries; interacts with DAWs.
-- `projects/rigel-synth/crates/xtask`: helper tasks including `cargo xtask
-  bundle` for plugin packaging.
-- `projects/wtgen/`: Python research workspace (nix devenv managed) for
-  generating wavetable assets used during development.
-- `projects/rigel-site` & `projects/rigel-backend`: placeholders for the public
-  site + future backend service; use them for planning docs and tracking TODOs.
+This file provides guidance for AI coding assistants and human contributors working with this repository.
 
-## Essential commands
+## Project Overview
 
-All commands must ALWAYS be executed in the devenv shell environment. Thanks to the
-direnv setup, you will likely be running in the devenv shell environment so all
-of these commands can be run as-is. If for some reason the devenv shell is
-broken, invoke them like: `devenv shell -- <command>`, fixing the devenv env
-immediately.
+Rigel is a wavetable synthesizer built in Rust with a focus on performance, deterministic real-time processing, and portability. The monorepo contains:
 
-### Building
+- **rigel-synth**: Rust audio plugin and DSP core (VST3/CLAP)
+- **wtgen**: Python wavetable generation and research toolkit
+- **rigel-site**: Future marketing/documentation website
+- **rigel-backend**: Future companion backend service
 
-- Build for the host platform: `build:native`
-- Build for macOS: `build:macos`
-- Build for x86_64 Linux: `build:linux`
-- Build for x86_64 Windows: `build:win`
+## Project Structure
 
-### Testing, Linting, and Formatting
+```
+projects/
+  rigel-synth/crates/
+    dsp/           # no_std DSP core - allocation-free real-time code
+    timing/        # no_std timing infrastructure (Timebase, Smoother, etc.)
+    math/          # no_std SIMD math library
+    simd/          # SIMD vector abstractions and backends
+    simd-dispatch/ # Runtime SIMD backend selection
+    modulation/    # Modulation sources (LFOs, envelopes)
+    cli/           # CLI tool for rendering audio and testing DSP
+    plugin/        # NIH-plug wrapper for VST3/CLAP
+    xtask/         # Build helpers (cargo xtask bundle)
+  wtgen/           # Python research workspace (separate devenv)
+  rigel-site/      # Placeholder for public site
+  rigel-backend/   # Placeholder for backend service
+```
 
-- Test: `cago:test`
-- Format: `cargo:fmt`
-- Lint: `cargo:lint`
+## Development Environment
 
-## Coding Style & Naming Conventions
-- Follow Rust 2021 defaults: 4-space indentation, snake_case modules,
-  UpperCamelCase types.
-- Keep `rigel-dsp` free of `std`, heap use, and dynamic allocation.
-- Expose parameters and commands with descriptive, lower-kebab subcommands
-  (`note`, `chord`, etc.).
-- Document public items with Rustdoc when adding APIs that surface outside the
-  crate.
-- When making edits to any nix files, pay close attention to nix string interpolation
-  causing conflicts with shell and always escape correctly
+**All development requires Nix + devenv.** The repository has two separate devenv shells:
 
-## Testing Guidelines
-- Primary suite runs via `cargo:test`; target crate-level coverage for DSP math
-  and CLI parsing.
-- Add focused tests under `projects/rigel-synth/crates/dsp` or module-specific
-  files; name tests
-  `mod_name_behavior`.
-- For audio changes, regenerate short WAV fixtures via the CLI and listen or
-  diff waveforms before merging.
-- Python experiments in `projects/wtgen/tests/` should mirror Rust expectations; check
-  in generated assets only when deterministic. Any large binary assets should
-  be checked in using git-lfs.
-- When testing any nix/devenv changes, tail the output as nix errors tend to
-  be very long with only the last 100 or so lines mattering much.
+1. **Root shell** (Rust): For rigel-synth development
+2. **wtgen shell** (Python): At `projects/wtgen/`
 
-## Commit & Pull Request Guidelines
-- Recent commits use short, imperative subjects (`Fix devenv comment`, `Make
-  pip install ...`); match that style and keep under ~72 chars.
-- Each commit should remain buildable and scoped to one concern (DSP, CLI,
-  plugin, or tooling).
-- Pull requests should describe motivation, outline testing (`cargo test`,
-  audio renders, DAW smoke checks), and link open issues or TODO entries.
-- Include screenshots or audio snippets when UI or audible behavior changes;
-  attach bundle paths if asking for DAW validation.
+With direnv configured, shells activate automatically when entering directories. If devenv is broken, prefix commands with `devenv shell -- <command>`.
 
-## Security & Configuration Tips
-- Verify new dependencies maintain `no_std` compatibility before adding them to
-  `rigel-dsp`.
-- Avoid blocking I/O or file access from real-time audio callbacks; stage work
-  on auxiliary threads.
+## Essential Commands
 
-## Release Process
+**Always use devenv scripts** - they handle environment setup automatically.
 
-The project uses automated GitHub Actions workflows to build and distribute plugin binaries.
-
-### Continuous Releases (Latest)
-
-Every push to `main` triggers `.github/workflows/continuous-release.yml`:
-- Builds VST3/CLAP plugins for Linux, Windows, and macOS
-- Updates the "latest" GitHub release with new binaries
-- Archives named: `rigel-plugin-latest-{linux|windows|macos}.tar.gz`
-- Marked as pre-release for development builds
-
-### Version Releases
-
-Creating and pushing a version tag triggers `.github/workflows/release.yml`:
+### Rust Development (from repository root)
 
 ```bash
-# Update version in Cargo.toml if needed
+# Building
+build:native        # Build plugin for current platform
+build:macos         # macOS native build (requires macOS)
+build:linux         # Linux native build (requires Linux)
+build:win           # Windows cross-build via xwin
+
+# Testing & Quality
+cargo:test          # Run all tests
+cargo:fmt           # Format code
+cargo:lint          # Run clippy
+
+# SIMD-Specific Tests
+test:avx2           # Test with AVX2 (requires x86_64)
+test:neon           # Test with NEON (requires macOS ARM)
+
+# Benchmarking
+bench:all           # Run full benchmark suite
+bench:criterion     # Wall-clock benchmarks
+bench:baseline      # Save baseline for comparison
+bench:flamegraph    # Generate flamegraph
+```
+
+### Python Development (from `projects/wtgen/`)
+
+```bash
+# Testing
+test:full           # Full pytest suite with parallel execution
+test:fast           # Single-process with early exit
+
+# Code Quality (run all before completing changes)
+lint                # Ruff lint
+format              # Ruff formatter
+typecheck           # Both mypy and basedpyright
+typecheck:mypy      # mypy only
+typecheck:pyright   # basedpyright only
+
+# CLI
+uv run wtgen generate <waveform> --output <file.npz>
+uv run wtgen info <file.npz>
+```
+
+## Critical Constraints
+
+### Real-Time Safety (rigel-dsp)
+
+The DSP core must maintain:
+- **No heap allocations**: No Vec, Box, String, or std collections
+- **No blocking I/O**: No file operations, network calls, or locks
+- **No std library**: Only libm for math operations
+- **Deterministic performance**: Consistent CPU usage regardless of input
+
+Verify new dependencies support `no_std` and don't allocate.
+
+### wtgen Standards
+
+- All code must pass both mypy and basedpyright
+- Run pytest, mypy, basedpyright, and ruff before considering changes complete
+- Add tests for new code
+
+## Testing Guidelines
+
+### Rust Tests
+
+Run with `cargo:test`. Always run all tests including architecture-specific features before completing a feature:
+- Unit tests in crate modules
+- Integration tests in `tests/` directories
+- SIMD tests (`test:avx2` on x86_64, `test:neon` on macOS ARM)
+
+### Python Tests (wtgen)
+
+Run with `test:full` or `test:fast`:
+- Unit tests: `tests/unit/`
+- Integration tests: `tests/integration/`
+- Property-based testing via Hypothesis
+
+## Coding Conventions
+
+### Rust
+- Rust 2021 edition, 4-space indentation
+- snake_case for functions/variables, UpperCamelCase for types
+- Keep rigel-dsp free of std, heap allocations, and blocking operations
+- Document public APIs with rustdoc
+- Test naming: `mod_name_behavior` pattern
+
+### Python
+- Line length: 100 characters
+- Type hints required on all public functions
+- Ruff for linting and formatting
+
+### Commits & PRs
+- Short, imperative messages (<72 chars)
+- Each commit should remain buildable and scoped to one concern
+- PRs should describe motivation, outline testing, and link issues
+
+### Nix/DevEnv
+- Pay attention to nix string interpolation conflicts with shell syntax
+- When testing nix changes, tail output (last 100 lines matter most)
+
+## CI/CD Pipeline
+
+### Main CI (`.github/workflows/ci.yml`)
+
+Runs on all PRs and pushes:
+- `rigel-pipeline`: fmt, clippy, scalar tests, AVX2 tests
+- `wtgen-pipeline`: ruff lint, pytest
+- Plugin builds: Linux (native), Windows (cross-compiled), macOS (native)
+
+### Release Workflows
+
+**Continuous Release**: Every successful CI on `main` updates the "latest" pre-release.
+
+**Tagged Release**: Push a tag like `v0.2.0` to create a versioned release:
+```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-This will:
-- Build plugins for all three platforms
-- Create a new GitHub release with the tag name
-- Auto-generate changelog from commits since last release
-- Upload binaries as: `rigel-plugin-v0.2.0-{platform}.tar.gz`
-
-### Archive Contents
-
-Each platform archive contains:
-- `rigel-plugin.clap` - CLAP format plugin (single file on Linux/Windows, bundle on macOS)
-- `rigel-plugin.vst3/` - VST3 format plugin bundle
-
-### Installation for Users
+### Plugin Installation
 
 **macOS:**
 ```bash
@@ -134,7 +187,48 @@ Copy-Item -Recurse rigel-plugin.vst3 "$env:COMMONPROGRAMFILES\VST3\"
 Copy-Item rigel-plugin.clap "$env:COMMONPROGRAMFILES\CLAP\"
 ```
 
-### Notes
+## Architecture Details
 
-- macOS binaries are currently unsigned; users will need to bypass Gatekeeper
-- Code signing can be added later by configuring Apple Developer certificates in GitHub secrets
+### SIMD Backend
+
+Rigel uses a layered architecture for SIMD:
+- **rigel-simd**: Trait-based SIMD vector abstractions (no_std, zero-allocation)
+- **rigel-simd-dispatch**: Runtime backend selection on x86_64
+- **rigel-math**: Math utilities built on SIMD abstractions
+- **rigel-dsp**: DSP core using the above
+
+**Backend selection:**
+- x86_64: Runtime dispatch (AVX-512 > AVX2 > scalar)
+- aarch64 (macOS): Compile-time NEON selection
+
+### rigel-timing
+
+Infrastructure for sample-accurate timing:
+- `Timebase`: Synchronized DSP module timing
+- `Smoother`: Parameter smoothing (Linear, Exponential, Logarithmic)
+- `ControlRateClock`: Control-rate update scheduling
+- `ModulationSource` trait: LFOs, envelopes, sequencers
+
+## Key File Locations
+
+### Configuration
+- `Cargo.toml` - Rust workspace manifest
+- `rust-toolchain.toml` - Rust version and targets
+- `devenv.nix` - Rust development environment
+- `projects/wtgen/devenv.nix` - Python development environment
+- `.github/workflows/ci.yml` - CI/CD pipeline
+
+### Source Code
+- `projects/rigel-synth/crates/dsp/src/` - Core DSP
+- `projects/rigel-synth/crates/timing/src/` - Timing infrastructure
+- `projects/rigel-synth/crates/math/src/` - Math utilities
+- `projects/rigel-synth/crates/simd/src/` - SIMD vector abstractions
+- `projects/rigel-synth/crates/simd-dispatch/src/` - Runtime backend selection
+- `projects/rigel-synth/crates/modulation/src/` - Modulation sources
+- `projects/rigel-synth/crates/plugin/src/` - Plugin wrapper
+- `projects/rigel-synth/crates/cli/src/` - CLI tool
+- `projects/wtgen/src/wtgen/` - Python package
+
+## Cross-Platform Notes
+
+macOS/Linux cross-compilation is not supported due to GUI library complexities. Use CI for cross-platform builds. Windows cross-compilation works via xwin.

@@ -1,7 +1,7 @@
 # Implementation Plan: SY-Style Envelope Modulation Source
 
 **Branch**: `005-sy-envelope` | **Date**: 2026-01-10 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/005-sy-envelope/spec.md`
+**Input**: Feature specification from `.specify/specs/005-sy-envelope/spec.md`
 **Linear Issue**: [NEW-5](https://linear.app/new-atlantis/issue/NEW-5/create-sy-style-envelope-modulation-source)
 
 ## Summary
@@ -14,7 +14,7 @@ Implement a Yamaha SY99-style multi-segment envelope generator that operates in 
 **Primary Dependencies**:
 - `rigel-timing` - Timebase for sample-accurate timing, ControlRateClock
 - `rigel-math` - SIMD-optimized math (exp, pow, log) for dB↔linear conversion
-- `rigel-simd` - Block processing, denormal protection
+- `rigel-simd-dispatch` - Block processing, denormal protection, runtime SIMD backend selection
 - `libm` - Fallback for precision-critical scalar math only
 
 **Storage**: N/A (pure computational library, no persistence)
@@ -97,7 +97,7 @@ Implement a Yamaha SY99-style multi-segment envelope generator that operates in 
 ### Documentation (this feature)
 
 ```text
-specs/005-sy-envelope/
+.specify/specs/005-sy-envelope/
 ├── plan.md              # This file
 ├── research.md          # Phase 0: MSFA algorithm research
 ├── data-model.md        # Phase 1: Entity definitions

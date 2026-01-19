@@ -1,6 +1,6 @@
 # Tasks: SY-Style Envelope Modulation Source
 
-**Input**: Design documents from `/specs/005-sy-envelope/`
+**Input**: Design documents from `.specify/specs/005-sy-envelope/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/envelope-api.rs
 
 **Tests**: Included per spec requirement ("fully tested and benchmarked")
@@ -26,11 +26,11 @@
 
 **Purpose**: Create envelope module structure within rigel-modulation crate
 
-- [ ] T001 Create envelope module directory structure at `projects/rigel-synth/crates/modulation/src/envelope/`
-- [ ] T002 Create module root with re-exports in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T003 [P] Add envelope module to crate root in `projects/rigel-synth/crates/modulation/src/lib.rs`
-- [ ] T004 [P] Create test file in `projects/rigel-synth/crates/modulation/tests/envelope_tests.rs`
-- [ ] T005 [P] Create benchmark file in `projects/rigel-synth/crates/modulation/benches/envelope_bench.rs`
+- [x] T001 Create envelope module directory structure at `projects/rigel-synth/crates/modulation/src/envelope/`
+- [x] T002 Create module root with re-exports in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T003 [P] Add envelope module to crate root in `projects/rigel-synth/crates/modulation/src/lib.rs`
+- [x] T004 [P] Create test file in `projects/rigel-synth/crates/modulation/tests/envelope_tests.rs`
+- [x] T005 [P] Create benchmark file in `projects/rigel-synth/crates/modulation/benches/envelope_bench.rs`
 
 ---
 
@@ -40,15 +40,15 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 Implement EnvelopePhase enum in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
-- [ ] T007 [P] Implement Segment struct in `projects/rigel-synth/crates/modulation/src/envelope/segment.rs`
-- [ ] T008 [P] Implement LoopConfig struct in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
-- [ ] T009 Implement EnvelopeConfig with const generics in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
-- [ ] T010 Implement EnvelopeLevel type (i16/Q8) and constants in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
-- [ ] T011 [P] Implement LEVEL_LUT lookup table in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T012 [P] Implement STATICS timing table in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T013 Implement EnvelopeState struct with i16 fields in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
-- [ ] T014 Implement type aliases (FmEnvelope, AwmEnvelope, SevenSegEnvelope) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T006 Implement EnvelopePhase enum in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
+- [x] T007 [P] Implement Segment struct in `projects/rigel-synth/crates/modulation/src/envelope/segment.rs`
+- [x] T008 [P] Implement LoopConfig struct in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
+- [x] T009 Implement EnvelopeConfig with const generics in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
+- [x] T010 Implement EnvelopeLevel type (i16/Q8) and constants in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
+- [x] T011 [P] Implement LEVEL_LUT lookup table in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T012 [P] Implement STATICS timing table in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T013 Implement EnvelopeState struct with i16 fields in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
+- [x] T014 Implement type aliases (FmEnvelope, AwmEnvelope, SevenSegEnvelope) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
 
 **Checkpoint**: Foundation ready - core types available for all user stories
 
@@ -62,22 +62,22 @@
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] Unit test for note_on triggers attack in `tests/envelope_tests.rs`
-- [ ] T016 [P] [US1] Unit test for note_off triggers release in `tests/envelope_tests.rs`
-- [ ] T017 [P] [US1] Unit test for output range 0.0-1.0 in `tests/envelope_tests.rs`
-- [ ] T018 [P] [US1] Unit test for segment transitions in `tests/envelope_tests.rs`
+- [x] T015 [P] [US1] Unit test for note_on triggers attack in `tests/envelope_tests.rs`
+- [x] T016 [P] [US1] Unit test for note_off triggers release in `tests/envelope_tests.rs`
+- [x] T017 [P] [US1] Unit test for output range 0.0-1.0 in `tests/envelope_tests.rs`
+- [x] T018 [P] [US1] Unit test for segment transitions in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Implement Envelope struct with config and state in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T020 [US1] Implement Envelope::new() and with_config() constructors in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T021 [US1] Implement note_on() method (start attack sequence) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T022 [US1] Implement note_off() method (transition to release) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T023 [US1] Implement level_to_linear() conversion using rigel_math::fast_exp2 in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T024 [US1] Implement process() method (advance one sample, return linear amplitude) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T025 [US1] Implement value() method (get current level without advancing) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T026 [US1] Implement advance_segment() helper for segment transitions in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T027 [US1] Implement reset() method in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T019 [US1] Implement Envelope struct with config and state in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T020 [US1] Implement Envelope::new() and with_config() constructors in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T021 [US1] Implement note_on() method (start attack sequence) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T022 [US1] Implement note_off() method (transition to release) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T023 [US1] Implement level_to_linear() conversion using rigel_math::fast_exp2 in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T024 [US1] Implement process() method (advance one sample, return linear amplitude) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T025 [US1] Implement value() method (get current level without advancing) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T026 [US1] Implement advance_segment() helper for segment transitions in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T027 [US1] Implement reset() method in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
 
 **Checkpoint**: Basic envelope responds to note events with attack/release behavior
 
@@ -91,16 +91,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T028 [P] [US2] Unit test for rate scaling at MIDI 60 (baseline) in `tests/envelope_tests.rs`
-- [ ] T029 [P] [US2] Unit test for rate scaling at MIDI 84 (faster) in `tests/envelope_tests.rs`
-- [ ] T030 [P] [US2] Unit test for rate scaling disabled (sensitivity=0) in `tests/envelope_tests.rs`
+- [x] T028 [P] [US2] Unit test for rate scaling at MIDI 60 (baseline) in `tests/envelope_tests.rs`
+- [x] T029 [P] [US2] Unit test for rate scaling at MIDI 84 (faster) in `tests/envelope_tests.rs`
+- [x] T030 [P] [US2] Unit test for rate scaling disabled (sensitivity=0) in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 2
 
-- [ ] T031 [US2] Implement rate_to_qrate() formula in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T032 [US2] Implement scale_rate() for MIDI note adjustment in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T033 [US2] Integrate rate scaling into note_on() with midi_note parameter in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T034 [US2] Cache midi_note in EnvelopeState for segment transitions in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
+- [x] T031 [US2] Implement rate_to_qrate() formula in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T032 [US2] Implement scale_rate() for MIDI note adjustment in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T033 [US2] Integrate rate scaling into note_on() with midi_note parameter in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T034 [US2] Cache midi_note in EnvelopeState for segment transitions in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
 
 **Checkpoint**: Envelope timing varies naturally across keyboard range
 
@@ -114,18 +114,18 @@
 
 ### Tests for User Story 3
 
-- [ ] T035 [P] [US3] Unit test for MSFA rate formula (rate * 41 >> 6) in `tests/envelope_tests.rs`
-- [ ] T036 [P] [US3] Unit test for distance-dependent timing in `tests/envelope_tests.rs`
-- [ ] T037 [P] [US3] Unit test for rate 99 near-instantaneous transition in `tests/envelope_tests.rs`
-- [ ] T038 [P] [US3] Tolerance test against MSFA reference (0.1dB) in `tests/envelope_tests.rs`
+- [x] T035 [P] [US3] Unit test for MSFA rate formula (rate * 41 >> 6) in `tests/envelope_tests.rs`
+- [x] T036 [P] [US3] Unit test for distance-dependent timing in `tests/envelope_tests.rs`
+- [x] T037 [P] [US3] Unit test for rate 99 near-instantaneous transition in `tests/envelope_tests.rs`
+- [x] T038 [P] [US3] Tolerance test against MSFA reference (0.1dB) in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 3
 
-- [ ] T039 [US3] Implement calculate_increment_q8() from qRate in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T040 [US3] Implement scale_output_level() with LEVEL_LUT in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T041 [US3] Implement decay behavior (linear decrease in log domain) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T042 [US3] Implement segment target level calculation in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T043 [US3] Implement same-level transition timing using STATICS table in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T039 [US3] Implement calculate_increment_q8() from qRate in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T040 [US3] Implement scale_output_level() with LEVEL_LUT in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T041 [US3] Implement decay behavior (linear decrease in log domain) in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T042 [US3] Implement segment target level calculation in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T043 [US3] Implement same-level transition timing using STATICS table in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
 
 **Checkpoint**: Envelope curves match MSFA reference within tolerance
 
@@ -139,24 +139,24 @@
 
 ### Tests for User Story 7
 
-- [ ] T044 [P] [US7] Unit test for zero allocations during processing in `tests/envelope_tests.rs`
-- [ ] T045 [P] [US7] Unit test for Copy/Clone trait bounds in `tests/envelope_tests.rs`
+- [x] T044 [P] [US7] Unit test for zero allocations during processing in `tests/envelope_tests.rs`
+- [x] T045 [P] [US7] Unit test for Copy/Clone trait bounds in `tests/envelope_tests.rs`
 
 ### Benchmarks for User Story 7
 
-- [ ] T046 [P] [US7] Criterion benchmark for single envelope processing in `benches/envelope_bench.rs`
-- [ ] T047 [P] [US7] Criterion benchmark for 1536 envelopes x 64 samples in `benches/envelope_bench.rs`
-- [ ] T048 [P] [US7] iai-callgrind benchmark for instruction count regression in `benches/envelope_bench.rs`
+- [x] T046 [P] [US7] Criterion benchmark for single envelope processing in `benches/envelope_bench.rs`
+- [x] T047 [P] [US7] Criterion benchmark for 1536 envelopes x 64 samples in `benches/envelope_bench.rs`
+- [x] T048 [P] [US7] iai-callgrind benchmark for instruction count regression in `benches/envelope_bench.rs`
 
 ### Implementation for User Story 7
 
-- [ ] T049 [US7] Implement process_block() method for batch sample processing in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T050 [US7] Create EnvelopeBatch struct in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
-- [ ] T051 [US7] Implement EnvelopeBatch::new() and with_config() in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
-- [ ] T052 [US7] Implement EnvelopeBatch::process() with SIMD acceleration in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
-- [ ] T053 [US7] Implement levels_to_linear_simd() using rigel_math in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
-- [ ] T054 [US7] Implement EnvelopeBatch::process_block() in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
-- [ ] T055 [US7] Verify #[derive(Copy, Clone)] on Envelope and EnvelopeState in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T049 [US7] Implement process_block() method for batch sample processing in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T050 [US7] Create EnvelopeBatch struct in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
+- [x] T051 [US7] Implement EnvelopeBatch::new() and with_config() in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
+- [x] T052 [US7] Implement EnvelopeBatch::process() with SIMD acceleration in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
+- [x] T053 [US7] Implement levels_to_linear_simd() using rigel_math in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
+- [x] T054 [US7] Implement EnvelopeBatch::process_block() in `projects/rigel-synth/crates/modulation/src/envelope/batch.rs`
+- [x] T055 [US7] Verify #[derive(Copy, Clone)] on Envelope and EnvelopeState in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
 
 **Checkpoint**: Performance targets met, zero allocations verified
 
@@ -170,14 +170,14 @@
 
 ### Tests for User Story 4
 
-- [ ] T056 [P] [US4] Unit test for immediate jump to JUMP_TARGET_Q8 on attack in `tests/envelope_tests.rs`
-- [ ] T057 [P] [US4] Unit test for smooth approach after jump in `tests/envelope_tests.rs`
+- [x] T056 [P] [US4] Unit test for immediate jump to JUMP_TARGET_Q8 on attack in `tests/envelope_tests.rs`
+- [x] T057 [P] [US4] Unit test for smooth approach after jump in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 4
 
-- [ ] T058 [US4] Add JUMP_TARGET_Q8 constant (1716) in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
-- [ ] T059 [US4] Implement attack_sample() with instant jump behavior in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T060 [US4] Implement exponential rise toward target after jump in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T058 [US4] Add JUMP_TARGET_Q8 constant (1716) in `projects/rigel-synth/crates/modulation/src/envelope/rates.rs`
+- [x] T059 [US4] Implement attack_sample() with instant jump behavior in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T060 [US4] Implement exponential rise toward target after jump in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
 
 **Checkpoint**: Attack has characteristic FM "punch"
 
@@ -191,15 +191,15 @@
 
 ### Tests for User Story 5
 
-- [ ] T061 [P] [US5] Unit test for delay countdown in `tests/envelope_tests.rs`
-- [ ] T062 [P] [US5] Unit test for note_off during delay aborts to release in `tests/envelope_tests.rs`
+- [x] T061 [P] [US5] Unit test for delay countdown in `tests/envelope_tests.rs`
+- [x] T062 [P] [US5] Unit test for note_off during delay aborts to release in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 5
 
-- [ ] T063 [US5] Add delay_samples field to EnvelopeConfig in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
-- [ ] T064 [US5] Add delay_remaining field to EnvelopeState in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
-- [ ] T065 [US5] Implement Delay phase handling in process() in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T066 [US5] Handle note_off during Delay phase in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T063 [US5] Add delay_samples field to EnvelopeConfig in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
+- [x] T064 [US5] Add delay_remaining field to EnvelopeState in `projects/rigel-synth/crates/modulation/src/envelope/state.rs`
+- [x] T065 [US5] Implement Delay phase handling in process() in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T066 [US5] Handle note_off during Delay phase in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
 
 **Checkpoint**: Delayed envelope start works for evolving sounds
 
@@ -213,15 +213,15 @@
 
 ### Tests for User Story 6
 
-- [ ] T067 [P] [US6] Unit test for loop from segment 3 to 5 in `tests/envelope_tests.rs`
-- [ ] T068 [P] [US6] Unit test for note_off exits loop in `tests/envelope_tests.rs`
-- [ ] T069 [P] [US6] Unit test for invalid loop boundaries fallback in `tests/envelope_tests.rs`
+- [x] T067 [P] [US6] Unit test for loop from segment 3 to 5 in `tests/envelope_tests.rs`
+- [x] T068 [P] [US6] Unit test for note_off exits loop in `tests/envelope_tests.rs`
+- [x] T069 [P] [US6] Unit test for invalid loop boundaries fallback in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 6
 
-- [ ] T070 [US6] Add LoopConfig validation methods in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
-- [ ] T071 [US6] Implement loop detection in advance_segment() in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T072 [US6] Implement loop exit on note_off in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T070 [US6] Add LoopConfig validation methods in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
+- [x] T071 [US6] Implement loop detection in advance_segment() in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T072 [US6] Implement loop exit on note_off in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
 
 **Checkpoint**: Looping envelopes create rhythmic/evolving textures
 
@@ -235,15 +235,15 @@
 
 ### Tests for User Story 8
 
-- [ ] T073 [P] [US8] Unit test for FmEnvelope (6+2 segments) in `tests/envelope_tests.rs`
-- [ ] T074 [P] [US8] Unit test for SevenSegEnvelope (5+2 segments) in `tests/envelope_tests.rs`
-- [ ] T075 [P] [US8] Unit test for AwmEnvelope (5+5 segments) in `tests/envelope_tests.rs`
+- [x] T073 [P] [US8] Unit test for FmEnvelope (6+2 segments) in `tests/envelope_tests.rs`
+- [x] T074 [P] [US8] Unit test for SevenSegEnvelope (5+2 segments) in `tests/envelope_tests.rs`
+- [x] T075 [P] [US8] Unit test for AwmEnvelope (5+5 segments) in `tests/envelope_tests.rs`
 
 ### Implementation for User Story 8
 
-- [ ] T076 [US8] Verify const generics work for all variants in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T077 [US8] Add FmEnvelopeConfig, AwmEnvelopeConfig, SevenSegEnvelopeConfig type aliases in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
-- [ ] T078 [US8] Add variant-specific default configurations in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
+- [x] T076 [US8] Verify const generics work for all variants in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T077 [US8] Add FmEnvelopeConfig, AwmEnvelopeConfig, SevenSegEnvelopeConfig type aliases in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
+- [x] T078 [US8] Add variant-specific default configurations in `projects/rigel-synth/crates/modulation/src/envelope/config.rs`
 
 **Checkpoint**: All envelope variants work correctly
 
@@ -253,12 +253,12 @@
 
 **Purpose**: Final integration, documentation, and cross-cutting concerns
 
-- [ ] T079 Implement ModulationSource trait for Envelope in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
-- [ ] T080 [P] Add inline documentation with examples in all public items
-- [ ] T081 [P] Verify no_std compatibility in `projects/rigel-synth/crates/modulation/Cargo.toml`
-- [ ] T082 Run full benchmark suite and document results in `specs/005-sy-envelope/benchmark-results.md`
-- [ ] T083 Validate quickstart.md examples compile and run
-- [ ] T084 Run `cargo:test` and `cargo:lint` for final validation
+- [x] T079 Implement ModulationSource trait for Envelope in `projects/rigel-synth/crates/modulation/src/envelope/mod.rs`
+- [x] T080 [P] Add inline documentation with examples in all public items
+- [x] T081 [P] Verify no_std compatibility in `projects/rigel-synth/crates/modulation/Cargo.toml`
+- [x] T082 Run full benchmark suite and document results in `.specify/specs/005-sy-envelope/benchmark-results.md`
+- [x] T083 Validate quickstart.md examples compile and run
+- [x] T084 Run `cargo:test` and `cargo:lint` for final validation
 
 ---
 

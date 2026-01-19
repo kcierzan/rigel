@@ -15,7 +15,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  GCC_SPECS: ""
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
 
@@ -61,17 +60,10 @@ jobs:
             libxcb-dri2-0-dev \
             mold
 
-      - name: Workaround GCC specs directory
-        run: test -d specs && mv specs specs.bak || true
-
       - name: Build plugin (Linux)
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Create archive
         run: |
@@ -121,15 +113,8 @@ jobs:
       - name: Install xwin
         run: cargo install xwin --locked
 
-      - name: Workaround GCC specs directory
-        run: test -d specs && mv specs specs.bak || true
-
       - name: Build plugin (Windows)
         run: ./ci/scripts/build-win.sh
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Create archive
         run: |
