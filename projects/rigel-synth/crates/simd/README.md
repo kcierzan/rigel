@@ -49,4 +49,4 @@ fn apply_gain(input: &Block64, output: &mut Block64, gain: f32) {
 
 ## License
 
-MIT OR Apache-2.0
+GNU GPLv3

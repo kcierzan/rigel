@@ -1,12 +1,13 @@
 [package]
 name = "rigel-math"
-version = "0.1.0"
-edition = "2021"
-authors = ["Kyle Cierzan <kylecierzan@gmail.com>"]
-license = "MIT OR Apache-2.0"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
 description = "Trait-based SIMD abstraction library for real-time audio DSP"
-repository = "https://github.com/kcierzan/rigel"
-homepage = "https://github.com/kcierzan/rigel"
 documentation = "https://docs.rs/rigel-math"
 readme = "README.md"
 keywords = ["audio", "dsp", "simd", "synthesizer", "real-time"]

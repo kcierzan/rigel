@@ -16,11 +16,11 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kyle Cierzan <kcierzan@gmail.com>"]
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-or-later"
 repository = "https://github.com/kcierzan/rigel"
 homepage = "https://github.com/kcierzan/rigel"
-description = "Advanced wavetable synthesizer with separate DSP core"
-rust-version = "1.80"
+description = "A vintage-digital emulating music synthesizer"
+rust-version = "1.83"
 
 [workspace.dependencies]
 # Math (no-std)
