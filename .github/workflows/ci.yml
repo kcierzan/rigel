@@ -17,8 +17,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Workaround: Clear GCC_SPECS to prevent specs directory conflict
-  GCC_SPECS: ""
   # Enable sccache for faster incremental builds
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
@@ -83,15 +81,8 @@ jobs:
             libxcb-icccm4-dev \
             libxcb-dri2-0-dev
 
-      - name: Workaround GCC specs directory
-        run: test -d specs && mv specs specs.bak || true
-
       - name: Run clippy
         run: cargo clippy --locked --all-targets -- -D warnings
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
 
   rust-tests:
     name: Rust Tests
@@ -134,9 +125,6 @@ jobs:
             libxcb-icccm4-dev \
             libxcb-dri2-0-dev
 
-      - name: Workaround GCC specs directory
-        run: test -d specs && mv specs specs.bak || true
-
       - name: Fetch dependencies
         run: cargo fetch --locked
 
@@ -147,10 +135,6 @@ jobs:
         env:
           RUSTFLAGS: "-C target-feature=+avx2,+fma"
         run: cargo test --locked --features avx2
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
 
   # ============================================================================
   # Python Pipeline (wtgen)
@@ -260,9 +244,6 @@ jobs:
             libxcb-dri2-0-dev \
             mold
 
-      - name: Workaround GCC specs directory
-        run: test -d specs && mv specs specs.bak || true
-
       - name: Fetch dependencies
         run: cargo fetch --locked
 
@@ -271,10 +252,6 @@ jobs:
           # Use mold linker for faster linking
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: cargo xtask bundle rigel-plugin --release --target x86_64-unknown-linux-gnu
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -319,18 +296,11 @@ jobs:
       - name: Install xwin
         run: cargo install xwin --locked
 
-      - name: Workaround GCC specs directory
-        run: test -d specs && mv specs specs.bak || true
-
       - name: Fetch dependencies
         run: cargo fetch --locked
 
       - name: Build plugin (Windows)
         run: ./ci/scripts/build-win.sh
-
-      - name: Restore specs directory
-        if: always()
-        run: test -d specs.bak && mv specs.bak specs || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

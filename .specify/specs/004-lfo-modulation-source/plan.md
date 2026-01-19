@@ -2,7 +2,7 @@
 
 **Branch**: `004-lfo-modulation-source` | **Date**: 2025-12-14 | **Spec**: [spec.md](./spec.md)
 **Linear Issue**: [NEW-6](https://linear.app/new-atlantis/issue/NEW-6/create-lfo-modulation-source)
-**Input**: Feature specification from `/specs/004-lfo-modulation-source/spec.md`
+**Input**: Feature specification from `.specify/specs/004-lfo-modulation-source/spec.md`
 
 ## Summary
 
@@ -41,7 +41,7 @@ Create a new `rigel-modulation` crate containing an LFO implementation with 7 wa
 ### Documentation (this feature)
 
 ```text
-specs/004-lfo-modulation-source/
+.specify/specs/004-lfo-modulation-source/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

@@ -1,6 +1,6 @@
 # Tasks: LFO Modulation Source
 
-**Input**: Design documents from `/specs/004-lfo-modulation-source/`
+**Input**: Design documents from `.specify/specs/004-lfo-modulation-source/`
 **Prerequisites**: plan.md (required), spec.md (required), research.md, data-model.md, contracts/
 
 **Tests**: Unit tests and benchmarks will be included in appropriate phases.

@@ -2,7 +2,8 @@
 
 **Feature Branch**: `005-sy-envelope`
 **Created**: 2026-01-10
-**Status**: Draft
+**Status**: Complete
+**Completed**: 2026-01-19
 **Input**: User description: "Implement a Yamaha SY-style envelope modulation source that meets the requirements described in the Linear NEW-5 task. The envelope should closely follow the functionality in MSFA and should exhibit the same rate scaling and instantaneous dB jump during initial attack. The implementation should serve as the basis for variants like the full 7-segment envelope as well as the 5+5 envelope in the AWM section. We should use rigel-math and SIMD functionality to make these envelopes as performant as possible as there will be at least 12 per voice x polyphony x unison. They should be fully tested and benchmarked."
 
 ## Clarifications
