@@ -69,6 +69,8 @@ in
       libsndfile
       ruff # Provide a native binary so linting works on NixOS without patching wheels.
       basedpyright
+      # Protocol Buffers compiler for wavetable format module
+      protobuf
     ]
     ++ lib.optionals isLinux [
       gcc

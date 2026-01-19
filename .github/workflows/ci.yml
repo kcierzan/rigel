@@ -79,7 +79,8 @@ jobs:
             libxcb-shape0-dev \
             libxcb-xfixes0-dev \
             libxcb-icccm4-dev \
-            libxcb-dri2-0-dev
+            libxcb-dri2-0-dev \
+            protobuf-compiler
 
       - name: Run clippy
         run: cargo clippy --locked --all-targets -- -D warnings
@@ -123,7 +124,8 @@ jobs:
             libxcb-shape0-dev \
             libxcb-xfixes0-dev \
             libxcb-icccm4-dev \
-            libxcb-dri2-0-dev
+            libxcb-dri2-0-dev \
+            protobuf-compiler
 
       - name: Fetch dependencies
         run: cargo fetch --locked
@@ -242,6 +244,7 @@ jobs:
             libxcb-xfixes0-dev \
             libxcb-icccm4-dev \
             libxcb-dri2-0-dev \
+            protobuf-compiler \
             mold
 
       - name: Fetch dependencies
