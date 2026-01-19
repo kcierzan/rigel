@@ -20,7 +20,7 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/kcierzan/rigel"
 homepage = "https://github.com/kcierzan/rigel"
 description = "A vintage-digital emulating music synthesizer"
-rust-version = "1.80"
+rust-version = "1.83"
 
 [workspace.dependencies]
 # Math (no-std)
