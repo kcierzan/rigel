@@ -16,6 +16,7 @@ path = "src/main.rs"
 [dependencies]
 # Internal dependencies
 rigel-dsp = { path = "../dsp" }
+wavetable-io = { path = "../wavetable-io" }
 
 # CLI framework
 clap.workspace = true
@@ -25,3 +26,10 @@ hound.workspace = true
 
 # Error handling
 anyhow.workspace = true
+
+[dev-dependencies]
+# Testing utilities
+tempfile = "3.15"
+
+# Re-use wavetable-io for test fixture creation
+wavetable-io = { path = "../wavetable-io" }

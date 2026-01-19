@@ -3,6 +3,8 @@
 //! Command-line interface for testing the Rigel wavetable synthesizer.
 //! Generates audio files for testing and development purposes.
 
+mod commands;
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use hound::{SampleFormat, WavSpec, WavWriter};
@@ -21,6 +23,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Wavetable file inspection and validation
+    #[command(subcommand)]
+    Wavetable(commands::wavetable::WavetableCommands),
+
     /// Generate a single note
     Note {
         /// Output file path
@@ -198,6 +204,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Wavetable(cmd) => commands::wavetable::execute(cmd),
+
         Commands::Note {
             output,
             note,
