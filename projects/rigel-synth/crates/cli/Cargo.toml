@@ -5,6 +5,7 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 description = "CLI tool for generating test audio with Rigel synthesizer"
 rust-version.workspace = true
 

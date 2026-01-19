@@ -50,55 +50,12 @@ bench:instruments
 
 ### Platform-Specific Setup
 
-#### macOS
-iai-callgrind requires Valgrind, which must be installed via Homebrew:
-```bash
-brew install valgrind
-```
-
-Note: Some Valgrind features may require disabling System Integrity Protection (SIP), but basic benchmarking works without this.
-
 #### Linux
 All tools are provided by devenv.nix automatically. For hardware performance counters with perf:
 ```bash
 # May need to adjust perf_event_paranoid
 sudo sysctl -w kernel.perf_event_paranoid=-1
 ```
-
-## Benchmark Suite Coverage
-
-### Utility Functions (`utility_functions` group)
-- `midi_to_freq` - MIDI note to frequency conversion (uses `libm::powf`)
-- `lerp` - Linear interpolation
-- `clamp` - Value clamping (in range, below min, above max)
-- `soft_clip` - Soft clipping with exponential curves
-
-### Oscillator (`oscillator` group)
-- Single sample generation
-- Buffer processing (100 samples, 44100 samples)
-- Frequency changes and combined operations
-
-### Envelope (`envelope` group)
-- Per-stage processing (Attack, Decay, Sustain, Release)
-- Full ADSR cycles
-- Percussive envelopes (fast attack/release)
-- Pad envelopes (slow attack/release)
-
-### SynthEngine (`synth_engine*` groups)
-- Single sample processing
-- Buffer processing (64, 128, 256, 512, 1024, 2048 samples)
-- Note lifecycle (note_on → sustain → note_off)
-- Rapid retriggering
-- Pitch modulation
-- Sustained vs percussive notes
-
-### Throughput (`throughput` group)
-- Different sample rates (44.1kHz, 48kHz, 96kHz)
-- Samples per second measurements
-
-### CPU Usage Validation (`cpu_usage_validation` group)
-- Single voice processing time
-- Polyphonic extrapolation (1, 4, 8, 16 voices)
 
 ## Interpreting Results
 
@@ -402,11 +359,6 @@ xcode-select --install
 ```
 
 The `instruments` binary is part of Apple's development tools and is required for profiling.
-
-### "Valgrind not found" (macOS)
-```bash
-brew install valgrind
-```
 
 ### "Permission denied" when using perf (Linux)
 ```bash

@@ -18,13 +18,13 @@ The architecture prioritizes real-time safety with a `no_std` DSP core that avoi
 
 The project also features a Python environment at `projects/wtgen/` for DSP experimentation,
 prototyping, and research. `wtgen` is under development but can be used to generate
-`.npz` and `.wav` format wavetables that Rigel will soon support.
+`.wav` format wavetables that Rigel will soon support.
 
 ## Features
 
 ### Current
 
-- **Monophonic synthesis** with sine wave oscillators
+- **Monophonic synthesis** with saw wave oscillators
 - **ADSR envelope generator** with configurable attack, decay, sustain, and release
 - **Pitch modulation** with semitone precision
 - **CLI audio generation** for testing and development
@@ -39,7 +39,7 @@ prototyping, and research. `wtgen` is under development but can be used to gener
 - LFO modulation system
 - Effects processing
 - Plugin interface (VST3/CLAP)
-- Iced-based GUI editor
+- Vizia-based GUI editor
 
 ## Quick Start
 
@@ -189,29 +189,6 @@ A NIH-plug based headless audio plugin providing:
 
 ## Development
 
-### Project Structure
-
-The workspace manifest (`Cargo.toml`) stays at the repository root so shared
-tooling can address every crate, while the code lives underneath this directory.
-
-```
-projects/rigel-synth/
-├── crates/
-│   ├── dsp/                # No-std DSP core
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       └── lib.rs      # All DSP code in single file
-│   ├── cli/                # Command-line tool
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       └── main.rs
-│   └── plugin/             # Plugin
-│       ├── Cargo.toml
-│       └── src/
-├── README.md
-└── TODO.md (if present)
-```
-
 ### Development Environment
 
 - `direnv` automatically enters the dev shell for this repo; without it, run `nix develop` (macOS/Linux) or `devenv shell`.
@@ -251,20 +228,6 @@ Rigel's `flake.nix` simply re-exports the shell described in `devenv.nix`, so ke
 - For partial rollbacks, you can selectively keep either lock file (e.g., keep `flake.lock` but revert `devenv.lock`) with the same command.
 - Once things look good again, rerun the sanity-check commands above and commit both the locks and any related changes to `devenv.nix`/`flake.nix`.
 
-### Building for Different Targets
-
-The `no_std` DSP core can be built for various targets:
-
-```bash
-# Standard desktop targets
-cargo build --target x86_64-apple-darwin     # macOS Intel
-cargo build --target aarch64-apple-darwin    # macOS Apple Silicon
-cargo build --target x86_64-pc-windows-msvc  # Windows
-
-# Embedded targets (DSP core only)
-cargo build -p rigel-dsp --target thumbv7em-none-eabihf
-```
-
 ### Testing
 
 ```bash
@@ -301,10 +264,12 @@ Typical performance on modern hardware:
 
 ## License
 
-This project is licensed under the MIT OR Apache-2.0 license.
+- This project is licensed under the GNU GPLv3 license
+
 
 ## Acknowledgments
 
 - [NIH-plug](https://github.com/robbert-vdh/nih-plug) for the plugin framework
 - [libm](https://github.com/rust-lang/libm) for no-std mathematical functions
+- [music-syntheizer-for-android](https://github.com/google/music-synthesizer-for-android) for DX implementation reference
 - The Rust audio community for inspiration and guidance
