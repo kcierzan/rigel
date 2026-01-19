@@ -14,6 +14,7 @@ from wtgen.format.proto import wavetable_pb2 as pb
 from wtgen.format.riff import (
     WAVE_FORMAT_IEEE_FLOAT,
     WAVE_FORMAT_PCM,
+    RiffError,
     extract_wtbl_chunk,
     read_data_chunk,
     read_fmt_chunk,
@@ -137,8 +138,6 @@ def load_wavetable_wav(
     try:
         file_size = path.stat().st_size
     except FileNotFoundError as e:
-        from wtgen.format.riff import RiffError
-
         raise RiffError(f"File not found: {path}") from e
     if file_size > MAX_FILE_SIZE_BYTES:
         raise ValidationError(

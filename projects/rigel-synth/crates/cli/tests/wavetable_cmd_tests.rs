@@ -115,7 +115,10 @@ fn test_inspect_command_basic() {
         stdout.contains("HIGH_RESOLUTION"),
         "Output should contain type"
     );
-    assert!(stdout.contains("2048"), "Output should contain frame length");
+    assert!(
+        stdout.contains("2048"),
+        "Output should contain frame length"
+    );
     assert!(stdout.contains("64"), "Output should contain num frames");
 }
 
@@ -254,7 +257,10 @@ fn test_inspect_nonexistent_file() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(!output.status.success(), "Command should fail for non-existent file");
+    assert!(
+        !output.status.success(),
+        "Command should fail for non-existent file"
+    );
 }
 
 /// Test the validate command with a non-existent file.
@@ -271,7 +277,10 @@ fn test_validate_nonexistent_file() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(!output.status.success(), "Command should fail for non-existent file");
+    assert!(
+        !output.status.success(),
+        "Command should fail for non-existent file"
+    );
 }
 
 /// Test the inspect command with all wavetable types.

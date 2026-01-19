@@ -5,15 +5,14 @@ These tests verify that the wavetable reader properly rejects:
 - FR-030b: Files exceeding 100MB in size
 """
 
-import struct
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from wtgen.format import WavetableType, load_wavetable_wav, save_wavetable_wav
-from wtgen.format.riff import build_wav_with_wtbl
 from wtgen.format.proto import wavetable_pb2 as pb
+from wtgen.format.riff import build_wav_with_wtbl
 from wtgen.format.standard.reader import MAX_FILE_SIZE_BYTES
 from wtgen.format.validation import ValidationError
 
@@ -74,7 +73,8 @@ class TestNaNInfinityRejection:
         with pytest.raises(ValidationError) as exc_info:
             load_wavetable_wav(output_path)
 
-        assert "non-finite" in str(exc_info.value).lower() or "infinity" in str(exc_info.value).lower()
+        err_msg = str(exc_info.value).lower()
+        assert "non-finite" in err_msg or "infinity" in err_msg
         assert "FR-028" in str(exc_info.value)
 
     def test_rejects_negative_infinity(self, tmp_path: Path) -> None:
@@ -100,7 +100,8 @@ class TestNaNInfinityRejection:
         with pytest.raises(ValidationError) as exc_info:
             load_wavetable_wav(output_path)
 
-        assert "non-finite" in str(exc_info.value).lower() or "infinity" in str(exc_info.value).lower()
+        err_msg = str(exc_info.value).lower()
+        assert "non-finite" in err_msg or "infinity" in err_msg
         assert "FR-028" in str(exc_info.value)
 
     def test_rejects_mixed_nan_and_inf(self, tmp_path: Path) -> None:
@@ -131,7 +132,8 @@ class TestNaNInfinityRejection:
     def test_accepts_valid_samples(self, tmp_path: Path) -> None:
         """Test that valid finite samples are accepted."""
         # Normal values including edge cases
-        mip0 = np.array([[0.0, 0.5, -0.5, 1.0, -1.0, 0.999999, -0.999999, 0.000001]], dtype=np.float32)
+        values = [0.0, 0.5, -0.5, 1.0, -1.0, 0.999999, -0.999999, 0.000001]
+        mip0 = np.array([values], dtype=np.float32)
 
         output_path = tmp_path / "test_valid.wav"
         save_wavetable_wav(

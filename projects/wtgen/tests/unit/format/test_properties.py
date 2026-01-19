@@ -6,9 +6,10 @@ These tests use property-based testing to verify that:
 3. Format invariants: file structure maintains required properties
 """
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -22,9 +23,10 @@ from wtgen.format.types import (
     HighResolutionMetadata,
     InterpolationHint,
     NormalizationMethod,
-    PcmSampleMetadata,
-    VintageEmulationMetadata,
 )
+
+if TYPE_CHECKING:
+    pass
 
 
 # Custom strategies for wavetable data generation
@@ -136,7 +138,10 @@ class TestRoundTripPreservation:
     )
     @given(mipmaps=simple_mipmap_strategy(), wt_type=wavetable_type_strategy())
     def test_mipmap_data_preserved(
-        self, tmp_path_factory: "pytest.TempPathFactory", mipmaps: list[np.ndarray], wt_type: WavetableType
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        mipmaps: list[np.ndarray],
+        wt_type: WavetableType,
     ) -> None:
         """Mipmap audio data should survive save/load cycle."""
         tmp_path = tmp_path_factory.mktemp("roundtrip")
@@ -151,7 +156,9 @@ class TestRoundTripPreservation:
         loaded = load_wavetable_wav(output_path)
 
         assert len(loaded.mipmaps) == len(mipmaps)
-        for i, (original, loaded_mip) in enumerate(zip(mipmaps, loaded.mipmaps)):
+        for i, (original, loaded_mip) in enumerate(
+            zip(mipmaps, loaded.mipmaps, strict=True)
+        ):
             np.testing.assert_array_almost_equal(
                 original, loaded_mip, decimal=5, err_msg=f"Mipmap {i} data mismatch"
             )
@@ -200,8 +207,14 @@ class TestRoundTripPreservation:
         deadline=None,
     )
     @given(
-        name=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"])),
-        author=st.text(min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"])),
+        name=st.text(
+            min_size=1, max_size=50,
+            alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"]),
+        ),
+        author=st.text(
+            min_size=1, max_size=50,
+            alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"]),
+        ),
     )
     def test_optional_string_metadata_preserved(
         self, tmp_path_factory: "pytest.TempPathFactory", name: str, author: str
@@ -237,7 +250,10 @@ class TestTypeSpecificMetadata:
     @given(
         bit_depth=st.sampled_from([8, 12, 16]),
         sample_rate=st.sampled_from([31250, 44100, 48000]),
-        source_hardware=st.text(min_size=1, max_size=30, alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"])),
+        source_hardware=st.text(
+            min_size=1, max_size=30,
+            alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"]),
+        ),
     )
     def test_classic_digital_metadata_preserved(
         self,
@@ -417,7 +433,3 @@ class TestFormatInvariants:
             f"total_samples() returned {loaded.total_samples()}, "
             f"but actual total is {actual_total}"
         )
-
-
-# Import pytest for type annotation
-import pytest
