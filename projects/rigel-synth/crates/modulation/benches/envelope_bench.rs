@@ -383,18 +383,18 @@ fn bench_polyphonic_workload(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_level_conversion(c: &mut Criterion) {
-    use rigel_modulation::envelope::{linear_to_param_level, param_to_level_f32};
+    use rigel_modulation::envelope::{level_to_linear, linear_to_param_level, param_to_level_q8};
 
     let mut group = c.benchmark_group("level_conversion");
 
-    group.bench_function("param_to_level_f32", |b| {
+    group.bench_function("param_to_level_q8", |b| {
         let params: Vec<u8> = (0..100).collect();
         let mut idx = 0;
 
         b.iter(|| {
             let param = params[idx % params.len()];
             idx += 1;
-            black_box(param_to_level_f32(black_box(param)))
+            black_box(param_to_level_q8(black_box(param)))
         })
     });
 
@@ -406,6 +406,31 @@ fn bench_level_conversion(c: &mut Criterion) {
             let linear = linears[idx % linears.len()];
             idx += 1;
             black_box(linear_to_param_level(black_box(linear)))
+        })
+    });
+
+    // Benchmark level_to_linear (the hot path we optimized)
+    group.bench_function("level_to_linear", |b| {
+        let levels: Vec<i16> = (0..4096).map(|i| i as i16).collect();
+        let mut idx = 0;
+
+        b.iter(|| {
+            let level = levels[idx % levels.len()];
+            idx += 1;
+            black_box(level_to_linear(black_box(level)))
+        })
+    });
+
+    // Benchmark level_to_linear with typical envelope levels (not edge cases)
+    group.bench_function("level_to_linear_typical", |b| {
+        // Typical levels seen during envelope processing (1716-4095 range)
+        let levels: Vec<i16> = (1716..4096).map(|i| i as i16).collect();
+        let mut idx = 0;
+
+        b.iter(|| {
+            let level = levels[idx % levels.len()];
+            idx += 1;
+            black_box(level_to_linear(black_box(level)))
         })
     });
 

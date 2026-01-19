@@ -3,19 +3,37 @@
 //! This module defines:
 //! - [`EnvelopePhase`] - Operational phases of the envelope
 //! - [`EnvelopeState`] - Runtime mutable state
-//! - [`EnvelopeLevel`] - Linear amplitude level type (f32)
+//! - [`EnvelopeLevel`] - Q8 fixed-point level type (i16)
+//!
+//! ## Q8 Fixed-Point Format with Fractional Accumulator
+//!
+//! The envelope uses a hybrid approach for hardware-authentic amplitude
+//! representation with precise timing:
+//!
+//! - **Output levels** are Q8 fixed-point (i16, 0-4095) for authentic amplitude
+//! - **Internal accumulation** uses f32 for sub-sample precision timing
+//!
+//! This allows slow envelope rates to achieve proper multi-second timing
+//! while maintaining the 4096-step quantization of real DX7 hardware.
+//!
+//! Q8 level mapping:
+//! - 0 = ~-96dB (silence)
+//! - 4095 = 0dB (full amplitude)
+//! - Each step ≈ 0.0235 dB
 
-/// Envelope level type in linear amplitude format.
+use super::rates::level_to_linear;
+
+/// Envelope level type in Q8 fixed-point format.
 ///
-/// Range: 0.0 to 1.0 (full dynamic range)
-/// This provides arbitrary precision for envelope timing.
-pub type EnvelopeLevel = f32;
+/// Range: 0 to 4095 (~96dB dynamic range, ~0.0235 dB per step)
+/// This provides hardware-authentic amplitude representation.
+pub type EnvelopeLevel = i16;
 
-/// Maximum envelope level (full amplitude)
-pub const LEVEL_MAX: f32 = 1.0;
+/// Maximum envelope level (full amplitude, 0dB)
+pub const LEVEL_MAX: i16 = 4095;
 
-/// Minimum envelope level (silence)
-pub const LEVEL_MIN: f32 = 0.0;
+/// Minimum envelope level (silence, ~-96dB)
+pub const LEVEL_MIN: i16 = 0;
 
 /// Envelope operational phases.
 ///
@@ -43,35 +61,32 @@ pub enum EnvelopePhase {
 /// Runtime state for envelope processing.
 ///
 /// Contains all mutable state that changes during envelope operation.
-/// Uses f32 floating-point format for precise timing at any duration.
+/// Uses a hybrid approach: Q8 (i16) for output levels, f32 for timing precision.
 ///
-/// # Memory Layout
+/// # Fractional Accumulator Design
 ///
-/// Slightly larger than Q8 version but provides much better timing accuracy.
+/// The `level_precise` field holds the exact accumulated level as f32 (0.0-4095.0),
+/// while `level` is the quantized Q8 output derived from it. This allows:
+/// - Sub-sample timing precision for slow rates (multi-second envelopes)
+/// - Hardware-authentic 4096-step amplitude quantization for output
 #[derive(Debug, Clone, Copy)]
 pub struct EnvelopeState {
-    /// Current level in linear amplitude (0.0-1.0).
-    pub(crate) level: f32,
+    /// Current level in Q8 fixed-point (0-4095).
+    /// This is the quantized output level, derived from `level_precise`.
+    pub(crate) level: i16,
 
-    /// Target level for current segment (0.0-1.0).
-    pub(crate) target_level: f32,
+    /// Precise accumulated level (0.0-4095.0).
+    /// Allows sub-sample increment precision for accurate timing.
+    /// The Q8 `level` is derived as `level_precise as i16`.
+    pub(crate) level_precise: f32,
 
-    /// Level change per sample (signed).
-    /// Positive for rising, negative for falling.
-    /// For attack phases only; decay uses decay_factor.
+    /// Target level for current segment in Q8 (0-4095).
+    pub(crate) target_level: i16,
+
+    /// Level change per sample (f32 for sub-sample precision).
+    /// Positive for rising (attack), negative for falling (decay).
+    /// Can be fractional (e.g., 0.1) for slow rates.
     pub(crate) increment: f32,
-
-    /// Multiplicative decay factor for exponential decay.
-    /// Each sample: level *= decay_factor (where 0 < decay_factor < 1).
-    /// This produces linear-in-dB decay (exponential in linear amplitude),
-    /// matching authentic DX7/SY99 behavior.
-    /// Only meaningful when `rising` is false.
-    pub(crate) decay_factor: f32,
-
-    /// Starting level for current attack segment.
-    /// Used to calculate exponential approach factor.
-    /// Only meaningful when `rising` is true.
-    pub(crate) attack_base_level: f32,
 
     /// Current segment index.
     /// 0..(K-1) for key-on, 0..(R-1) for release.
@@ -94,10 +109,9 @@ impl Default for EnvelopeState {
     fn default() -> Self {
         Self {
             level: LEVEL_MIN,
+            level_precise: LEVEL_MIN as f32,
             target_level: LEVEL_MIN,
             increment: 0.0,
-            decay_factor: 1.0, // No decay by default
-            attack_base_level: LEVEL_MIN,
             segment_index: 0,
             phase: EnvelopePhase::Idle,
             rising: false,
@@ -108,10 +122,18 @@ impl Default for EnvelopeState {
 }
 
 impl EnvelopeState {
-    /// Get current level in linear amplitude (0.0-1.0).
+    /// Get current level in Q8 fixed-point (0-4095).
+    #[inline]
+    pub fn level_q8(&self) -> i16 {
+        self.level
+    }
+
+    /// Get current level converted to linear amplitude (0.0-1.0).
+    ///
+    /// Converts from Q8 fixed-point to linear amplitude for output.
     #[inline]
     pub fn level(&self) -> f32 {
-        self.level
+        level_to_linear(self.level)
     }
 
     /// Get current phase.
@@ -152,7 +174,7 @@ mod tests {
     #[test]
     fn test_default_state() {
         let state = EnvelopeState::default();
-        assert!((state.level - LEVEL_MIN).abs() < f32::EPSILON);
+        assert_eq!(state.level, LEVEL_MIN);
         assert_eq!(state.phase, EnvelopePhase::Idle);
         assert!(!state.is_active());
         assert!(!state.is_releasing());
@@ -185,7 +207,42 @@ mod tests {
 
     #[test]
     fn test_level_constants() {
-        assert!((LEVEL_MIN - 0.0).abs() < f32::EPSILON);
-        assert!((LEVEL_MAX - 1.0).abs() < f32::EPSILON);
+        // Q8 format: 0 = silence, 4095 = full
+        assert_eq!(LEVEL_MIN, 0);
+        assert_eq!(LEVEL_MAX, 4095);
+    }
+
+    #[test]
+    fn test_level_to_linear_conversion() {
+        // Q8 0 should give exactly 0 (silence)
+        let linear_min = level_to_linear(LEVEL_MIN);
+        assert_eq!(
+            linear_min, 0.0,
+            "LEVEL_MIN should be 0.0, got {}",
+            linear_min
+        );
+
+        // Q8 4095 should give exactly 1.0 (full amplitude)
+        let linear_max = level_to_linear(LEVEL_MAX);
+        assert_eq!(
+            linear_max, 1.0,
+            "LEVEL_MAX should be 1.0, got {}",
+            linear_max
+        );
+
+        // Monotonic: higher Q8 = higher linear
+        let linear_low = level_to_linear(1000);
+        let linear_mid = level_to_linear(2000);
+        let linear_high = level_to_linear(3000);
+        assert!(linear_low < linear_mid);
+        assert!(linear_mid < linear_high);
+
+        // Midpoint should be roughly -48dB
+        let linear_mid_check = level_to_linear(2048);
+        assert!(
+            linear_mid_check > 0.003 && linear_mid_check < 0.005,
+            "Mid-level ~2048 should be around -48dB, got {}",
+            linear_mid_check
+        );
     }
 }

@@ -13,10 +13,16 @@
 //! - Instantaneous attack jump for FM "punch"
 //! - SIMD batch processing for polyphonic efficiency
 //!
-//! # Internal Format: f32 Linear Amplitude
+//! # Internal Format: Hybrid Q8/f32
 //!
-//! The envelope uses f32 floating-point format internally for arbitrary
-//! precision timing. Level range is 0.0 to 1.0 (linear amplitude).
+//! The envelope uses a hybrid approach for hardware-authentic amplitude
+//! with precise timing:
+//!
+//! - **Output levels** are Q8 fixed-point (i16, 0-4095) providing authentic
+//!   DX7-style 96dB dynamic range with 4096 discrete steps
+//! - **Internal accumulation** uses f32 for sub-sample timing precision,
+//!   allowing slow rates to achieve proper multi-second durations
+//!
 //! Timing uses the STATICS table to support durations from instant to 40+ seconds.
 //!
 //! # Example
@@ -58,8 +64,9 @@ pub use config::{
 };
 pub use rates::{
     calculate_increment_f32, calculate_increment_f32_scaled, calculate_increment_f32_with_max_rate,
-    get_static_count, linear_to_param_level, max_rate_for_sample_rate, param_to_level_f32,
-    scale_rate, seconds_to_rate, JUMP_TARGET, MIN_SEGMENT_TIME_SECONDS, STATICS,
+    get_static_count, level_to_linear, linear_to_param_level, max_rate_for_sample_rate,
+    param_to_level_q8, scale_rate, seconds_to_rate, JUMP_TARGET_Q8, MIN_SEGMENT_TIME_SECONDS,
+    STATICS,
 };
 pub use segment::Segment;
 pub use state::{EnvelopeLevel, EnvelopePhase, EnvelopeState, LEVEL_MAX, LEVEL_MIN};
@@ -69,8 +76,10 @@ use rigel_timing::Timebase;
 
 /// SY-style multi-segment envelope generator.
 ///
-/// Uses f32 linear amplitude (0.0-1.0) internally for precise timing.
-/// Implements MSFA-compatible rate calculations and attack behavior.
+/// Uses a hybrid Q8/f32 approach: output levels are Q8 fixed-point (i16)
+/// for authentic 96dB dynamic range, while internal accumulation uses f32
+/// for sub-sample timing precision. Implements MSFA-compatible rate
+/// calculations and attack behavior.
 ///
 /// # Type Parameters
 ///
@@ -192,7 +201,8 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
     /// Process one sample and return linear amplitude.
     ///
     /// Advances the envelope state by one sample and returns the
-    /// current amplitude value.
+    /// current amplitude value. Internal processing uses Q8 fixed-point;
+    /// conversion to linear amplitude happens only at output.
     ///
     /// # Returns
     ///
@@ -233,14 +243,14 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
     /// Get current linear amplitude without advancing state.
     ///
     /// Useful for UI display or modulation routing without
-    /// consuming a sample.
+    /// consuming a sample. Converts from internal Q8 format.
     ///
     /// # Returns
     ///
     /// Current linear amplitude in range [0.0, 1.0]
     #[inline]
     pub fn value(&self) -> f32 {
-        self.state.level
+        level_to_linear(self.state.level)
     }
 
     // =========================================================================
@@ -344,14 +354,14 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
             self.advance_segment();
         }
 
-        self.state.level
+        level_to_linear(self.state.level)
     }
 
     /// Process sustain phase - hold at current level.
     #[inline]
     fn process_sustain(&mut self) -> f32 {
         // Just return current level, no change
-        self.state.level
+        level_to_linear(self.state.level)
     }
 
     /// Process release segments.
@@ -365,7 +375,7 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
             self.advance_release_segment();
         }
 
-        self.state.level
+        level_to_linear(self.state.level)
     }
 
     // =========================================================================
@@ -378,12 +388,13 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
         self.state.segment_index = 0;
 
         // Apply attack jump BEFORE setup_segment calculates increment.
-        // This jump to ~0.16% amplitude (-56dB) gets the envelope out of the
-        // sub-perceptual range quickly. The DX7 uses 1716 in Q8 format (~40dB
-        // above minimum). This preserves FM "punch" while allowing proper
-        // slow attacks that build from near-silence.
-        if self.state.level < JUMP_TARGET {
-            self.state.level = JUMP_TARGET;
+        // This jump to 1716 Q8 (~-56dB) gets the envelope out of the
+        // sub-perceptual range quickly. This preserves FM "punch" while
+        // allowing proper slow attacks that build from near-silence.
+        // Reference: MSFA/Dexed `const int jumptarget = 1716`
+        if self.state.level_precise < JUMP_TARGET_Q8 as f32 {
+            self.state.level_precise = JUMP_TARGET_Q8 as f32;
+            self.state.level = JUMP_TARGET_Q8;
         }
 
         self.setup_segment(0, true);
@@ -392,9 +403,10 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
     /// Start release phase.
     fn start_release_phase(&mut self) {
         if R == 0 {
-            // No release segments, go directly to complete
+            // No release segments, go directly to complete (Q8 minimum = silence)
             self.state.phase = EnvelopePhase::Complete;
             self.state.level = LEVEL_MIN;
+            self.state.level_precise = LEVEL_MIN as f32;
         } else {
             self.state.phase = EnvelopePhase::Release;
             self.state.segment_index = 0;
@@ -403,6 +415,14 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
     }
 
     /// Setup a segment for processing.
+    ///
+    /// Uses f32 increments for precise timing with sub-sample accuracy.
+    /// Both attack and decay use additive increments in the Q8 domain,
+    /// which matches MSFA/DX7 behavior (additive in log domain).
+    ///
+    /// The fractional accumulator approach allows slow rates to achieve
+    /// proper multi-second timing (matching STATICS table) while maintaining
+    /// authentic Q8 amplitude quantization.
     fn setup_segment(&mut self, segment_index: u8, is_key_on: bool) {
         let segment = if is_key_on {
             &self.config.key_on_segments[segment_index as usize]
@@ -410,25 +430,23 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
             &self.config.release_segments[segment_index as usize]
         };
 
-        // Calculate target level from segment (linear 0.0-1.0)
-        self.state.target_level = param_to_level_f32(segment.level);
+        // Calculate target level from segment in Q8 format
+        self.state.target_level = param_to_level_q8(segment.level);
 
-        // Calculate the distance to travel
-        let distance = (self.state.target_level - self.state.level).abs();
+        // Calculate the distance to travel in Q8 units
+        let distance = (self.state.target_level as f32 - self.state.level_precise).abs();
 
         // If already at target, no movement needed
-        if distance < f32::EPSILON {
+        if distance < 0.5 {
             self.state.increment = 0.0;
-            self.state.decay_factor = 1.0;
             self.state.rising = false;
             return;
         }
 
         // Calculate per-sample increment with rate scaling applied.
-        // The raw increment is for full 0.0-1.0 range; scale by actual distance
-        // so that the configured time matches the actual transition time.
+        // The f32 increment is for full 0.0-1.0 range; convert to Q8 units.
         // Uses pre-computed max_rate to avoid O(100) search per segment change.
-        let full_range_increment = calculate_increment_f32_with_max_rate(
+        let full_range_increment_f32 = calculate_increment_f32_with_max_rate(
             segment.rate,
             self.state.midi_note,
             self.config.rate_scaling,
@@ -436,47 +454,25 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
             self.config.max_rate(),
         );
 
-        // Scale increment by distance to maintain correct timing
-        let scaled_increment = full_range_increment * distance;
+        // Convert f32 increment (0.0-1.0 range) to Q8 units (0.0-4095.0 range)
+        // No minimum clamping - f32 allows fractional increments for slow rates
+        let increment_q8 = full_range_increment_f32 * LEVEL_MAX as f32;
 
         // Determine direction
         self.state.rising = self.state.target_level > self.state.level;
 
         if self.state.rising {
-            // For attack (rising) segments, use MSFA-faithful exponential approach.
-            // The average factor is ~9 (integral of 1+16(1-x) from 0 to 1 = 9),
-            // so we divide the increment by 9 to maintain correct timing.
-            self.state.attack_base_level = self.state.level;
-            self.state.increment = scaled_increment / 9.0;
-            self.state.decay_factor = 1.0; // Not used for attack
+            // For attack (rising) segments, use MSFA-style exponential approach.
+            // The increment is scaled by remaining distance to max, creating
+            // the characteristic FM "snap" - fast through quiet region, slowing at top.
+            // Divisor 6 compensates for average factor ~5.7 over the 1716→4095 range
+            // (attacks start from JUMP_TARGET_Q8, not from 0).
+            self.state.increment = increment_q8 / 6.0;
         } else {
-            // For decay (falling) segments, use exponential decay (linear-in-dB).
-            // This matches authentic DX7/SY99 behavior where decay is constant dB/second.
-            //
-            // Calculate decay factor: level *= decay_factor each sample
-            // To go from current_level to target_level in N samples:
-            //   target = current * decay_factor^N
-            //   decay_factor = (target / current)^(1/N)
-            //
-            // N samples = distance / scaled_increment (since increment covers full distance)
-            let samples = if scaled_increment > f32::EPSILON {
-                distance / scaled_increment
-            } else {
-                1.0
-            };
-
-            // Handle target = 0 case: use a small minimum to avoid log(0)
-            // -120dB is well below audible threshold
-            const MIN_TARGET: f32 = 1e-6;
-            let effective_target = self.state.target_level.max(MIN_TARGET);
-            let current = self.state.level.max(MIN_TARGET);
-
-            // decay_factor = (target / current)^(1/samples)
-            let ratio = effective_target / current;
-            self.state.decay_factor = libm::powf(ratio, 1.0 / samples);
-
-            // Store increment for timing reference (used by reached_target check)
-            self.state.increment = -scaled_increment;
+            // For decay (falling) segments, use additive decrement in Q8 domain.
+            // In log domain, additive decrement = exponential decay in linear.
+            // This matches authentic DX7/SY99 behavior.
+            self.state.increment = -increment_q8;
         }
     }
 
@@ -486,8 +482,9 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
 
     /// Advance to next key-on segment.
     fn advance_segment(&mut self) {
-        // Snap to target
+        // Snap to target (both Q8 and precise)
         self.state.level = self.state.target_level;
+        self.state.level_precise = self.state.target_level as f32;
 
         let next_segment = self.state.segment_index + 1;
 
@@ -514,8 +511,9 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
 
     /// Advance to next release segment.
     fn advance_release_segment(&mut self) {
-        // Snap to target
+        // Snap to target (both Q8 and precise)
         self.state.level = self.state.target_level;
+        self.state.level_precise = self.state.target_level as f32;
 
         let next_segment = self.state.segment_index + 1;
 
@@ -524,9 +522,10 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
             self.state.segment_index = next_segment;
             self.setup_segment(next_segment, false);
         } else {
-            // Release complete
+            // Release complete - set to Q8 minimum (silence)
             self.state.phase = EnvelopePhase::Complete;
             self.state.level = LEVEL_MIN;
+            self.state.level_precise = LEVEL_MIN as f32;
         }
     }
 
@@ -536,65 +535,58 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
 
     /// MSFA-faithful exponential approach for attack (rising) phases.
     ///
-    /// The factor varies from ~17 at start to ~1 near target, creating
-    /// the characteristic FM "snap" - fast through quiet region, slowing at top.
-    /// This matches the DX7/MSFA formula: `level += ((max - level) >> 24) * inc`
+    /// Uses remaining distance to max to create the characteristic FM "snap" -
+    /// fast through quiet region, slowing at top. This matches the DX7/MSFA
+    /// formula: `level += ((max - level) >> shift) * inc`
+    ///
+    /// Uses level_precise (f32) for sub-sample timing accuracy, then
+    /// quantizes to Q8 (i16) for authentic amplitude representation.
     #[inline]
     fn apply_attack_increment(&mut self) {
-        // Calculate progress through attack (0.0 at start, 1.0 at end)
-        let remaining = self.state.target_level - self.state.level;
-        let total = self.state.target_level - self.state.attack_base_level;
+        // Factor based on remaining distance to max (not to target)
+        // This creates the characteristic FM "snap" - fast at low levels, slow at top
+        // Using f32 version of the shift: remaining / 256.0 gives 0.0-16.0 range, +1 gives 1.0-17.0
+        let remaining_to_max = LEVEL_MAX as f32 - self.state.level_precise;
+        let factor = (remaining_to_max / 256.0) + 1.0;
 
-        let progress = if total > f32::EPSILON {
-            1.0 - (remaining / total)
-        } else {
-            1.0
-        };
+        // Apply increment scaled by factor
+        // Increment was already scaled by 1/9 in setup_segment
+        // to compensate for the average factor being ~9
+        let delta = self.state.increment * factor;
+        self.state.level_precise =
+            (self.state.level_precise + delta).min(self.state.target_level as f32);
 
-        // Factor varies from 17.0 (at start) to 1.0 (at end)
-        // This matches MSFA's ~17x variation for authentic FM attack character
-        let factor = 1.0 + 16.0 * (1.0 - progress);
-
-        self.state.level += self.state.increment * factor;
-        self.state.level = self.state.level.min(self.state.target_level);
+        // Quantize to Q8 for output
+        self.state.level = self.state.level_precise as i16;
     }
 
-    /// Exponential decay for falling phases (linear-in-dB).
+    /// Additive decrement for falling phases (exponential in linear domain).
     ///
-    /// The DX7/SY99/MSFA operates internally in dB domain where decay is
-    /// linear subtraction in dB. In linear amplitude domain, this translates
-    /// to multiplicative decay: level *= decay_factor each sample.
+    /// In Q8 (log) domain, additive decrement produces exponential decay
+    /// in linear amplitude domain. This matches authentic DX7/SY99 behavior.
     ///
-    /// This produces the characteristic where "slope increases as level
-    /// approaches zero" - faster decay through quiet regions, matching
-    /// authentic FM synth behavior.
+    /// Uses level_precise (f32) for sub-sample timing accuracy, then
+    /// quantizes to Q8 (i16) for authentic amplitude representation.
     #[inline]
     fn apply_decay_increment(&mut self) {
-        // Exponential decay: multiply by factor each sample
-        self.state.level *= self.state.decay_factor;
+        // Additive decrement in Q8 domain (increment is negative for decay)
+        // f32 allows fractional increments for slow rates
+        self.state.level_precise =
+            (self.state.level_precise + self.state.increment).max(LEVEL_MIN as f32);
 
-        // Clamp to valid range and snap to minimum when very small
-        // to avoid denormal numbers and infinite asymptotic approach
-        if self.state.level < LEVEL_MIN + 1e-7 {
-            self.state.level = LEVEL_MIN;
-        }
+        // Quantize to Q8 for output
+        self.state.level = self.state.level_precise as i16;
     }
 
     /// Check if we've reached the target level.
     ///
-    /// For decay (exponential), we check if we're within a small tolerance
-    /// of the target to handle floating-point precision and ensure we don't
-    /// get stuck in asymptotic approach.
+    /// Uses level_precise for accurate detection with fractional increments.
     #[inline]
     fn reached_target(&self) -> bool {
         if self.state.rising {
-            self.state.level >= self.state.target_level
+            self.state.level_precise >= self.state.target_level as f32
         } else {
-            // For decay, check if we've reached or slightly passed target,
-            // or if we're within 0.1% of target (handles exponential asymptotic approach)
-            self.state.level <= self.state.target_level
-                || (self.state.target_level > 0.0
-                    && self.state.level <= self.state.target_level * 1.001)
+            self.state.level_precise <= self.state.target_level as f32
         }
     }
 }
@@ -670,18 +662,38 @@ mod tests {
         // Process until we've gone through segments
         let mut last_segment = 0;
         let mut segment_changes = 0;
+        let mut first_change_at = 0u32;
+        let mut final_phase = env.phase();
 
-        for _ in 0..44100 {
+        for i in 0..44100 {
             env.process();
             let current = env.current_segment();
             if current != last_segment {
+                if segment_changes == 0 {
+                    first_change_at = i;
+                }
                 segment_changes += 1;
                 last_segment = current;
             }
+            final_phase = env.phase();
         }
 
         // Should have transitioned through at least some segments
-        assert!(segment_changes > 0, "No segment transitions occurred");
+        assert!(
+            segment_changes > 0,
+            "No segment transitions occurred. Final phase: {:?}, final segment: {}, level: {}",
+            final_phase,
+            env.current_segment(),
+            env.state().level_q8()
+        );
+
+        // Verify we reached sustain or later
+        assert!(
+            segment_changes >= 5,
+            "Expected at least 5 segment changes (0→1→2→3→4→5), got {}. First change at sample {}",
+            segment_changes,
+            first_change_at
+        );
     }
 
     #[test]
