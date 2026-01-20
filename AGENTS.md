@@ -78,9 +78,7 @@ test:fast           # Single-process with early exit
 # Code Quality (run all before completing changes)
 lint                # Ruff lint
 format              # Ruff formatter
-typecheck           # Both mypy and basedpyright
-typecheck:mypy      # mypy only
-typecheck:pyright   # basedpyright only
+typecheck           # ty type checker
 
 # CLI
 uv run wtgen generate <waveform> --output <file.npz>
@@ -101,8 +99,8 @@ Verify new dependencies support `no_std` and don't allocate.
 
 ### wtgen Standards
 
-- All code must pass both mypy and basedpyright
-- Run pytest, mypy, basedpyright, and ruff before considering changes complete
+- All code must pass ty type checking
+- Run pytest, ty, and ruff before considering changes complete
 - Add tests for new code
 
 ## Testing Guidelines
@@ -150,7 +148,7 @@ Run with `test:full` or `test:fast`:
 
 Runs on all PRs and pushes:
 - `rigel-pipeline`: fmt, clippy, scalar tests, AVX2 tests
-- `wtgen-pipeline`: ruff lint, pytest
+- `wtgen-pipeline`: ruff lint, ty type check, pytest
 - Plugin builds: Linux (native), Windows (cross-compiled), macOS (native)
 
 ### Release Workflows
