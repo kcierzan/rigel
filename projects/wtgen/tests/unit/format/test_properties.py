@@ -156,9 +156,7 @@ class TestRoundTripPreservation:
         loaded = load_wavetable_wav(output_path)
 
         assert len(loaded.mipmaps) == len(mipmaps)
-        for i, (original, loaded_mip) in enumerate(
-            zip(mipmaps, loaded.mipmaps, strict=True)
-        ):
+        for i, (original, loaded_mip) in enumerate(zip(mipmaps, loaded.mipmaps, strict=True)):
             np.testing.assert_array_almost_equal(
                 original, loaded_mip, decimal=5, err_msg=f"Mipmap {i} data mismatch"
             )
@@ -208,11 +206,13 @@ class TestRoundTripPreservation:
     )
     @given(
         name=st.text(
-            min_size=1, max_size=50,
+            min_size=1,
+            max_size=50,
             alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"]),
         ),
         author=st.text(
-            min_size=1, max_size=50,
+            min_size=1,
+            max_size=50,
             alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"]),
         ),
     )
@@ -251,7 +251,8 @@ class TestTypeSpecificMetadata:
         bit_depth=st.sampled_from([8, 12, 16]),
         sample_rate=st.sampled_from([31250, 44100, 48000]),
         source_hardware=st.text(
-            min_size=1, max_size=30,
+            min_size=1,
+            max_size=30,
             alphabet=st.characters(whitelist_categories=["L", "N", "P", "S", "Zs"]),
         ),
     )
@@ -352,7 +353,7 @@ class TestFormatInvariants:
 
         for i in range(1, len(loaded.mip_frame_lengths)):
             assert loaded.mip_frame_lengths[i] <= loaded.mip_frame_lengths[i - 1], (
-                f"mip_frame_lengths[{i}] should be <= mip_frame_lengths[{i-1}]"
+                f"mip_frame_lengths[{i}] should be <= mip_frame_lengths[{i - 1}]"
             )
 
     @settings(
@@ -430,6 +431,5 @@ class TestFormatInvariants:
 
         actual_total = sum(m.size for m in loaded.mipmaps)
         assert loaded.total_samples() == actual_total, (
-            f"total_samples() returned {loaded.total_samples()}, "
-            f"but actual total is {actual_total}"
+            f"total_samples() returned {loaded.total_samples()}, but actual total is {actual_total}"
         )
