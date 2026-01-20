@@ -68,7 +68,7 @@ in
       ninja
       libsndfile
       ruff # Provide a native binary so linting works on NixOS without patching wheels.
-      basedpyright
+      ty # Astral's fast Python type checker - native binary for NixOS compatibility
       # Protocol Buffers compiler for wavetable format module
       protobuf
     ]
@@ -168,15 +168,15 @@ in
       uv pip install --quiet -e .
     fi
 
-    # Make sure native nixpkgs tooling (like ruff) takes precedence over wheel
+    # Make sure native nixpkgs tooling (ruff, ty) takes precedence over wheel
     # binaries inside .venv to avoid dynamic loader issues on NixOS.
-    export PATH="${pkgs.ruff}/bin:${pkgs.basedpyright}/bin:$PATH"
+    export PATH="${pkgs.ruff}/bin:${pkgs.ty}/bin:$PATH"
 
     printf '\nwtgen devenv ready (Python %s)\n\n' "$(python -c 'import platform; print(platform.python_version())')"
     printf 'Helpful commands:\n'
     printf '  - devenv shell -- test:full            (pytest -n auto)\n'
     printf '  - devenv shell -- test:fast            (pytest -x --tb=short)\n'
-    printf '  - devenv shell -- typecheck            (mypy + basedpyright)\n'
+    printf '  - devenv shell -- typecheck            (ty type checker)\n'
     printf '  - devenv shell -- lint / format        (Ruff lint/format)\n'
     printf '  - devenv shell -- uv:sync              (refresh .venv)\n\n'
 
@@ -209,19 +209,9 @@ in
       exec = "ruff format";
     };
 
-    "typecheck:mypy" = {
-      description = "Strict type checking via mypy";
-      exec = "uv run mypy src/";
-    };
-
-    "typecheck:pyright" = {
-      description = "Type checking via basedpyright";
-      exec = "basedpyright src/";
-    };
-
     typecheck = {
-      description = "Run both mypy and basedpyright";
-      exec = "uv run mypy src/ && basedpyright src/";
+      description = "Type checking via ty";
+      exec = "ty check src/";
     };
 
     "test:full" = {
