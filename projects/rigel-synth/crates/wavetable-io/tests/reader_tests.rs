@@ -463,7 +463,7 @@ fn test_riff_parser_chunk_size_overflow() {
     // fmt chunk
     data[12..16].copy_from_slice(b"fmt ");
     data[16..20].copy_from_slice(&u32::MAX.to_le_bytes()); // Overflow-inducing chunk size
-    // Should not panic due to our checked_add fix
+                                                           // Should not panic due to our checked_add fix
     let result = read_wavetable_from_bytes(&data);
     assert!(result.is_err());
 }
