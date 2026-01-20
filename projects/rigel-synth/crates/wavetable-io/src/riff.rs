@@ -60,7 +60,8 @@ pub fn parse_riff_chunks(data: &[u8]) -> Result<Vec<RiffChunk>> {
     // Parse chunks starting at offset 12
     let mut chunks = Vec::new();
     let mut offset = 12;
-    let end = (file_size + 8).min(data.len());
+    // Use saturating_add to prevent overflow on malicious input (H-1 fix)
+    let end = file_size.saturating_add(8).min(data.len());
 
     while offset + 8 <= end {
         let chunk_id: [u8; 4] = data[offset..offset + 4].try_into().unwrap();
@@ -72,7 +73,11 @@ pub fn parse_riff_chunks(data: &[u8]) -> Result<Vec<RiffChunk>> {
         ]) as usize;
 
         let data_start = offset + 8;
-        let data_end = (data_start + chunk_size).min(data.len());
+        // Use checked arithmetic to prevent overflow on malicious chunk sizes (H-2 fix)
+        let data_end = data_start
+            .checked_add(chunk_size)
+            .map(|v| v.min(data.len()))
+            .unwrap_or(data.len());
 
         if data_end > data.len() {
             break;
