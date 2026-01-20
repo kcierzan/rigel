@@ -246,6 +246,9 @@ def _split_into_mipmaps(
 def _decode_24bit_pcm(data: bytes) -> NDArray[np.float32]:
     """Decode 24-bit PCM samples to float32.
 
+    Uses vectorized NumPy operations for performance (H-4 fix).
+    The naive Python loop was extremely slow for large files.
+
     Args:
         data: Raw 24-bit PCM data (3 bytes per sample, little-endian).
 
@@ -253,20 +256,25 @@ def _decode_24bit_pcm(data: bytes) -> NDArray[np.float32]:
         Float32 samples normalized to [-1, 1].
     """
     num_samples = len(data) // 3
-    samples = np.zeros(num_samples, dtype=np.float32)
+    if num_samples == 0:
+        return np.array([], dtype=np.float32)
 
-    for i in range(num_samples):
-        # Read 3 bytes as little-endian 24-bit signed integer
-        b0 = data[i * 3]
-        b1 = data[i * 3 + 1]
-        b2 = data[i * 3 + 2]
+    # Truncate to exact multiple of 3 bytes and reshape to (N, 3)
+    raw = np.frombuffer(data[: num_samples * 3], dtype=np.uint8).reshape(-1, 3)
 
-        # Combine bytes and sign-extend
-        value = b0 | (b1 << 8) | (b2 << 16)
-        if value & 0x800000:  # Sign bit set
-            value |= 0xFF000000  # Sign extend to 32 bits
-            value = value - 0x100000000  # Convert to signed
+    # Combine bytes as little-endian 24-bit unsigned integers
+    # raw[:, 0] is LSB, raw[:, 2] is MSB
+    values = (
+        raw[:, 0].astype(np.int32)
+        | (raw[:, 1].astype(np.int32) << 8)
+        | (raw[:, 2].astype(np.int32) << 16)
+    )
 
-        samples[i] = value / 8388608.0  # 2^23
+    # Sign extend from 24-bit: if bit 23 is set, the value is negative
+    # We need to set bits 24-31 to 1 for negative values
+    sign_mask = (values & 0x800000) != 0
+    values = np.where(sign_mask, values | np.int32(0xFF000000), values)
 
-    return samples
+    # Convert to float32 normalized to [-1, 1]
+    # 2^23 = 8388608 is the maximum positive value for 24-bit signed
+    return (values / 8388608.0).astype(np.float32)
