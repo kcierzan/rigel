@@ -6,25 +6,32 @@ from typing import Annotated
 import numpy as np
 from cyclopts import App, Parameter
 from rich.console import Console
+from rich.table import Table
 
 from wtgen.cli.validators import (
     validate_eq_string,
+    validate_positive_integer,
     validate_power_of_two_integer,
     validate_tilt_string,
 )
 from wtgen.dsp.eq import Equalizer
 from wtgen.dsp.fir import RolloffMethod
-from wtgen.dsp.mipmap import Mipmap
+from wtgen.dsp.mipmap import Mipmap, build_multiframe_mipmap
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import WaveGenerator
 from wtgen.export import save_mipmaps_as_wav
 from wtgen.format import (
     HighResolutionMetadata,
     NormalizationMethod,
+    ValidationError,
     WavetableType,
     load_wavetable_wav,
     save_wavetable_wav,
+    validate_audio_data,
+    validate_metadata,
 )
+from wtgen.format.importers import detect_wav_wavetable, import_hires_wav
+from wtgen.format.riff import RiffError, extract_wtbl_chunk
 from wtgen.types import (
     BitDepth,
     HarmonicPartial,
@@ -36,7 +43,18 @@ console = Console()
 
 
 def print_error(message: str) -> None:
+    """Print an error message in red."""
     console.print(message, style="bold red")
+
+
+def print_success(message: str) -> None:
+    """Print a success message in green."""
+    console.print(message, style="bold green")
+
+
+def print_warning(message: str) -> None:
+    """Print a warning message in yellow."""
+    console.print(message, style="bold yellow")
 
 
 def parse_partials_string(partials: str) -> list[HarmonicPartial]:
@@ -405,6 +423,350 @@ def info(file: Path) -> int:
                 console.print(f"    Max harmonics: {type_meta.max_harmonics}")
             if type_meta.source_synth:
                 console.print(f"    Source synth: {type_meta.source_synth}")
+
+    return 0
+
+
+@app.command
+def validate(
+    file: Path,
+    strict: bool = False,
+    output_json: Annotated[bool, Parameter(name=["--json"])] = False,
+) -> int:
+    """
+    Validate a WTBL wavetable file.
+
+    Checks RIFF structure, WTBL chunk presence, metadata consistency,
+    and audio data integrity.
+
+    Parameters
+    ----------
+    file: Path
+        The path to the .wav WTBL file to validate
+    strict: bool
+        Treat warnings as errors (default: False)
+    output_json: bool
+        Output results as JSON (default: False)
+    """
+    results: dict[str, object] = {
+        "file": str(file),
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+    }
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # Check file exists
+    if not file.exists():
+        errors.append(f"File not found: {file}")
+        results["valid"] = False
+        results["errors"] = errors
+        if output_json:
+            console.print(json.dumps(results, indent=2))
+        else:
+            print_error(f"[FAIL] File not found: {file}")
+        return 1
+
+    # Check WTBL chunk exists
+    try:
+        extract_wtbl_chunk(file)
+    except RiffError as e:
+        errors.append(f"RIFF/WTBL error: {e}")
+        results["valid"] = False
+        results["errors"] = errors
+        if output_json:
+            console.print(json.dumps(results, indent=2))
+        else:
+            print_error(f"[FAIL] RIFF/WTBL error: {e}")
+            console.print(
+                "  Suggestion: This may not be a valid WTBL file. "
+                "Use 'wtgen analyze' to check if it's a raw WAV wavetable."
+            )
+        return 1
+
+    # Load and validate the file
+    try:
+        wt_file = load_wavetable_wav(file, validate=True)
+    except ValidationError as e:
+        errors.append(f"Validation error: {e}")
+        results["valid"] = False
+        results["errors"] = errors
+        if output_json:
+            console.print(json.dumps(results, indent=2))
+        else:
+            print_error(f"[FAIL] Validation error: {e}")
+        return 1
+
+    # Run metadata validation to get warnings
+    meta_result = validate_metadata(wt_file.metadata)
+    warnings.extend(meta_result.warnings)
+
+    # Run audio data validation to get warnings
+    audio_result = validate_audio_data(wt_file.mipmaps, wt_file.metadata)
+    warnings.extend(audio_result.warnings)
+
+    results["warnings"] = warnings
+
+    # In strict mode, warnings become errors
+    if strict and warnings:
+        results["valid"] = False
+        results["errors"] = [f"Strict mode: {w}" for w in warnings]
+
+    if output_json:
+        console.print(json.dumps(results, indent=2))
+        return 0 if results["valid"] else 1
+
+    # Rich formatted output
+    if results["valid"]:
+        print_success(f"[PASS] {file}")
+        console.print(f"  Type: {wt_file.wavetable_type.display_name}")
+        console.print(f"  Frames: {wt_file.num_frames}")
+        console.print(f"  Frame length: {wt_file.frame_length}")
+        console.print(f"  Mip levels: {wt_file.num_mip_levels}")
+
+        if warnings:
+            console.print("")
+            for warning in warnings:
+                print_warning(f"  [WARN] {warning}")
+    else:
+        print_error(f"[FAIL] {file}")
+        err_list = results.get("errors", [])
+        if isinstance(err_list, list):
+            for error in err_list:
+                console.print(f"  {error}")
+
+    return 0 if results["valid"] else 1
+
+
+@app.command
+def analyze(
+    file: Path,
+    output_json: Annotated[bool, Parameter(name=["--json"])] = False,
+) -> int:
+    """
+    Analyze a WAV file and suggest wavetable parameters.
+
+    This command examines a WAV file and suggests possible interpretations
+    as a wavetable, showing frame count and frame size combinations.
+
+    Parameters
+    ----------
+    file: Path
+        The path to the .wav file to analyze
+    output_json: bool
+        Output results as JSON (default: False)
+    """
+    if not file.exists():
+        print_error(f"Error: File not found: {file}")
+        return 1
+
+    try:
+        analysis = detect_wav_wavetable(file)
+    except Exception as e:
+        print_error(f"Error analyzing file: {e}")
+        return 1
+
+    if output_json:
+        console.print(json.dumps(analysis, indent=2))
+        return 0
+
+    # Rich formatted output
+    file_info = analysis["file_info"]
+    console.print(f"[bold]File Analysis: {file}[/bold]")
+    console.print("")
+    console.print("[bold]File Info:[/bold]")
+    console.print(f"  Total samples: {file_info['total_samples']:,}")
+    console.print(f"  Sample rate: {file_info['sample_rate']} Hz")
+    console.print(f"  Duration: {file_info['duration_seconds']:.3f}s")
+    console.print(f"  Bit depth: {file_info['bit_depth']}-bit")
+    console.print(f"  Channels: {file_info['channels']}")
+
+    suggestions = analysis["suggestions"]
+    if not suggestions:
+        print_warning("\nNo valid wavetable interpretations found.")
+        console.print("The total sample count doesn't divide evenly into common frame counts.")
+        return 0
+
+    console.print("")
+    console.print("[bold]Possible Interpretations:[/bold]")
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Frames", justify="right")
+    table.add_column("Frame Size", justify="right")
+    table.add_column("Power of 2", justify="center")
+    table.add_column("Type", justify="left")
+    table.add_column("Import Command", justify="left")
+
+    for suggestion in suggestions:
+        is_pow2 = suggestion["is_power_of_two"]
+        power_of_two = "[green]Yes[/green]" if is_pow2 else "[yellow]No[/yellow]"
+        import_cmd = f"wtgen import {file.name} --frames {suggestion['num_frames']}"
+        table.add_row(
+            str(suggestion["num_frames"]),
+            str(suggestion["frame_length"]),
+            power_of_two,
+            suggestion["likely_type"],
+            import_cmd,
+        )
+
+    console.print(table)
+
+    # Show recommended import command
+    recommended = analysis.get("recommended")
+    if recommended:
+        console.print("")
+        console.print("[bold]Recommended:[/bold]")
+        console.print(f"  wtgen import {file} --frames {recommended['num_frames']}")
+
+    return 0
+
+
+@app.command(name="import")
+def import_(
+    source: Path,
+    frames: Annotated[int, Parameter(validator=validate_positive_integer)],
+    output: Path = Path("imported.wav"),
+    frame_size: int | None = None,
+    wavetable_type: WavetableType = WavetableType.HIGH_RESOLUTION,
+    mip_levels: Annotated[int, Parameter(validator=validate_positive_integer)] = 7,
+    no_mipmaps: bool = False,
+    rolloff: RolloffMethod = "raised_cosine",
+    do_normalize: bool = True,
+    dry_run: bool = False,
+    name: str | None = None,
+    author: str | None = None,
+) -> int:
+    """
+    Import a WAV file as a WTBL wavetable with explicit parameters.
+
+    Converts a raw WAV file containing wavetable data into the standardized
+    WTBL format with optional mipmap generation using proper FIR anti-aliasing.
+
+    Parameters
+    ----------
+    source: Path
+        The source WAV file to import
+    frames: int
+        Number of frames to extract (required)
+    output: Path
+        Output path for the WTBL file (default: imported.wav)
+    frame_size: int | None
+        Samples per frame (auto-calculated from total_samples/frames if omitted)
+    wavetable_type: WavetableType
+        Wavetable type classification (default: high-resolution)
+    mip_levels: int
+        Number of mipmap levels to generate (default: 7)
+    no_mipmaps: bool
+        Skip mipmap generation, output single level only (default: False)
+    rolloff: RolloffMethod
+        FIR filter rolloff method for mipmap anti-aliasing. Options:
+        raised_cosine (default), tukey, hann, blackman, brick_wall
+    do_normalize: bool
+        Normalize audio to [-1, 1] range (default: True)
+    dry_run: bool
+        Preview import without writing output (default: False)
+    name: str | None
+        Wavetable name metadata
+    author: str | None
+        Wavetable author metadata
+    """
+    if not source.exists():
+        print_error(f"Error: Source file not found: {source}")
+        console.print("  Suggestion: Check the file path and try again.")
+        return 1
+
+    # Import base wavetable
+    try:
+        base_mipmaps, import_metadata = import_hires_wav(
+            source,
+            num_frames=frames,
+            frame_length=frame_size,
+            normalize=do_normalize,
+        )
+    except ValueError as e:
+        print_error(f"Error: {e}")
+        console.print("")
+        console.print("  Suggestion: Use 'wtgen analyze' to find valid frame counts:")
+        console.print(f"    wtgen analyze {source}")
+        return 1
+    except Exception as e:
+        print_error(f"Error importing file: {e}")
+        return 1
+
+    base_wavetable = base_mipmaps[0]
+    actual_frame_size = base_wavetable.shape[1]
+    actual_frames = base_wavetable.shape[0]
+
+    # Generate mipmaps if requested
+    if no_mipmaps:
+        final_mipmaps = [base_wavetable]
+        num_mip_levels = 1
+    else:
+        # Generate mipmaps with proper FIR anti-aliasing filtering
+        console.print(
+            f"Generating {mip_levels} mipmap levels with [cyan bold]{rolloff}[/] rolloff..."
+        )
+        final_mipmaps = build_multiframe_mipmap(
+            wavetable=base_wavetable,
+            num_octaves=mip_levels - 1,  # num_octaves + 1 = total levels
+            rolloff_method=rolloff,
+            decimate=True,
+        )
+        num_mip_levels = len(final_mipmaps)
+
+    # Dry run output
+    if dry_run:
+        console.print("")
+        console.print("[bold]Dry Run - No files written[/bold]")
+        console.print("")
+        console.print("[bold]Import Summary:[/bold]")
+        console.print(f"  Source: {source}")
+        console.print(f"  Frames: {actual_frames}")
+        console.print(f"  Frame size: {actual_frame_size}")
+        console.print(f"  Type: {wavetable_type.display_name}")
+        console.print(f"  Mip levels: {num_mip_levels}")
+        if name:
+            console.print(f"  Name: {name}")
+        if author:
+            console.print(f"  Author: {author}")
+        console.print(f"  Output: {output}")
+        console.print("")
+
+        # Show mip level sizes
+        console.print("[bold]Mipmap Levels:[/bold]")
+        for i, mip in enumerate(final_mipmaps):
+            rms = np.sqrt(np.mean(mip**2))
+            frames, samples = mip.shape[0], mip.shape[1]
+            console.print(f"  Level {i}: {frames} frames x {samples} samples, RMS={rms:.3f}")
+
+        return 0
+
+    # Write output file
+    try:
+        norm_method = NormalizationMethod.PEAK if do_normalize else NormalizationMethod.NONE
+        type_meta = None
+        if wavetable_type == WavetableType.HIGH_RESOLUTION:
+            type_meta = HighResolutionMetadata(max_harmonics=actual_frame_size // 2)
+
+        save_wavetable_wav(
+            output,
+            final_mipmaps,
+            wavetable_type=wavetable_type,
+            name=name or source.stem,
+            author=author,
+            normalization_method=norm_method,
+            sample_rate=int(import_metadata.get("sample_rate", 44100)),
+            type_metadata=type_meta,
+        )
+    except Exception as e:
+        print_error(f"Error writing output: {e}")
+        return 1
+
+    print_success(f"Imported {source} -> {output}")
+    console.print(f"  Frames: {actual_frames}")
+    console.print(f"  Frame size: {actual_frame_size}")
+    console.print(f"  Mip levels: {num_mip_levels}")
 
     return 0
 
