@@ -291,3 +291,190 @@ fn test_read_error_invalid_file() {
     let result = read_wavetable_from_bytes(invalid_data);
     assert!(result.is_err());
 }
+
+// ============================================================================
+// Edge Case Tests
+// ============================================================================
+
+#[test]
+fn test_edge_case_single_sample_frame() {
+    // Minimum valid frame size: 1 sample per frame
+    let metadata = create_metadata(proto::WavetableType::Custom, 1, 4, vec![1]);
+    let wtbl_data = metadata.encode_to_vec();
+
+    // 4 frames of 1 sample each
+    let samples = vec![0.0f32, 0.5, -0.5, 1.0];
+    let wav_data = build_wav_with_wtbl(&samples, 44100, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert_eq!(wavetable.metadata.frame_length, 1);
+    assert_eq!(wavetable.mip_levels[0].frames.len(), 4);
+    assert_eq!(wavetable.mip_levels[0].frames[0].len(), 1);
+    assert!((wavetable.mip_levels[0].frames[0][0] - 0.0).abs() < 1e-6);
+    assert!((wavetable.mip_levels[0].frames[1][0] - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn test_edge_case_single_frame_wavetable() {
+    // Minimum valid: single frame with multiple samples
+    let metadata = create_metadata(proto::WavetableType::Custom, 16, 1, vec![16]);
+    let wtbl_data = metadata.encode_to_vec();
+    let samples = create_samples(&metadata, 0.25);
+    let wav_data = build_wav_with_wtbl(&samples, 44100, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert_eq!(wavetable.metadata.num_frames, 1);
+    assert_eq!(wavetable.mip_levels[0].frames.len(), 1);
+}
+
+#[test]
+fn test_edge_case_minimal_wavetable() {
+    // Absolute minimum: 1 frame of 1 sample
+    let metadata = create_metadata(proto::WavetableType::Custom, 1, 1, vec![1]);
+    let wtbl_data = metadata.encode_to_vec();
+    let samples = vec![0.42f32];
+    let wav_data = build_wav_with_wtbl(&samples, 44100, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert_eq!(wavetable.metadata.frame_length, 1);
+    assert_eq!(wavetable.metadata.num_frames, 1);
+    assert_eq!(wavetable.mip_levels.len(), 1);
+    assert!((wavetable.mip_levels[0].frames[0][0] - 0.42).abs() < 1e-6);
+}
+
+#[test]
+fn test_edge_case_many_mip_levels() {
+    // Test with many mip levels (8 levels)
+    let metadata = create_metadata(
+        proto::WavetableType::HighResolution,
+        2048,
+        8,
+        vec![2048, 1024, 512, 256, 128, 64, 32, 16],
+    );
+    let wtbl_data = metadata.encode_to_vec();
+    let samples = create_samples(&metadata, 0.1);
+    let wav_data = build_wav_with_wtbl(&samples, 48000, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert_eq!(wavetable.mip_levels.len(), 8);
+    assert_eq!(wavetable.mip_levels[0].frame_length, 2048);
+    assert_eq!(wavetable.mip_levels[7].frame_length, 16);
+}
+
+#[test]
+fn test_edge_case_two_sample_frame() {
+    // Two samples per frame - smallest power of 2 greater than 1
+    let metadata = create_metadata(proto::WavetableType::Custom, 2, 2, vec![2]);
+    let wtbl_data = metadata.encode_to_vec();
+    let samples = vec![0.5f32, -0.5, 0.25, -0.25];
+    let wav_data = build_wav_with_wtbl(&samples, 44100, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert_eq!(wavetable.mip_levels[0].frames[0], vec![0.5, -0.5]);
+    assert_eq!(wavetable.mip_levels[0].frames[1], vec![0.25, -0.25]);
+}
+
+#[test]
+fn test_edge_case_boundary_sample_values() {
+    // Test with boundary float values (not NaN/Inf but at edges)
+    let metadata = create_metadata(proto::WavetableType::Custom, 4, 1, vec![4]);
+    let wtbl_data = metadata.encode_to_vec();
+
+    // Use extreme but valid values
+    let samples = vec![1.0f32, -1.0, 0.0, f32::MIN_POSITIVE];
+    let wav_data = build_wav_with_wtbl(&samples, 44100, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert!((wavetable.mip_levels[0].frames[0][0] - 1.0).abs() < 1e-6);
+    assert!((wavetable.mip_levels[0].frames[0][1] - (-1.0)).abs() < 1e-6);
+    assert!((wavetable.mip_levels[0].frames[0][2] - 0.0).abs() < 1e-6);
+}
+
+#[test]
+fn test_edge_case_large_frame_count() {
+    // Test with many frames (256 frames)
+    let metadata = create_metadata(proto::WavetableType::Custom, 4, 256, vec![4]);
+    let wtbl_data = metadata.encode_to_vec();
+    let samples = create_samples(&metadata, 0.5);
+    let wav_data = build_wav_with_wtbl(&samples, 44100, &wtbl_data);
+
+    let wavetable = read_wavetable_from_bytes(&wav_data).unwrap();
+
+    assert_eq!(wavetable.mip_levels[0].frames.len(), 256);
+}
+
+// ============================================================================
+// RIFF Parser Edge Case Tests (for fuzz coverage)
+// ============================================================================
+
+#[test]
+fn test_riff_parser_truncated_header() {
+    // Less than 12 bytes - should fail gracefully
+    let data = b"RIFF\x04\x00";
+    let result = read_wavetable_from_bytes(data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_riff_parser_invalid_magic() {
+    // Valid size but wrong magic
+    let mut data = vec![0u8; 44];
+    data[0..4].copy_from_slice(b"XXXX"); // Not RIFF
+    let result = read_wavetable_from_bytes(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_riff_parser_not_wave_format() {
+    // RIFF but not WAVE format
+    let mut data = vec![0u8; 44];
+    data[0..4].copy_from_slice(b"RIFF");
+    data[4..8].copy_from_slice(&36u32.to_le_bytes());
+    data[8..12].copy_from_slice(b"AVI "); // Not WAVE
+    let result = read_wavetable_from_bytes(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_riff_parser_huge_declared_size() {
+    // RIFF header with size claiming file is huge (overflow test)
+    let mut data = vec![0u8; 44];
+    data[0..4].copy_from_slice(b"RIFF");
+    data[4..8].copy_from_slice(&u32::MAX.to_le_bytes()); // Huge size
+    data[8..12].copy_from_slice(b"WAVE");
+    // Should not panic due to our saturating_add fix
+    let result = read_wavetable_from_bytes(&data);
+    assert!(result.is_err()); // Will error but shouldn't panic
+}
+
+#[test]
+fn test_riff_parser_chunk_size_overflow() {
+    // Chunk with size that would overflow when added to offset
+    let mut data = vec![0u8; 100];
+    data[0..4].copy_from_slice(b"RIFF");
+    data[4..8].copy_from_slice(&92u32.to_le_bytes());
+    data[8..12].copy_from_slice(b"WAVE");
+    // fmt chunk
+    data[12..16].copy_from_slice(b"fmt ");
+    data[16..20].copy_from_slice(&u32::MAX.to_le_bytes()); // Overflow-inducing chunk size
+    // Should not panic due to our checked_add fix
+    let result = read_wavetable_from_bytes(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_riff_parser_empty_after_header() {
+    // Just the RIFF/WAVE header with no chunks
+    let mut data = vec![0u8; 12];
+    data[0..4].copy_from_slice(b"RIFF");
+    data[4..8].copy_from_slice(&4u32.to_le_bytes()); // Just WAVE
+    data[8..12].copy_from_slice(b"WAVE");
+    let result = read_wavetable_from_bytes(&data);
+    assert!(result.is_err()); // No WTBL chunk
+}
