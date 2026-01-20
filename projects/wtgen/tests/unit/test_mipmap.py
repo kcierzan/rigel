@@ -6,7 +6,7 @@ import pytest
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
-from wtgen.dsp.mipmap import Mipmap, MipmapChain, MipmapLevel
+from wtgen.dsp.mipmap import Mipmap, MipmapChain, MipmapLevel, build_multiframe_mipmap
 from wtgen.utils import EPSILON
 
 
@@ -816,3 +816,201 @@ class TestMipmapEdgeCases:
         except (ValueError, RuntimeError):
             # If it raises an exception, that's also acceptable behavior
             pass
+
+
+class TestBuildMultiframeMipmap:
+    """Tests for the build_multiframe_mipmap function."""
+
+    def test_multiframe_basic(self):
+        """Test basic multiframe mipmap generation."""
+        num_frames = 8
+        frame_length = 1024
+        num_octaves = 5
+
+        # Create multi-frame test wavetable
+        t = np.linspace(0, 2 * np.pi, frame_length, endpoint=False)
+        wavetable = np.zeros((num_frames, frame_length), dtype=np.float64)
+        for i in range(num_frames):
+            # Each frame has slightly different harmonic content
+            wavetable[i] = np.sin(t) + 0.3 * np.sin((i + 1) * t)
+
+        mipmaps = build_multiframe_mipmap(wavetable, num_octaves=num_octaves)
+
+        # Should have correct number of levels
+        assert len(mipmaps) == num_octaves + 1
+
+        # Each level should have correct number of frames
+        for level_idx, level in enumerate(mipmaps):
+            assert level.shape[0] == num_frames, (
+                f"Level {level_idx}: expected {num_frames} frames, got {level.shape[0]}"
+            )
+            assert level.dtype == np.float32
+
+        # First level should have original frame length
+        assert mipmaps[0].shape[1] == frame_length
+
+        # Subsequent levels should be decimated
+        for level_idx in range(1, len(mipmaps)):
+            expected_length = max(frame_length // (2**level_idx), 64)
+            assert mipmaps[level_idx].shape[1] == expected_length, (
+                f"Level {level_idx}: expected {expected_length} samples, "
+                f"got {mipmaps[level_idx].shape[1]}"
+            )
+
+    def test_multiframe_no_aliasing(self):
+        """Test that multiframe mipmap prevents aliasing with proper filtering."""
+        num_frames = 4
+        frame_length = 2048
+        sample_rate = 44100.0
+
+        # Create multi-frame wavetable with high harmonic content
+        t = np.linspace(0, 2 * np.pi, frame_length, endpoint=False)
+        wavetable = np.zeros((num_frames, frame_length), dtype=np.float64)
+        for i in range(num_frames):
+            # Rich harmonic content that would cause aliasing without filtering
+            for h in range(1, 30):
+                wavetable[i] += (1.0 / h) * np.sin(h * t)
+
+        mipmaps = build_multiframe_mipmap(wavetable, num_octaves=6, sample_rate=sample_rate)
+
+        # Check that higher mip levels have reduced high-frequency content
+        for level_idx in range(1, len(mipmaps)):
+            level = mipmaps[level_idx]
+            level_length = level.shape[1]
+
+            # Analyze each frame's spectral content
+            for frame_idx in range(num_frames):
+                frame = level[frame_idx]
+                spectrum = np.abs(np.fft.fft(frame))
+
+                # Calculate the expected cutoff for this level
+                # Higher levels should have less high-frequency content
+                half_spectrum = spectrum[: level_length // 2]
+
+                # No significant energy should be above the level's Nyquist-safe frequency
+                # The energy in upper bins should be greatly reduced
+                upper_quarter_energy = np.sum(half_spectrum[level_length // 4 :])
+                lower_quarter_energy = np.sum(half_spectrum[: level_length // 4])
+
+                # Upper frequencies should have less energy than lower frequencies
+                # This is a loose check since exact ratios depend on the filtering
+                if lower_quarter_energy > EPSILON:
+                    ratio = upper_quarter_energy / lower_quarter_energy
+                    # Higher levels should have more aggressive filtering
+                    assert ratio < 1.0, (
+                        f"Level {level_idx}, frame {frame_idx}: "
+                        f"upper/lower energy ratio {ratio:.3f} too high"
+                    )
+
+    def test_multiframe_consistency(self):
+        """Test that each frame is processed correctly and consistently."""
+        num_frames = 4
+        frame_length = 512
+
+        # Create wavetable where each frame is the same
+        t = np.linspace(0, 2 * np.pi, frame_length, endpoint=False)
+        single_frame = np.sin(t) + 0.5 * np.sin(3 * t)
+        wavetable = np.tile(single_frame, (num_frames, 1))
+
+        mipmaps = build_multiframe_mipmap(wavetable, num_octaves=4)
+
+        # All frames within each level should be nearly identical
+        for level_idx, level in enumerate(mipmaps):
+            for frame_idx in range(1, num_frames):
+                # Frames should be very similar (within floating point tolerance)
+                diff = np.max(np.abs(level[frame_idx] - level[0]))
+                assert diff < 1e-5, (
+                    f"Level {level_idx}: frame {frame_idx} differs from frame 0 by {diff}"
+                )
+
+    def test_multiframe_single_frame(self):
+        """Test multiframe mipmap with single frame wavetable."""
+        frame_length = 1024
+
+        t = np.linspace(0, 2 * np.pi, frame_length, endpoint=False)
+        wavetable = np.sin(t).reshape(1, frame_length)
+
+        mipmaps = build_multiframe_mipmap(wavetable, num_octaves=4)
+
+        # Should work correctly with single frame
+        assert len(mipmaps) == 5
+        for level in mipmaps:
+            assert level.shape[0] == 1
+            assert level.dtype == np.float32
+
+    def test_multiframe_different_rolloff_methods(self):
+        """Test multiframe mipmap with different rolloff methods."""
+        num_frames = 2
+        frame_length = 512
+
+        t = np.linspace(0, 2 * np.pi, frame_length, endpoint=False)
+        wavetable = np.zeros((num_frames, frame_length), dtype=np.float64)
+        for i in range(num_frames):
+            wavetable[i] = np.sin(t) + 0.3 * np.sin(5 * t)
+
+        rolloff_methods = ["raised_cosine", "tukey", "hann", "blackman", "brick_wall"]
+
+        for method in rolloff_methods:
+            mipmaps = build_multiframe_mipmap(wavetable, num_octaves=3, rolloff_method=method)
+
+            # Should produce valid output regardless of method
+            assert len(mipmaps) == 4
+            for level in mipmaps:
+                assert level.shape[0] == num_frames
+                assert np.all(np.isfinite(level))
+                # Should not clip
+                assert np.all(level >= -1.0)
+                assert np.all(level <= 1.0)
+
+    def test_multiframe_invalid_input_1d(self):
+        """Test that 1D input raises an error."""
+        wavetable_1d = np.sin(np.linspace(0, 2 * np.pi, 512))
+
+        with pytest.raises(ValueError, match="Expected 2D wavetable"):
+            build_multiframe_mipmap(wavetable_1d)
+
+    def test_multiframe_invalid_input_3d(self):
+        """Test that 3D input raises an error."""
+        wavetable_3d = np.zeros((4, 512, 2))
+
+        with pytest.raises(ValueError, match="Expected 2D wavetable"):
+            build_multiframe_mipmap(wavetable_3d)
+
+    def test_multiframe_no_clipping(self):
+        """Test that multiframe mipmap prevents clipping with extreme values."""
+        num_frames = 4
+        frame_length = 256
+
+        # Create wavetable with extreme values
+        wavetable = np.random.randn(num_frames, frame_length) * 100.0
+
+        mipmaps = build_multiframe_mipmap(wavetable, num_octaves=3)
+
+        # All levels should be properly normalized without clipping
+        for level_idx, level in enumerate(mipmaps):
+            assert np.all(level >= -1.0), f"Level {level_idx}: clipping detected (values < -1.0)"
+            assert np.all(level <= 1.0), f"Level {level_idx}: clipping detected (values > 1.0)"
+
+    @given(
+        num_frames=st.integers(min_value=1, max_value=16),
+        frame_length=st.sampled_from([64, 128, 256, 512, 1024]),
+        num_octaves=st.integers(min_value=1, max_value=6),
+    )
+    @settings(deadline=None, max_examples=20)
+    def test_multiframe_hypothesis(self, num_frames, frame_length, num_octaves):
+        """Property-based test for multiframe mipmap generation."""
+        # Create random wavetable
+        wavetable = np.random.randn(num_frames, frame_length).astype(np.float64)
+
+        mipmaps = build_multiframe_mipmap(wavetable, num_octaves=num_octaves)
+
+        # Basic validity checks
+        assert len(mipmaps) == num_octaves + 1
+
+        for _level_idx, level in enumerate(mipmaps):
+            assert level.shape[0] == num_frames
+            assert level.dtype == np.float32
+            assert np.all(np.isfinite(level))
+            # Should not clip
+            assert np.all(level >= -1.0)
+            assert np.all(level <= 1.0)
