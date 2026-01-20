@@ -46,7 +46,7 @@ All of these commands can be launched from inside the shell, or via `devenv shel
 - `devenv shell -- uv:sync` – rebuild `.venv` from `uv.lock` (re-runs sync + editable install).
 - `devenv shell -- lint` – Ruff lint.
 - `devenv shell -- format` – Ruff formatter.
-- `devenv shell -- typecheck` – mypy followed by basedpyright (use `typecheck:mypy` or `typecheck:pyright` individually as needed).
+- `devenv shell -- typecheck` – ty type checker.
 - `devenv shell -- test:full` – full pytest suite with xdist auto-sharding.
 - `devenv shell -- test:fast` – single-process pytest with `-x --tb=short`.
 
@@ -111,32 +111,6 @@ uv run wtgen generate square \
 # Generate a polyblep sawtooth (band-limited)
 uv run wtgen generate polyblep_saw --output polyblep.npz
 ```
-
-## Plotting API
-
-The `wtgen.plotting` module provides data-first helpers that work well in notebooks,
-tests, or LLM-powered tooling. Each helper returns a `PlotFigure` dataclass that can
-either be rendered to matplotlib or inspected as structured data:
-
-```python
-from wtgen.plotting import tables_plot_figure, render_figure
-from wtgen.export import load_wavetable_npz
-
-data = load_wavetable_npz("sawtooth.npz")
-figure = tables_plot_figure(data["tables"], table_id="base")
-
-# Text summary for quick inspection or logging
-print(figure.summary(max_points=4))
-
-# Render when you actually need the image output
-render_figure(figure, show=True)
-```
-
-The summary/`to_dict` helpers expose key RMS/peak statistics so automated
-verification (including tests and LLM agents) can reason about the plots without
-opening a GUI. Extending the plotting system only requires creating new
-`PlotPanel`/`PlotFigure` instances, so CLI features automatically gain visualization
-support by reusing the same interface.
 
 ### Generate Harmonic Wavetables
 
@@ -274,113 +248,6 @@ Each mipmap level goes through a standardized processing pipeline:
 4. **Zero-crossing Alignment**: Ensure consistent phase relationships
 
 This ensures consistent playback characteristics across all mipmap levels.
-
-## Python API Usage
-
-For programmatic access, wtgen provides a clean Python API for wavetable generation:
-
-### Basic Wavetable Generation
-
-```python
-import numpy as np
-from wtgen.dsp.waves import harmonics_to_table, generate_polyblep_sawtooth_wavetable
-from wtgen.dsp.mipmap import build_mipmap
-from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
-
-# Generate a sawtooth wave from harmonics
-partials = [(i, 1.0/i, 0.0) for i in range(1, 17)]  # 1/n amplitude series
-wavetable = harmonics_to_table(partials, table_size=2048)
-
-# Create mipmaps for alias-free playback
-mipmaps = build_mipmap(wavetable, num_octaves=8, rolloff_method='tukey')
-
-# Process each mipmap level
-processed_mipmaps = []
-for mipmap in mipmaps:
-    processed = align_to_zero_crossing(dc_remove(normalize(mipmap)))
-    processed_mipmaps.append(processed)
-
-# Save to file
-np.savez_compressed('my_wavetable.npz',
-                   mipmaps=np.array(processed_mipmaps, dtype=np.float32))
-```
-
-### Custom Harmonic Content
-
-```python
-from wtgen.dsp.waves import harmonics_to_table
-
-# Create a custom waveform with specific harmonics
-# Format: (harmonic_number, amplitude, phase_radians)
-custom_partials = [
-    (1, 1.0, 0.0),      # Fundamental
-    (2, 0.5, 0.0),      # Second harmonic
-    (3, 0.33, np.pi),   # Third harmonic (inverted)
-    (5, 0.2, np.pi/2),  # Fifth harmonic (90° phase)
-]
-
-wavetable = harmonics_to_table(custom_partials, table_size=2048)
-```
-
-### Different Waveform Types
-
-```python
-from wtgen.plotting import (
-    generate_sawtooth_wavetable,
-    generate_square_wavetable,
-    generate_pulse_wavetable,
-    generate_triangle_wavetable
-)
-
-# Generate different base waveforms
-_, sawtooth = generate_sawtooth_wavetable(frequency=1.0)
-_, square = generate_square_wavetable(frequency=1.0, duty_cycle=0.5)
-_, pulse = generate_pulse_wavetable(frequency=1.0, duty_cycle=0.1)
-_, triangle = generate_triangle_wavetable(frequency=1.0)
-```
-
-### Advanced Mipmap Configuration
-
-```python
-from wtgen.dsp.mipmap import build_mipmap
-
-# Try different rolloff methods
-rolloff_methods = ['tukey', 'hann', 'blackman', 'raised_cosine']
-
-for method in rolloff_methods:
-    mipmaps = build_mipmap(
-        wavetable,
-        num_octaves=10,
-        rolloff_method=method,
-        sample_rate=44100  # Optional: specify sample rate
-    )
-    print(f"{method}: {len(mipmaps)} mipmap levels generated")
-```
-
-### Loading and Analyzing Wavetables
-
-```python
-import numpy as np
-
-# Load a generated wavetable
-data = np.load('my_wavetable.npz', allow_pickle=True)
-mipmaps = data['mipmaps']
-metadata = data.get('metadata', {})
-
-print(f"Mipmap levels: {len(mipmaps)}")
-print(f"Table size: {mipmaps[0].shape[0]}")
-
-# Analyze RMS levels
-for i, mipmap in enumerate(mipmaps):
-    rms = np.sqrt(np.mean(mipmap**2))
-    print(f"Level {i} RMS: {rms:.3f}")
-
-# Frequency analysis
-import scipy.fft
-spectrum = np.abs(scipy.fft.fft(mipmaps[0]))
-freqs = scipy.fft.fftfreq(len(spectrum))
-# Plot or analyze spectrum as needed
-```
 
 ## Installation
 
@@ -533,14 +400,8 @@ uv run ruff format
 
 ### Type Checking
 
-The project supports both mypy and basedpyright for type checking:
+The project uses ty for type checking:
 
 ```bash
-# Using mypy
-uv run mypy src/
-
-# Using basedpyright (configured to suppress noisy warnings from scientific libraries)
-uv run basedpyright src/
+devenv shell -- typecheck
 ```
-
-Basedpyright is configured in `pyproject.toml` to suppress warnings about missing type stubs and unknown types from third-party scientific libraries while still catching real type errors.

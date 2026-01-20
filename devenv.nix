@@ -114,7 +114,6 @@ in
     with pkgs;
     [
       python3
-      basedpyright
       git
       pkg-config
       cmake

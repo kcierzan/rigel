@@ -140,7 +140,7 @@ This is a monorepo with:
 **Purpose**: Improvements that affect multiple user stories
 
 - [X] T046 [P] Add property-based tests (Hypothesis) for Python format module in projects/wtgen/tests/unit/format/test_properties.py
-- [X] T047 Run full Python quality checks (ruff, mypy, basedpyright) for format module
+- [X] T047 Run full Python quality checks (ruff, ty) for format module
 - [X] T048 Run full Rust quality checks (cargo fmt, clippy) for wavetable-io
 - [X] T049 [P] Add performance benchmark for wavetable loading (target: <5s for 100MB per SC-003) in projects/rigel-synth/crates/wavetable-io/benches/loading_bench.rs
 - [X] T050 Validate quickstart.md scenarios work end-to-end
