@@ -90,9 +90,7 @@ def save_wavetable_wav(
         if mip_arr.ndim != 2:
             raise ValueError(f"mipmaps[{i}] should be 2D, got shape {mip_arr.shape}")
         if mip_arr.shape[0] != num_frames:
-            raise ValueError(
-                f"mipmaps[{i}] has {mip_arr.shape[0]} frames, expected {num_frames}"
-            )
+            raise ValueError(f"mipmaps[{i}] has {mip_arr.shape[0]} frames, expected {num_frames}")
         mip_frame_lengths.append(mip_arr.shape[1])
 
     # Build metadata

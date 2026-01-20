@@ -139,9 +139,7 @@ def validate_audio_data(
 
     # Check number of mip levels
     if len(mipmaps) != metadata.num_mip_levels:
-        errors.append(
-            f"Expected {metadata.num_mip_levels} mip levels, got {len(mipmaps)}"
-        )
+        errors.append(f"Expected {metadata.num_mip_levels} mip levels, got {len(mipmaps)}")
         return ValidationResult.failure(errors, warnings)
 
     # Check each mip level

@@ -88,9 +88,7 @@ class PlotFigure:
             for series in panel.series:
                 preview = series.to_dict(max_points=max_points)
                 first_points = preview["points"][: min(max_points, len(preview["points"]))]
-                lines.append(
-                    f"  · {series.label}: {len(series.x)} samples, preview={first_points}"
-                )
+                lines.append(f"  · {series.label}: {len(series.x)} samples, preview={first_points}")
         return "\n".join(lines)
 
     def to_dict(self, max_points: int = 64) -> dict[str, Any]:
@@ -266,9 +264,7 @@ def compare_sawtooth_methods(
         ylabel="Amplitude",
     )
 
-    discontinuity_indices = [
-        i for i in range(1, len(naive)) if naive[i] < naive[i - 1]
-    ]
+    discontinuity_indices = [i for i in range(1, len(naive)) if naive[i] < naive[i - 1]]
 
     if discontinuity_indices:
         disc_idx = discontinuity_indices[0]

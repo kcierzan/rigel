@@ -133,7 +133,6 @@ class WavetableMetadata(Message):
     def vintage_emulation(self) -> VintageEmulationMetadata: ...
     @property
     def pcm_sample(self) -> PcmSampleMetadata: ...
-
     def __init__(
         self,
         *,

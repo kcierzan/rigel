@@ -39,6 +39,7 @@ Example Usage
 >>> print(wavetable.metadata.name)
 """
 
+from wtgen.format.importers import detect_wav_wavetable
 from wtgen.format.standard.reader import WavetableFile, load_wavetable_wav
 from wtgen.format.standard.writer import save_wavetable_wav
 from wtgen.format.types import (
@@ -74,4 +75,6 @@ __all__ = [
     "validate_metadata",
     "validate_audio_data",
     "ValidationError",
+    # Analysis
+    "detect_wav_wavetable",
 ]
