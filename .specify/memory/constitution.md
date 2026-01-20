@@ -1,15 +1,12 @@
 <!--
 Sync Impact Report:
-Version: 1.0.1 → 1.1.0 (MINOR: Material expansion of Principle IV)
+Version: 1.1.0 → 1.1.1 (PATCH: Update type checker references from mypy/basedpyright to ty)
 Modified Principles:
-  - Principle IV (Performance Accountability): Added rigel-math mandate for optimized math operations
-Added Sections:
-  - "Math Operation Requirements" subsection in Principle IV
+  - Principle III (Test-Driven Validation): Updated type checker reference to ty
+  - Type Safety section: Updated type checking requirement to ty
+Added Sections: None
 Removed Sections: None
-Templates Requiring Updates:
-  ✅ .specify/templates/plan-template.md - Reviewed, no updates needed (generic constitution check)
-  ✅ .specify/templates/spec-template.md - Reviewed, no updates needed (generic requirements)
-  ✅ .specify/templates/tasks-template.md - Reviewed, no updates needed (generic task structure)
+Templates Requiring Updates: None (no template changes needed for type checker tool update)
 Follow-up TODOs: None
 -->
 
@@ -52,7 +49,7 @@ All DSP changes MUST be validated through both automated tests and audible verif
 - Rust: ALWAYS run architecture-specific tests for features available on the current host (NEON on aarch64, AVX2/AVX-512 on x86_64)
 - Rust: ALWAYS add tests for new code and run them before task completion
 - Python (wtgen): 103+ tests including property-based testing with Hypothesis
-- Python (wtgen): ALWAYS run pytest, mypy, basedpyright, and ruff before considering changes complete
+- Python (wtgen): ALWAYS run pytest, ty, and ruff before considering changes complete
 - Python (wtgen): ALWAYS add tests for new code and run them before task completion
 - For audio changes: Regenerate WAV fixtures via CLI and verify audibly
 
@@ -125,7 +122,7 @@ All wavetable DSP operations MUST preserve mathematical invariants to ensure ali
 
 - Line length: 100 characters (pyproject.toml)
 - Type hints REQUIRED on all public functions
-- MUST pass both mypy and basedpyright
+- MUST pass ty type checking
 - Ruff for linting and formatting
 - Scientific computing conventions allow magic values for DSP algorithms
 
@@ -189,4 +186,4 @@ Development guidance for AI agents (Claude Code) is maintained in `CLAUDE.md`. T
 - CI/CD pipeline information
 - Performance targets and benchmarking procedures
 
-**Version**: 1.1.0 | **Ratified**: 2025-11-17 | **Last Amended**: 2025-12-07
+**Version**: 1.1.1 | **Ratified**: 2025-11-17 | **Last Amended**: 2026-01-19
