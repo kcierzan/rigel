@@ -16,6 +16,7 @@ import numpy as np
 import soundfile as sf
 from numpy.typing import NDArray
 
+from wtgen.dsp.mipmap import build_multiframe_mipmap
 from wtgen.format.analysis.inference import infer_wavetable_type
 from wtgen.format.types import WavetableType
 
@@ -176,16 +177,18 @@ def detect_wav_wavetable(
                 is_power_of_two = frame_length > 0 and (frame_length & (frame_length - 1)) == 0
 
                 # Create temporary wavetable for type inference
-                temp_wavetable = data[:num_frames * frame_length].reshape(num_frames, frame_length)
+                temp_wavetable = data[: num_frames * frame_length].reshape(num_frames, frame_length)
                 temp_wavetable = temp_wavetable.astype(np.float32)
                 wt_type, _ = infer_wavetable_type(temp_wavetable)
 
-                suggestions.append({
-                    "num_frames": num_frames,
-                    "frame_length": frame_length,
-                    "is_power_of_two": is_power_of_two,
-                    "likely_type": wt_type.name,
-                })
+                suggestions.append(
+                    {
+                        "num_frames": num_frames,
+                        "frame_length": frame_length,
+                        "is_power_of_two": is_power_of_two,
+                        "likely_type": wt_type.name,
+                    }
+                )
 
     # Sort by likelihood (prefer power-of-two frame lengths)
     suggestions.sort(key=lambda s: (not s["is_power_of_two"], s["num_frames"]))
@@ -209,36 +212,36 @@ def import_wav_with_mips(
     num_frames: int,
     num_mip_levels: int = 7,
     normalize: bool = True,
+    rolloff_method: str = "raised_cosine",
 ) -> tuple[list[NDArray[np.float32]], dict[str, Any]]:
-    """Import a WAV file and generate mip levels automatically.
+    """Import a WAV file and generate mip levels with proper anti-aliasing.
 
-    This is a convenience function that imports a WAV file and generates
-    bandwidth-limited mip levels using simple decimation.
-
-    For production use, consider using wtgen's proper mip generation
-    which includes anti-aliasing filtering.
+    This function imports a WAV file and generates bandwidth-limited mip levels
+    using proper FIR anti-aliasing filtering before decimation to prevent
+    aliasing artifacts.
 
     Args:
         path: Path to the WAV file.
         num_frames: Number of frames to extract.
         num_mip_levels: Number of mip levels to generate.
         normalize: Whether to normalize audio to [-1, 1].
+        rolloff_method: FIR filter rolloff method for anti-aliasing.
+            Options: "raised_cosine" (default), "tukey", "hann", "blackman", "brick_wall".
 
     Returns:
         Tuple of (mipmaps, metadata) where mipmaps has multiple levels.
     """
     # Import base level
-    mipmaps, metadata = import_hires_wav(path, num_frames, normalize=normalize)
-    base = mipmaps[0]
+    base_mipmaps, metadata = import_hires_wav(path, num_frames, normalize=normalize)
+    base = base_mipmaps[0]
 
-    # Generate additional mip levels
-    current = base
-    for _ in range(1, num_mip_levels):
-        # Simple decimation (production code should low-pass filter first)
-        if current.shape[1] < 8:  # Minimum frame length
-            break
-        decimated = current[:, ::2]  # Take every other sample
-        mipmaps.append(decimated.astype(np.float32))
-        current = decimated
+    # Generate mipmap levels with proper FIR anti-aliasing
+    # num_octaves + 1 = total levels, so num_mip_levels - 1 = num_octaves
+    mipmaps = build_multiframe_mipmap(
+        wavetable=base,
+        num_octaves=num_mip_levels - 1,
+        rolloff_method=rolloff_method,
+        decimate=True,
+    )
 
     return mipmaps, metadata
