@@ -15,10 +15,9 @@
 }:
 
 let
-  # We target Python 3.11 because it is the lowest supported version in
-  # pyproject.toml and still the most stable release for NumPy/Numba in late
-  # 2024.  Using a single constant makes it trivial to bump in the future.
-  pythonVersion = "3.11";
+  # We target Python 3.13, which is now stable and well-supported by NumPy/Numba.
+  # Using a single constant makes it trivial to bump in the future.
+  pythonVersion = "3.13";
 
   # Convenience booleans used in a few conditional package selections.
   isLinux = pkgs.stdenv.isLinux;

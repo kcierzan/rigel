@@ -5,8 +5,6 @@ This module provides parametric EQ functionality that can be applied to mipmap
 chains while preserving phase relationships and RMS levels.
 """
 
-from typing import TypeAlias
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -14,8 +12,8 @@ from wtgen.dsp.process import align_to_zero_crossing
 from wtgen.utils import EPSILON
 
 # Type aliases
-EQBand: TypeAlias = dict[str, float]
-EQSettings: TypeAlias = list[EQBand]
+type EQBand = dict[str, float]
+type EQSettings = list[EQBand]
 
 
 class Equalizer:

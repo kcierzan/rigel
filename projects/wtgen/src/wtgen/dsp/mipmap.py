@@ -1,4 +1,4 @@
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -8,8 +8,8 @@ from wtgen.dsp.fir import FIRFilter, RolloffMethod
 from wtgen.utils import EPSILON
 
 # Type alias for mipmap levels
-MipmapLevel: TypeAlias = NDArray[np.float32]
-MipmapChain: TypeAlias = list[MipmapLevel]
+type MipmapLevel = NDArray[np.float32]
+type MipmapChain = list[MipmapLevel]
 
 TARGET_RMS = 0.35  # This provides good headroom while maximizing signal level
 
