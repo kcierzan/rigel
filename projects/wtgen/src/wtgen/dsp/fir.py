@@ -1,4 +1,4 @@
-from typing import Literal, TypeAlias
+from typing import Literal
 
 import numpy as np
 from numpy import cos, pi
@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 
 from wtgen.utils import assert_exhaustiveness
 
-RolloffMethod: TypeAlias = Literal["raised_cosine", "tukey", "hann", "blackman", "brick_wall"]
+type RolloffMethod = Literal["raised_cosine", "tukey", "hann", "blackman", "brick_wall"]
 
 
 class FIRFilter:

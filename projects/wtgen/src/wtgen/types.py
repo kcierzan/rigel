@@ -1,14 +1,15 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
 
-WavetableData: TypeAlias = NDArray[np.float32]
-MipmapList: TypeAlias = list[WavetableData]
-WavetableTables: TypeAlias = dict[str, MipmapList]
+type WavetableData = NDArray[np.float32]
+type MipmapList = list[WavetableData]
+type WavetableTables = dict[str, MipmapList]
+type WavetableMetadata = dict[str, Any]
 
 BitDepth = Literal[16, 24, 32]
 
@@ -64,4 +65,4 @@ class HarmonicPartial:
     phase: float
 
 
-HarmonicPartialList: TypeAlias = list[HarmonicPartial]
+type HarmonicPartialList = list[HarmonicPartial]

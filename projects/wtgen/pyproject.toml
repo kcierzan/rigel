@@ -3,7 +3,7 @@ name = "wtgen"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.0",
     "scipy>=1.16",
@@ -55,7 +55,7 @@ include = ["src"]
 exclude = ["tests", "**/__pycache__", "*_pb2.py", "*_pb2.pyi"]
 
 [tool.ty.environment]
-python-version = "3.11"
+python-version = "3.13"
 
 [tool.ty.terminal]
 output-format = "full"
