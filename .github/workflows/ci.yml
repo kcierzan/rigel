@@ -79,7 +79,8 @@ jobs:
             libxcb-shape0-dev \
             libxcb-xfixes0-dev \
             libxcb-icccm4-dev \
-            libxcb-dri2-0-dev
+            libxcb-dri2-0-dev \
+            protobuf-compiler
 
       - name: Run clippy
         run: cargo clippy --locked --all-targets -- -D warnings
@@ -123,7 +124,8 @@ jobs:
             libxcb-shape0-dev \
             libxcb-xfixes0-dev \
             libxcb-icccm4-dev \
-            libxcb-dri2-0-dev
+            libxcb-dri2-0-dev \
+            protobuf-compiler
 
       - name: Fetch dependencies
         run: cargo fetch --locked
@@ -180,6 +182,10 @@ jobs:
       - name: Ruff lint
         working-directory: projects/wtgen
         run: uv run ruff check .
+
+      - name: Type check (ty)
+        working-directory: projects/wtgen
+        run: uv run ty check src/
 
       - name: Run wtgen tests
         working-directory: projects/wtgen
@@ -242,6 +248,7 @@ jobs:
             libxcb-xfixes0-dev \
             libxcb-icccm4-dev \
             libxcb-dri2-0-dev \
+            protobuf-compiler \
             mold
 
       - name: Fetch dependencies
@@ -284,6 +291,9 @@ jobs:
           cache-on-failure: true
           shared-key: build-windows
           save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Cache xwin SDK
         uses: actions/cache@v4
@@ -332,6 +342,9 @@ jobs:
           shared-key: build-macos
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - name: Install protobuf compiler
+        run: brew install protobuf
+
       - name: Fetch dependencies
         run: cargo fetch --locked
 
@@ -370,6 +383,9 @@ jobs:
           cache-on-failure: true
           shared-key: neon-tests
           save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install protobuf compiler
+        run: brew install protobuf
 
       - name: Fetch dependencies
         run: cargo fetch --locked

@@ -4,6 +4,7 @@ Integration tests for EQ functionality with the complete wavetable generation pi
 Tests EQ integration with CLI commands, mipmap generation, and export functionality.
 """
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -15,7 +16,12 @@ from wtgen.dsp.fir import RolloffMethod
 from wtgen.dsp.mipmap import Mipmap
 from wtgen.dsp.process import align_to_zero_crossing, dc_remove, normalize
 from wtgen.dsp.waves import WaveGenerator
-from wtgen.export import load_wavetable_npz, save_wavetable_npz
+from wtgen.format import (
+    NormalizationMethod,
+    WavetableType,
+    load_wavetable_wav,
+    save_wavetable_wav,
+)
 
 
 class TestEQWithMipmapPipeline:
@@ -266,10 +272,10 @@ class TestEQWithHarmonics:
 class TestEQExportCompatibility:
     """Test EQ compatibility with export formats."""
 
-    def test_eq_with_npz_export(self):
-        """Test EQ works correctly with NPZ export."""
+    def test_eq_with_wtbl_export(self):
+        """Test EQ works correctly with WTBL export."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = Path(temp_dir) / "eq_test.npz"
+            output_path = Path(temp_dir) / "eq_test.wav"
 
             # Generate EQ'd wavetable
             _, base_wave = WaveGenerator().sawtooth(1.0)
@@ -283,26 +289,24 @@ class TestEQExportCompatibility:
                 proc = align_to_zero_crossing(dc_remove(normalize(mip)))
                 processed.append(proc)
 
-            # Export
-            tables = {"base": processed}
-            meta = {
-                "version": 1,
-                "name": "eq_test",
-                "author": "test",
-                "sample_rate_hz": 44100,
-                "cycle_length_samples": 512,
-                "phase_convention": "zero_at_idx0",
-                "normalization": "rms_0.35",
-                "tuning": {"root_midi_note": 69, "cents_offset": 0},
-            }
+            # Reshape mipmaps to 2D arrays (num_frames=1, frame_length)
+            mipmaps_2d = [mip.reshape(1, -1).astype(np.float32) for mip in processed]
 
-            save_wavetable_npz(output_path, tables, meta)
+            # Export as WTBL
+            save_wavetable_wav(
+                output_path,
+                mipmaps_2d,
+                wavetable_type=WavetableType.HIGH_RESOLUTION,
+                name="eq_test",
+                author="test",
+                normalization_method=NormalizationMethod.RMS,
+                sample_rate=44100,
+            )
 
             # Load and verify
-            loaded = load_wavetable_npz(output_path)
-            assert "tables" in loaded
-            assert "base" in loaded["tables"]
-            assert len(loaded["tables"]["base"]) == len(processed)
+            loaded = load_wavetable_wav(output_path)
+            assert loaded.num_mip_levels == len(processed)
+            assert loaded.name == "eq_test"
 
     def test_eq_preserves_export_metadata(self):
         """Test that EQ processing preserves export metadata."""
@@ -318,25 +322,31 @@ class TestEQExportCompatibility:
                 proc = align_to_zero_crossing(dc_remove(normalize(mip)))
                 processed.append(proc)
 
-            # Create metadata with EQ info
-            tables = {"base": processed}
-            meta = {
-                "version": 1,
-                "name": "eq_wavetable",
-                "generation": {
-                    "waveform": "sawtooth",
-                    "eq_applied": True,
-                    "eq_settings": "1500:-2.0:1.5",
-                },
+            # Reshape mipmaps to 2D arrays
+            mipmaps_2d = [mip.reshape(1, -1).astype(np.float32) for mip in processed]
+
+            # Create generation parameters with EQ info
+            generation_params = {
+                "waveform": "sawtooth",
+                "eq_applied": True,
+                "eq_settings": "1500:-2.0:1.5",
             }
 
-            output_path = Path(temp_dir) / "eq_meta_test.npz"
-            save_wavetable_npz(output_path, tables, meta)
+            output_path = Path(temp_dir) / "eq_meta_test.wav"
+            save_wavetable_wav(
+                output_path,
+                mipmaps_2d,
+                wavetable_type=WavetableType.HIGH_RESOLUTION,
+                name="eq_wavetable",
+                generation_parameters=json.dumps(generation_params),
+                sample_rate=44100,
+            )
 
             # Load and verify metadata preservation
-            loaded = load_wavetable_npz(output_path)
-            assert loaded["manifest"]["generation"]["eq_applied"] is True
-            assert loaded["manifest"]["generation"]["eq_settings"] == "1500:-2.0:1.5"
+            loaded = load_wavetable_wav(output_path)
+            gen_params = json.loads(loaded.metadata.generation_parameters)
+            assert gen_params["eq_applied"] is True
+            assert gen_params["eq_settings"] == "1500:-2.0:1.5"
 
     def test_eq_with_tilt_export_metadata(self):
         """Test that tilt EQ settings are preserved in export metadata."""
@@ -354,30 +364,35 @@ class TestEQExportCompatibility:
                 proc = align_to_zero_crossing(dc_remove(normalize(mip)))
                 processed.append(proc)
 
-            # Create metadata with complete EQ info
-            tables = {"base": processed}
-            meta = {
-                "version": 1,
-                "name": "tilt_eq_wavetable",
-                "generation": {
-                    "waveform": "sawtooth",
-                    "eq_applied": True,
-                    "eq_settings": "1000:2.0",
-                    "high_tilt_settings": "0.5:4.0",
-                    "low_tilt_settings": "0.3:-2.0",
-                },
+            # Reshape mipmaps to 2D arrays
+            mipmaps_2d = [mip.reshape(1, -1).astype(np.float32) for mip in processed]
+
+            # Create generation parameters with complete EQ info
+            generation_params = {
+                "waveform": "sawtooth",
+                "eq_applied": True,
+                "eq_settings": "1000:2.0",
+                "high_tilt_settings": "0.5:4.0",
+                "low_tilt_settings": "0.3:-2.0",
             }
 
-            output_path = Path(temp_dir) / "tilt_eq_meta_test.npz"
-            save_wavetable_npz(output_path, tables, meta)
+            output_path = Path(temp_dir) / "tilt_eq_meta_test.wav"
+            save_wavetable_wav(
+                output_path,
+                mipmaps_2d,
+                wavetable_type=WavetableType.HIGH_RESOLUTION,
+                name="tilt_eq_wavetable",
+                generation_parameters=json.dumps(generation_params),
+                sample_rate=44100,
+            )
 
             # Load and verify metadata preservation
-            loaded = load_wavetable_npz(output_path)
-            generation = loaded["manifest"]["generation"]
-            assert generation["eq_applied"] is True
-            assert generation["eq_settings"] == "1000:2.0"
-            assert generation["high_tilt_settings"] == "0.5:4.0"
-            assert generation["low_tilt_settings"] == "0.3:-2.0"
+            loaded = load_wavetable_wav(output_path)
+            gen_params = json.loads(loaded.metadata.generation_parameters)
+            assert gen_params["eq_applied"] is True
+            assert gen_params["eq_settings"] == "1000:2.0"
+            assert gen_params["high_tilt_settings"] == "0.5:4.0"
+            assert gen_params["low_tilt_settings"] == "0.3:-2.0"
 
 
 class TestEQEdgeCases:

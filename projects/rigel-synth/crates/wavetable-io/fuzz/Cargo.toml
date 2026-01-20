@@ -1,0 +1,37 @@
+[package]
+name = "wavetable-io-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.wavetable-io]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz_riff_parser"
+path = "fuzz_targets/fuzz_riff_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_wavetable_reader"
+path = "fuzz_targets/fuzz_wavetable_reader.rs"
+test = false
+doc = false
+bench = false

@@ -27,3 +27,9 @@ def validate_power_of_two_integer(type_: object, size: int) -> None:
     """Validate that size is a power of 2."""
     if size & (size - 1) != 0:
         raise ValueError("Size must be a power of 2")
+
+
+def validate_positive_integer(type_: object, value: int) -> None:
+    """Validate that value is a positive integer (> 0)."""
+    if value <= 0:
+        raise ValueError(f"Value must be a positive integer, got {value}")

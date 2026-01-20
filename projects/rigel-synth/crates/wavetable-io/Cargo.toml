@@ -1,0 +1,32 @@
+[package]
+name = "wavetable-io"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Wavetable file I/O with RIFF/WAV container and protobuf metadata"
+rust-version.workspace = true
+
+[dependencies]
+# Protobuf encoding/decoding
+prost = "0.14"
+bytes = "1"
+
+# Error handling
+anyhow.workspace = true
+
+[build-dependencies]
+# Protobuf code generation
+prost-build = "0.14"
+
+[dev-dependencies]
+# Test utilities
+tempfile = "3"
+# Benchmarking
+criterion = "0.5"
+
+[[bench]]
+name = "loading_bench"
+harness = false

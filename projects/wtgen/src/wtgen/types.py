@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, TypeAlias
+from typing import Literal, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
@@ -9,7 +9,6 @@ from numpy.typing import NDArray
 WavetableData: TypeAlias = NDArray[np.float32]
 MipmapList: TypeAlias = list[WavetableData]
 WavetableTables: TypeAlias = dict[str, MipmapList]
-WavetableMetadata: TypeAlias = dict[str, Any]
 
 BitDepth = Literal[16, 24, 32]
 

@@ -8,7 +8,8 @@ members = [
   "projects/rigel-synth/crates/simd-dispatch",
   "projects/rigel-synth/crates/math",
   "projects/rigel-synth/crates/timing",
-  "projects/rigel-synth/crates/modulation"
+  "projects/rigel-synth/crates/modulation",
+  "projects/rigel-synth/crates/wavetable-io"
 ]
 resolver = "2"
 

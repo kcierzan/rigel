@@ -122,6 +122,8 @@ in
       zip
       unzip
       just
+      # Protocol Buffers compiler for wavetable-io protobuf codegen
+      protobuf
       # xwin downloads Windows SDK/MSVC redistributables so we can link MSVC builds
       # without requiring a Windows VM.
       xwin

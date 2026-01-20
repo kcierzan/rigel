@@ -1,0 +1,218 @@
+// Wavetable Interchange Format - Protocol Buffers Schema
+//
+// This schema defines the metadata structure for wavetable files.
+// The protobuf message is stored in a custom RIFF chunk (FourCC: "WTBL")
+// within a standard WAV file container.
+//
+// Schema Version: 1
+// Feature: 001-wavetable-interchange-format
+// Date: 2026-01-19
+
+syntax = "proto3";
+
+package rigel.wavetable;
+
+// WavetableMetadata - The root message stored in the WTBL chunk
+//
+// Field number ranges:
+//   1-15:  Core fields (v1) - required for basic functionality
+//   16-30: Metadata fields (v1) - optional descriptive data
+//   31-49: Reserved for future core extensions
+//   50-60: Type-specific metadata (oneof)
+//   61+:   Reserved for future versions
+message WavetableMetadata {
+  // === CORE FIELDS (1-15) ===
+
+  // Schema version for compatibility checking
+  // Current version: 1
+  // Readers MUST check this and handle unknown versions gracefully
+  uint32 schema_version = 1;
+
+  // Classification of the wavetable
+  // Determines appropriate handling and playback behavior
+  WavetableType wavetable_type = 2;
+
+  // Number of samples per waveform frame at mip level 0
+  // MUST be > 0, typically a power of 2 (256, 512, 1024, 2048)
+  uint32 frame_length = 3;
+
+  // Number of keyframes (waveform snapshots) per mip level
+  // MUST be > 0, typically 64-256
+  uint32 num_frames = 4;
+
+  // Number of mip levels for bandwidth-limited playback
+  // MUST be > 0, typically 7-11
+  uint32 num_mip_levels = 5;
+
+  // Frame length for each mip level
+  // MUST have exactly num_mip_levels entries
+  // MUST be decreasing (mip 0 = highest resolution)
+  // Example: [2048, 1024, 512, 256, 128, 64, 32]
+  repeated uint32 mip_frame_lengths = 6;
+
+  // === METADATA FIELDS (16-30) ===
+
+  // How the audio samples were normalized
+  NormalizationMethod normalization_method = 16;
+
+  // Original source bit depth (8, 16, 24, 32)
+  // 0 = unspecified
+  optional uint32 source_bit_depth = 17;
+
+  // Creator attribution
+  optional string author = 18;
+
+  // Human-readable name for the wavetable
+  optional string name = 19;
+
+  // Extended description
+  optional string description = 20;
+
+  // Reference frequency in Hz for tuning (default: 440.0)
+  optional float tuning_reference = 21;
+
+  // JSON-encoded generation parameters (for reproducibility)
+  optional string generation_parameters = 22;
+
+  // Sample rate context (if meaningful, e.g., for PCM samples)
+  optional uint32 sample_rate = 23;
+
+  // === RESERVED (31-49) ===
+  reserved 31 to 49;
+
+  // === TYPE-SPECIFIC METADATA (50-60) ===
+
+  // Type-specific metadata - only one may be set
+  // The type should correspond to wavetable_type enum value
+  oneof type_metadata {
+    ClassicDigitalMetadata classic_digital = 50;
+    HighResolutionMetadata high_resolution = 51;
+    VintageEmulationMetadata vintage_emulation = 52;
+    PcmSampleMetadata pcm_sample = 53;
+  }
+
+  // === RESERVED FOR FUTURE VERSIONS (61+) ===
+  reserved 61 to 100;
+}
+
+// WavetableType - Classification of wavetable for handling
+//
+// Readers MUST handle unknown values by treating them as WAVETABLE_TYPE_CUSTOM.
+// This ensures forward compatibility when new types are added.
+enum WavetableType {
+  // Default value for unset/unknown type
+  // Readers receiving this should treat as CUSTOM
+  WAVETABLE_TYPE_UNSPECIFIED = 0;
+
+  // PPG Wave-style wavetables
+  // Characteristics: 256 samples/frame, 64 frames, 8-bit source
+  // 7 mip levels with harmonic caps: 128, 64, 16, 8, 4, 2 harmonics
+  WAVETABLE_TYPE_CLASSIC_DIGITAL = 1;
+
+  // Modern/vintage digital high-resolution wavetables
+  // Characteristics: 2048+ samples/frame, 64-256 frames
+  // Full mipmap chain for alias-free playback
+  WAVETABLE_TYPE_HIGH_RESOLUTION = 2;
+
+  // Emulations of vintage analog-era digital oscillators
+  // Characteristics: 256-512 samples/frame, 1-16 frames
+  // May preserve intentional aliasing or quantization artifacts
+  WAVETABLE_TYPE_VINTAGE_EMULATION = 3;
+
+  // Short single-cycle PCM samples (AWM/SY99-style)
+  // Characteristics: Variable frame length, typically single frame
+  // Often single mip level, uses different anti-aliasing approach
+  WAVETABLE_TYPE_PCM_SAMPLE = 4;
+
+  // User-defined wavetables that don't fit other categories
+  // No specific handling assumptions
+  WAVETABLE_TYPE_CUSTOM = 5;
+
+  // Reserved for future types
+  reserved 6 to 20;
+}
+
+// NormalizationMethod - How audio samples were normalized
+enum NormalizationMethod {
+  NORMALIZATION_UNSPECIFIED = 0;
+
+  // Normalized to peak amplitude (max sample = 1.0 or -1.0)
+  NORMALIZATION_PEAK = 1;
+
+  // Normalized to target RMS level
+  NORMALIZATION_RMS = 2;
+
+  // No normalization applied (original levels preserved)
+  NORMALIZATION_NONE = 3;
+}
+
+// InterpolationHint - Suggested interpolation method for playback
+enum InterpolationHint {
+  INTERPOLATION_UNSPECIFIED = 0;
+
+  // Linear interpolation (fast, some aliasing)
+  INTERPOLATION_LINEAR = 1;
+
+  // Cubic interpolation (Catmull-Rom, good quality)
+  INTERPOLATION_CUBIC = 2;
+
+  // Windowed sinc interpolation (highest quality, expensive)
+  INTERPOLATION_SINC = 3;
+}
+
+// ClassicDigitalMetadata - Type-specific data for CLASSIC_DIGITAL wavetables
+message ClassicDigitalMetadata {
+  // Original bit depth (typically 8 for PPG-style)
+  optional uint32 original_bit_depth = 1;
+
+  // Original sample rate if known
+  optional uint32 original_sample_rate = 2;
+
+  // Source hardware identifier (e.g., "PPG Wave 2.2", "Waldorf Microwave")
+  optional string source_hardware = 3;
+
+  // Maximum harmonics per mip level (for documentation)
+  // Example: [128, 64, 16, 8, 4, 2] meaning mip0 has up to 128 harmonics
+  repeated uint32 harmonic_caps = 4;
+}
+
+// HighResolutionMetadata - Type-specific data for HIGH_RESOLUTION wavetables
+message HighResolutionMetadata {
+  // Maximum harmonic count at mip level 0
+  optional uint32 max_harmonics = 1;
+
+  // Suggested interpolation method for playback
+  InterpolationHint interpolation_hint = 2;
+
+  // Source synthesizer if known (e.g., "AN1x", "Nord Lead 3")
+  optional string source_synth = 3;
+}
+
+// VintageEmulationMetadata - Type-specific data for VINTAGE_EMULATION wavetables
+message VintageEmulationMetadata {
+  // Target hardware being emulated (e.g., "OSCar", "EDP Wasp")
+  optional string emulated_hardware = 1;
+
+  // Specific oscillator type/variant
+  optional string oscillator_type = 2;
+
+  // Whether aliasing artifacts are intentionally preserved
+  // true = aliasing is part of the character, don't filter
+  optional bool preserves_aliasing = 3;
+}
+
+// PcmSampleMetadata - Type-specific data for PCM_SAMPLE wavetables
+message PcmSampleMetadata {
+  // Original sample rate of the source material
+  optional uint32 original_sample_rate = 1;
+
+  // MIDI note number for unity (1:1) playback
+  // Middle C = 60, A4 = 69
+  optional uint32 root_note = 2;
+
+  // Loop start sample index (0-based)
+  optional uint32 loop_start = 3;
+
+  // Loop end sample index (0-based, exclusive)
+  optional uint32 loop_end = 4;
+}

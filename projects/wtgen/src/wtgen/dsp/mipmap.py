@@ -270,3 +270,72 @@ def build_mipmap(
         rolloff_method=resolved_method,
         decimate=decimate,
     ).generate()
+
+
+def build_multiframe_mipmap(
+    wavetable: NDArray[np.floating],
+    num_octaves: int = 8,
+    sample_rate: float = 44100.0,
+    rolloff_method: RolloffMethod | str = "raised_cosine",
+    decimate: bool = True,
+) -> list[NDArray[np.float32]]:
+    """Build mipmap chain for a multi-frame wavetable with proper FIR anti-aliasing.
+
+    This function processes each frame of a multi-frame wavetable through the
+    existing Mipmap class to apply proper bandlimited filtering before decimation,
+    preventing aliasing artifacts.
+
+    Args:
+        wavetable: Multi-frame wavetable with shape (num_frames, frame_length).
+        num_octaves: Number of octave levels to generate (default 8).
+        sample_rate: Sample rate in Hz (default 44100.0).
+        rolloff_method: Method for smooth FIR window rolloff of LP filter.
+            Options: "raised_cosine", "tukey", "hann", "blackman", "brick_wall".
+        decimate: Whether to decimate each level by half (default True for imports).
+
+    Returns:
+        List of 2D mipmap levels, each with shape (num_frames, level_frame_length).
+        Level 0 is the full-resolution base, subsequent levels are decimated.
+
+    Raises:
+        ValueError: If wavetable is not 2D.
+
+    Example:
+        >>> wavetable = np.random.randn(64, 2048).astype(np.float32)  # 64 frames
+        >>> mipmaps = build_multiframe_mipmap(wavetable, num_octaves=6)
+        >>> print(f"Generated {len(mipmaps)} mip levels")
+        >>> for i, mip in enumerate(mipmaps):
+        ...     print(f"Level {i}: {mip.shape}")
+    """
+    if wavetable.ndim != 2:
+        raise ValueError(f"Expected 2D wavetable (num_frames, frame_length), got {wavetable.ndim}D")
+
+    num_frames, _frame_length = wavetable.shape
+    resolved_method = cast(RolloffMethod, rolloff_method)
+
+    # Process each frame through the Mipmap class
+    frame_mipmap_chains: list[MipmapChain] = []
+    for frame_idx in range(num_frames):
+        frame = wavetable[frame_idx]
+        mipmap = Mipmap(
+            base_wavetable=frame,
+            num_octaves=num_octaves,
+            sample_rate=sample_rate,
+            rolloff_method=resolved_method,
+            decimate=decimate,
+        )
+        frame_mipmap_chains.append(mipmap.generate())
+
+    # Determine number of mip levels (all frames should have the same)
+    num_levels = len(frame_mipmap_chains[0])
+
+    # Stack frames for each mip level into 2D arrays
+    multiframe_mipmaps: list[NDArray[np.float32]] = []
+    for level_idx in range(num_levels):
+        # Gather this level from all frames
+        level_frames = [chain[level_idx] for chain in frame_mipmap_chains]
+        # Stack into (num_frames, level_frame_length)
+        level_array = np.stack(level_frames, axis=0)
+        multiframe_mipmaps.append(level_array.astype(np.float32))
+
+    return multiframe_mipmaps

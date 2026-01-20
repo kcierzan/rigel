@@ -13,6 +13,7 @@ dependencies = [
     "kitcat>=1.2.1",
     "cyclopts>=3.23.1",
     "rich>=14.1.0",
+    "protobuf>=5.0",
 ]
 
 [project.scripts]
@@ -20,6 +21,8 @@ wtgen = "wtgen.cli.commands:app"
 
 [tool.ruff]
 line-length = 100
+# Exclude auto-generated protobuf files from linting
+exclude = ["*_pb2.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "NPY", "PL", "PERF"]
@@ -33,10 +36,8 @@ ignore = [
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.31.1",
     "hypothesis>=6.138.2",
     "ipython>=9.5.0",
-    "mypy>=1.17.1",
     "pytest>=8.4.1",
     "pytest-benchmark>=4.0",
     "pytest-cov>=6.2.1",
@@ -44,37 +45,18 @@ dev = [
     "pytest-xdist>=3.8.0",
     "ruff>=0.12.8",
     "scipy-stubs>=1.16.1.0",
+    "ty>=0.0.12",
     "types-setuptools>=80.9.0.20250809",
 ]
 
-[tool.basedpyright]
+[tool.ty]
+[tool.ty.src]
 include = ["src"]
-exclude = ["tests", "**/__pycache__"]
-venvPath = "."
-venv = ".venv"
+exclude = ["tests", "**/__pycache__", "*_pb2.py", "*_pb2.pyi"]
 
-# Core type checking settings
-typeCheckingMode = "standard"
-useLibraryCodeForTypes = true
+[tool.ty.environment]
+python-version = "3.11"
 
-# Disable problematic warnings for scientific computing
-reportMissingTypeStubs = false
-reportUnknownParameterType = false
-reportUnknownArgumentType = false
-reportUnknownVariableType = false
-reportUnknownMemberType = false
-reportAny = false
-reportMissingTypeArgument = false
-
-# Keep important warnings enabled
-reportGeneralTypeIssues = true
-reportOptionalMemberAccess = true
-reportOptionalSubscript = true
-reportOptionalOperand = true
-reportUntypedFunctionDecorator = true
-reportUntypedClassDecorator = true
-reportUntypedBaseClass = true
-reportUntypedNamedTuple = true
-
-# Disable additional noisy warnings
-reportUnusedCallResult = false # Common with matplotlib plotting
+[tool.ty.terminal]
+output-format = "full"
+error-on-warning = false
