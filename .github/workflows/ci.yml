@@ -183,6 +183,10 @@ jobs:
         working-directory: projects/wtgen
         run: uv run ruff check .
 
+      - name: Type check (ty)
+        working-directory: projects/wtgen
+        run: uv run ty check src/
+
       - name: Run wtgen tests
         working-directory: projects/wtgen
         env:
