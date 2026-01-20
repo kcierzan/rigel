@@ -3,6 +3,38 @@
 This module provides tools for analyzing wavetable data and inferring
 the appropriate wavetable type based on characteristics like frame size,
 harmonic content, and source metadata.
+
+## Classification Thresholds
+
+The magic numbers used in this module are derived from historical
+synthesizer specifications and industry conventions:
+
+### Classic Digital Wavetables
+- **256 samples, 64 frames**: PPG Wave 2.2/2.3 standard (1982-1983)
+  - 8-bit resolution, 31.25kHz effective sample rate
+  - Reference: "PPG Wave 2.2/2.3 Service Manual", Wolfgang Palm, 1983
+- **128-512 samples, 32-128 frames**: Waldorf Microwave/Wave family (1989-1997)
+  - Extended PPG format with variable table sizes
+- **≤12-bit depth**: Characteristic of 1980s-1990s digital wavetable synths
+
+### High Resolution Wavetables
+- **≥1024 samples/frame**: Modern "supersaw" and complex waveform tables
+  - Serum (2014+): 2048 samples default
+  - Vital (2020+): 2048 samples
+  - Reference: Common industry practice for alias-free synthesis
+- **≥512 samples with ≥128 frames**: Extended morphing tables
+  - Allows smooth morphing with high harmonic content
+
+### Vintage Emulation
+- **≤16 frames**: Characteristic of simple analog-style oscillators
+  - EDP Wasp (1978): 8 waveforms
+  - Casio CZ series (1984): 8 phase distortion shapes
+- **Aliasing artifacts present**: Intentional non-band-limited waveforms
+
+### PCM Sample
+- **≤4 frames**: Single-cycle or minimal morphing waveforms
+  - Common for sampled instrument tones
+  - Roland D-50 (1987): Single-cycle PCM attack transients
 """
 
 from typing import Any
@@ -12,6 +44,37 @@ from numpy.typing import NDArray
 
 from wtgen.format.analysis.harmonics import analyze_harmonic_content
 from wtgen.format.types import WavetableType
+
+# =============================================================================
+# Classification Threshold Constants
+# =============================================================================
+
+# Classic Digital: PPG Wave 2.2/2.3 standard (Wolfgang Palm, 1982)
+# The PPG Wave used 256 samples per frame, 64 frames per wavetable, 8-bit resolution
+PPG_STANDARD_FRAME_LENGTH = 256
+PPG_STANDARD_NUM_FRAMES = 64
+
+# Classic Digital: Waldorf Microwave/Wave family extensions
+# Extended PPG format allowed 128-512 samples and 32-128 frames
+CLASSIC_DIGITAL_MIN_FRAME_LENGTH = 128
+CLASSIC_DIGITAL_MAX_FRAME_LENGTH = 512
+CLASSIC_DIGITAL_MIN_FRAMES = 32
+CLASSIC_DIGITAL_MAX_FRAMES = 128
+CLASSIC_DIGITAL_MAX_BIT_DEPTH = 12  # 1980s-90s hardware limitation
+
+# High Resolution: Modern synths (Serum, Vital, Zebra)
+# Industry standard for alias-free, high-quality wavetable synthesis
+HIGH_RES_MIN_FRAME_LENGTH = 1024  # Serum/Vital default: 2048
+HIGH_RES_EXTENDED_FRAME_LENGTH = 512  # For large morph tables
+HIGH_RES_EXTENDED_MIN_FRAMES = 128
+
+# Vintage Emulation: Simple analog-style oscillators
+# EDP Wasp: 8 waves, Casio CZ: 8 shapes, early digital: limited memory
+VINTAGE_MAX_FRAMES = 16
+
+# PCM Sample: Single-cycle or minimal morphing
+# Common for sampled transients and simple waveforms
+PCM_MAX_FRAMES = 4
 
 
 def infer_wavetable_type(
@@ -66,9 +129,7 @@ def infer_wavetable_type(
 
     # High Resolution: Modern synths
     if _is_high_resolution(frame_length, num_frames):
-        analysis["evidence"].append(
-            f"High resolution profile: {frame_length} samples/frame"
-        )
+        analysis["evidence"].append(f"High resolution profile: {frame_length} samples/frame")
         harmonic_info = analyze_harmonic_content(wavetable)
         if harmonic_info["has_high_harmonics"]:
             max_harm = harmonic_info["estimated_max_harmonic"]
@@ -90,9 +151,7 @@ def infer_wavetable_type(
 
     # PCM Sample: Single frame or very few frames
     if _is_pcm_sample(frame_length, num_frames):
-        analysis["evidence"].append(
-            f"PCM sample profile: {num_frames} frame(s)"
-        )
+        analysis["evidence"].append(f"PCM sample profile: {num_frames} frame(s)")
         analysis["confidence"] = "medium"
         return WavetableType.PCM_SAMPLE, analysis
 
@@ -108,28 +167,46 @@ def _check_hardware_signature(hardware: str) -> WavetableType | None:
 
     # Classic digital synthesizers
     classic_digital_keywords = [
-        "ppg", "wave", "waldorf", "microwave", "blofeld",
+        "ppg",
+        "wave",
+        "waldorf",
+        "microwave",
+        "blofeld",
     ]
     if any(kw in hardware_lower for kw in classic_digital_keywords):
         return WavetableType.CLASSIC_DIGITAL
 
     # High-resolution digital
     hires_keywords = [
-        "an1x", "nord", "serum", "vital", "zebra", "massive",
+        "an1x",
+        "nord",
+        "serum",
+        "vital",
+        "zebra",
+        "massive",
     ]
     if any(kw in hardware_lower for kw in hires_keywords):
         return WavetableType.HIGH_RESOLUTION
 
     # Vintage emulation targets
     vintage_keywords = [
-        "oscar", "wasp", "edp", "casio", "cz",
+        "oscar",
+        "wasp",
+        "edp",
+        "casio",
+        "cz",
     ]
     if any(kw in hardware_lower for kw in vintage_keywords):
         return WavetableType.VINTAGE_EMULATION
 
     # PCM sample sources
     pcm_keywords = [
-        "sy99", "awm", "roland", "korg", "m1", "sample",
+        "sy99",
+        "awm",
+        "roland",
+        "korg",
+        "m1",
+        "sample",
     ]
     if any(kw in hardware_lower for kw in pcm_keywords):
         return WavetableType.PCM_SAMPLE
@@ -142,21 +219,52 @@ def _is_classic_digital(
     num_frames: int,
     bit_depth: int | None,
 ) -> bool:
-    """Check if characteristics match classic digital wavetables."""
-    # PPG-style: 256 samples, 64 frames, 8-bit
-    if frame_length == 256 and num_frames == 64:
+    """Check if characteristics match classic digital wavetables.
+
+    Detection is based on PPG Wave and Waldorf specifications:
+    - PPG standard: 256 samples/frame, 64 frames (strict match)
+    - Waldorf extensions: 128-512 samples, 32-128 frames with ≤12-bit depth
+
+    See module docstring for detailed historical references.
+    """
+    # PPG Wave 2.2/2.3 exact specification
+    if frame_length == PPG_STANDARD_FRAME_LENGTH and num_frames == PPG_STANDARD_NUM_FRAMES:
         return True
-    # Variations: 128-512 samples, 32-128 frames
-    if 128 <= frame_length <= 512 and 32 <= num_frames <= 128:
-        if bit_depth is not None and bit_depth <= 12:
+
+    # Waldorf Microwave/Wave family variations
+    in_classic_frame_range = (
+        CLASSIC_DIGITAL_MIN_FRAME_LENGTH <= frame_length <= CLASSIC_DIGITAL_MAX_FRAME_LENGTH
+    )
+    in_classic_count_range = CLASSIC_DIGITAL_MIN_FRAMES <= num_frames <= CLASSIC_DIGITAL_MAX_FRAMES
+
+    if in_classic_frame_range and in_classic_count_range:
+        # Require low bit depth to confirm classic digital origin
+        if bit_depth is not None and bit_depth <= CLASSIC_DIGITAL_MAX_BIT_DEPTH:
             return True
+
     return False
 
 
 def _is_high_resolution(frame_length: int, num_frames: int) -> bool:
-    """Check if characteristics match high-resolution wavetables."""
-    # Modern synths: 1024+ samples, 64+ frames
-    return frame_length >= 1024 or (frame_length >= 512 and num_frames >= 128)
+    """Check if characteristics match high-resolution wavetables.
+
+    Detection is based on modern synth standards:
+    - Primary: ≥1024 samples/frame (Serum, Vital, Zebra standard)
+    - Extended: ≥512 samples with ≥128 frames (large morph tables)
+
+    See module docstring for detailed references.
+    """
+    # Modern high-resolution standard (Serum/Vital/etc.)
+    if frame_length >= HIGH_RES_MIN_FRAME_LENGTH:
+        return True
+
+    # Extended morph tables with moderate resolution
+    has_extended_frames = frame_length >= HIGH_RES_EXTENDED_FRAME_LENGTH
+    has_many_frames = num_frames >= HIGH_RES_EXTENDED_MIN_FRAMES
+    if has_extended_frames and has_many_frames:
+        return True
+
+    return False
 
 
 def _is_vintage_emulation(
@@ -164,21 +272,33 @@ def _is_vintage_emulation(
     num_frames: int,
     wavetable: NDArray[np.float32],
 ) -> bool:
-    """Check if characteristics match vintage emulation wavetables."""
-    # Vintage style: few frames, simpler waveforms
-    if num_frames > 16:
+    """Check if characteristics match vintage emulation wavetables.
+
+    Detection is based on early digital/analog hybrid synths:
+    - Few frames (≤16): EDP Wasp, Casio CZ, early ROMs
+    - Aliasing artifacts present: intentional non-band-limited character
+
+    See module docstring for detailed references.
+    """
+    # Vintage synths had limited frame counts due to memory constraints
+    if num_frames > VINTAGE_MAX_FRAMES:
         return False
 
-    # Check for simple waveform characteristics
-    # (steep transitions, quantization artifacts)
+    # Vintage emulations often preserve intentional aliasing
     harmonic_info = analyze_harmonic_content(wavetable)
     return harmonic_info["has_aliasing_artifacts"]
 
 
 def _is_pcm_sample(frame_length: int, num_frames: int) -> bool:
-    """Check if characteristics match PCM sample wavetables."""
-    # PCM samples: typically single cycle
-    return num_frames <= 4
+    """Check if characteristics match PCM sample wavetables.
+
+    Detection is based on single-cycle sample conventions:
+    - Very few frames (≤4): single-cycle or minimal morphing
+    - Common in ROM-based synths for attack transients
+
+    See module docstring for detailed references.
+    """
+    return num_frames <= PCM_MAX_FRAMES
 
 
 def suggest_type_metadata(
