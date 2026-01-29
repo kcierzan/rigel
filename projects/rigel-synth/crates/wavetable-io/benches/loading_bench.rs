@@ -4,8 +4,8 @@
 //! <5 seconds for 100MB of wavetable data.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use prost::Message;
+use std::hint::black_box;
 use wavetable_io::proto;
 use wavetable_io::reader::read_wavetable_from_bytes;
 use wavetable_io::riff::build_wav_with_wtbl;
