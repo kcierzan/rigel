@@ -51,13 +51,14 @@ fn test_timing_accuracy_at_checkpoints() {
         }
 
         // Advance control-rate envelope
+        // tick() advances inner by update_interval samples and sets target_value
         control_rate.tick();
-        for _ in 0..samples_per_checkpoint {
-            control_rate.sample();
-        }
 
+        // Compare values immediately after tick() - this is when both envelopes
+        // are synchronized (both have processed N*64 samples from their inner state)
+        // The control-rate envelope's inner().value() should match per_sample.value()
         let per_sample_val = per_sample.value();
-        let control_rate_val = control_rate.current_value();
+        let control_rate_val = control_rate.inner().value();
 
         let diff = (per_sample_val - control_rate_val).abs();
         assert!(
@@ -68,6 +69,11 @@ fn test_timing_accuracy_at_checkpoints() {
             control_rate_val,
             diff
         );
+
+        // Consume samples to keep the control-rate envelope in sync
+        for _ in 0..samples_per_checkpoint {
+            control_rate.sample();
+        }
     }
 }
 
