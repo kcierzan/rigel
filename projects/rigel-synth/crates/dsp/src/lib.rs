@@ -8,7 +8,7 @@
 use core::f32::consts::TAU;
 use rigel_math::expf;
 use rigel_math::scalar::polyblep_sawtooth;
-use rigel_modulation::envelope::{FmEnvelope, FmEnvelopeConfig};
+use rigel_modulation::envelope::{ControlRateFmEnvelope, FmEnvelopeConfig};
 use rigel_simd::DenormalGuard;
 use rigel_simd_dispatch::SimdContext;
 
@@ -293,7 +293,7 @@ impl Default for BandlimitedSawOscillator {
 #[derive(Debug, Clone)]
 pub struct SynthEngine {
     oscillator: BandlimitedSawOscillator,
-    envelope: FmEnvelope,
+    envelope: ControlRateFmEnvelope,
     sample_rate: f32,
     current_note: Option<NoteNumber>,
     current_velocity: f32,
@@ -310,6 +310,10 @@ pub struct SynthEngine {
     timebase: Timebase,
     /// Last envelope params for detecting changes
     last_env_params: FmEnvelopeParams,
+    /// Control-rate update interval in samples
+    control_rate_interval: u32,
+    /// Counter for tracking when to call tick()
+    samples_until_tick: u32,
 }
 
 impl SynthEngine {
@@ -330,9 +334,12 @@ impl SynthEngine {
         // Default envelope params
         let default_env_params = FmEnvelopeParams::default();
 
+        // Calculate control-rate interval (~1.5ms)
+        let control_rate_interval = Self::calculate_control_interval(sample_rate);
+
         // Create envelope with default config
         let envelope_config = Self::fm_params_to_config(&default_env_params, sample_rate);
-        let envelope = FmEnvelope::with_config(envelope_config);
+        let envelope = ControlRateFmEnvelope::new(envelope_config, control_rate_interval);
 
         Self {
             oscillator: BandlimitedSawOscillator::new(),
@@ -347,6 +354,30 @@ impl SynthEngine {
             cached_frequency: 440.0,
             timebase: Timebase::new(sample_rate),
             last_env_params: default_env_params,
+            control_rate_interval,
+            samples_until_tick: 0,
+        }
+    }
+
+    /// Calculate power-of-2 interval for ~1.5ms control rate
+    fn calculate_control_interval(sample_rate: f32) -> u32 {
+        let target_samples = (1.5 / 1000.0) * sample_rate;
+        let rounded = Self::nearest_power_of_two(target_samples as u32);
+        rounded.clamp(1, 128)
+    }
+
+    /// Find the nearest power of two to a given value
+    fn nearest_power_of_two(n: u32) -> u32 {
+        if n == 0 {
+            return 1;
+        }
+        let high_bit = 31 - n.leading_zeros();
+        let lower = 1u32 << high_bit;
+        let upper = lower << 1;
+        if upper.saturating_sub(n) < n.saturating_sub(lower) {
+            upper.min(128)
+        } else {
+            lower.max(1)
         }
     }
 
@@ -404,6 +435,9 @@ impl SynthEngine {
 
         // Trigger envelope with MIDI note for rate scaling
         self.envelope.note_on(note);
+
+        // Reset so first sample gets fresh tick
+        self.samples_until_tick = 0;
     }
 
     /// Start playing a note with specific envelope parameters
@@ -436,6 +470,9 @@ impl SynthEngine {
 
         // Trigger envelope with MIDI note for rate scaling
         self.envelope.note_on(note);
+
+        // Reset so first sample gets fresh tick
+        self.samples_until_tick = 0;
     }
 
     /// Stop playing the current note
@@ -466,9 +503,16 @@ impl SynthEngine {
             self.last_env_params = params.envelope;
         }
 
+        // Control-rate tick management
+        if self.samples_until_tick == 0 {
+            self.envelope.tick();
+            self.samples_until_tick = self.control_rate_interval;
+        }
+        self.samples_until_tick -= 1;
+
         // Generate audio
         let osc_output = self.oscillator.process_sample();
-        let env_value = self.envelope.process();
+        let env_value = self.envelope.sample();
 
         // If envelope finished, clear current note
         if !self.envelope.is_active() {
@@ -498,6 +542,7 @@ impl SynthEngine {
         self.timebase.reset();
         // Reset to default envelope params
         self.last_env_params = FmEnvelopeParams::default();
+        self.samples_until_tick = 0;
     }
 
     /// Check if any note is currently playing

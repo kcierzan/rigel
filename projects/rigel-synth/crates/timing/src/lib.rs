@@ -34,7 +34,9 @@ mod smoother;
 mod timebase;
 
 // Re-export all public types
-pub use control_rate::{ControlRateClock, ControlRateUpdates};
+pub use control_rate::{
+    ControlRateClock, ControlRateUpdates, TimebasedControlRateClock, DEFAULT_CONTROL_RATE_MS,
+};
 pub use smoother::{Smoother, SmoothingMode};
 pub use timebase::Timebase;
 
