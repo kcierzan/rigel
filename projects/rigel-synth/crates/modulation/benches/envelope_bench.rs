@@ -9,7 +9,9 @@
 //! the full attack/decay/release behavior including exponential decay phases.
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use rigel_modulation::envelope::{EnvelopeBatch, FmEnvelope, FmEnvelopeBatch8, FmEnvelopeConfig};
+use rigel_modulation::envelope::{
+    ControlRateFmEnvelope, EnvelopeBatch, FmEnvelope, FmEnvelopeBatch8, FmEnvelopeConfig,
+};
 use std::hint::black_box;
 
 /// Sample rate for all benchmarks
@@ -521,6 +523,246 @@ fn bench_note_events(c: &mut Criterion) {
     group.finish();
 }
 
+// =============================================================================
+// Control Rate vs Per-Sample Comparison Benchmarks
+// =============================================================================
+
+fn bench_control_rate_comparison(c: &mut Criterion) {
+    let mut group = c.benchmark_group("control_rate_vs_per_sample");
+
+    // Throughput: 1 second of audio samples
+    group.throughput(Throughput::Elements(SAMPLES_PER_SECOND as u64));
+
+    // Per-sample baseline: standard envelope processing
+    group.bench_function("per_sample_baseline", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = FmEnvelope::with_config(config);
+
+        b.iter(|| {
+            env.reset();
+            env.note_on(60);
+
+            // Process ~500ms key-on
+            for _ in 0..22050 {
+                black_box(env.process());
+            }
+
+            env.note_off();
+
+            // Process ~500ms release
+            for _ in 0..22050 {
+                black_box(env.process());
+            }
+
+            env.value()
+        })
+    });
+
+    // Control-rate with 64-sample interval (~1.45ms at 44.1kHz)
+    group.bench_function("control_rate_64_samples", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = ControlRateFmEnvelope::new(config, 64);
+
+        b.iter(|| {
+            env.reset();
+            env.note_on(60);
+
+            // Process ~500ms key-on with control-rate ticks
+            let key_on_blocks = 22050 / 64;
+            for _ in 0..key_on_blocks {
+                env.tick();
+                for _ in 0..64 {
+                    black_box(env.sample());
+                }
+            }
+
+            env.note_off();
+
+            // Process ~500ms release
+            let release_blocks = 22050 / 64;
+            for _ in 0..release_blocks {
+                env.tick();
+                for _ in 0..64 {
+                    black_box(env.sample());
+                }
+            }
+
+            env.current_value()
+        })
+    });
+
+    // Control-rate with 32-sample interval (~0.73ms at 44.1kHz)
+    group.bench_function("control_rate_32_samples", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = ControlRateFmEnvelope::new(config, 32);
+
+        b.iter(|| {
+            env.reset();
+            env.note_on(60);
+
+            // Process ~500ms key-on
+            let key_on_blocks = 22050 / 32;
+            for _ in 0..key_on_blocks {
+                env.tick();
+                for _ in 0..32 {
+                    black_box(env.sample());
+                }
+            }
+
+            env.note_off();
+
+            // Process ~500ms release
+            let release_blocks = 22050 / 32;
+            for _ in 0..release_blocks {
+                env.tick();
+                for _ in 0..32 {
+                    black_box(env.sample());
+                }
+            }
+
+            env.current_value()
+        })
+    });
+
+    // Control-rate with generate_block for efficient block processing
+    group.bench_function("control_rate_64_block", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut env = ControlRateFmEnvelope::new(config, 64);
+        let mut output = [0.0f32; 64];
+
+        b.iter(|| {
+            env.reset();
+            env.note_on(60);
+
+            // Process ~500ms key-on
+            let key_on_blocks = 22050 / 64;
+            for _ in 0..key_on_blocks {
+                env.generate_block(&mut output);
+            }
+
+            env.note_off();
+
+            // Process ~500ms release
+            let release_blocks = 22050 / 64;
+            for _ in 0..release_blocks {
+                env.generate_block(&mut output);
+            }
+
+            black_box(output[0])
+        })
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// Polyphonic Control-Rate Benchmarks (768 envelopes = 64 voices × 12 operators)
+// =============================================================================
+
+fn bench_polyphonic_control_rate(c: &mut Criterion) {
+    let mut group = c.benchmark_group("polyphonic_control_rate");
+
+    const NUM_ENVELOPES: usize = 768;
+    const UPDATE_INTERVAL: u32 = 64;
+
+    // Throughput: 768 envelopes × 1 second
+    group.throughput(Throughput::Elements(
+        (NUM_ENVELOPES * SAMPLES_PER_SECOND) as u64,
+    ));
+
+    // Per-sample: 768 individual envelopes
+    group.bench_function("per_sample_768_env", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut envelopes: Vec<FmEnvelope> = (0..NUM_ENVELOPES)
+            .map(|_| FmEnvelope::with_config(config))
+            .collect();
+
+        b.iter(|| {
+            // Reset and trigger all
+            for env in envelopes.iter_mut() {
+                env.reset();
+                env.note_on(60);
+            }
+
+            // Process ~500ms key-on
+            for _ in 0..22050 {
+                for env in envelopes.iter_mut() {
+                    black_box(env.process());
+                }
+            }
+
+            // Release all
+            for env in envelopes.iter_mut() {
+                env.note_off();
+            }
+
+            // Process ~500ms release
+            for _ in 0..22050 {
+                for env in envelopes.iter_mut() {
+                    black_box(env.process());
+                }
+            }
+
+            envelopes[0].value()
+        })
+    });
+
+    // Control-rate: 768 individual envelopes
+    group.bench_function("control_rate_768_env", |b| {
+        let config = FmEnvelopeConfig::adsr(0.1, 0.2, 0.7, 0.5, SAMPLE_RATE);
+        let mut envelopes: Vec<ControlRateFmEnvelope> = (0..NUM_ENVELOPES)
+            .map(|_| ControlRateFmEnvelope::new(config, UPDATE_INTERVAL))
+            .collect();
+
+        b.iter(|| {
+            // Reset and trigger all
+            for env in envelopes.iter_mut() {
+                env.reset();
+                env.note_on(60);
+            }
+
+            // Process ~500ms key-on
+            let key_on_blocks = 22050 / UPDATE_INTERVAL as usize;
+            for _ in 0..key_on_blocks {
+                // Control-rate tick for all envelopes
+                for env in envelopes.iter_mut() {
+                    env.tick();
+                }
+
+                // Sample all envelopes
+                for _ in 0..UPDATE_INTERVAL {
+                    for env in envelopes.iter_mut() {
+                        black_box(env.sample());
+                    }
+                }
+            }
+
+            // Release all
+            for env in envelopes.iter_mut() {
+                env.note_off();
+            }
+
+            // Process ~500ms release
+            let release_blocks = 22050 / UPDATE_INTERVAL as usize;
+            for _ in 0..release_blocks {
+                for env in envelopes.iter_mut() {
+                    env.tick();
+                }
+
+                for _ in 0..UPDATE_INTERVAL {
+                    for env in envelopes.iter_mut() {
+                        black_box(env.sample());
+                    }
+                }
+            }
+
+            envelopes[0].current_value()
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_single_envelope_process,
@@ -529,6 +771,8 @@ criterion_group!(
     bench_level_conversion,
     bench_rate_calculations,
     bench_note_events,
+    bench_control_rate_comparison,
+    bench_polyphonic_control_rate,
 );
 
 criterion_main!(benches);

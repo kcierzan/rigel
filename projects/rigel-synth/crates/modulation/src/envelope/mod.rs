@@ -53,6 +53,7 @@
 
 mod batch;
 mod config;
+mod control_rate;
 mod rates;
 mod segment;
 mod state;
@@ -61,6 +62,9 @@ mod state;
 pub use batch::{EnvelopeBatch, FmEnvelopeBatch16, FmEnvelopeBatch4, FmEnvelopeBatch8};
 pub use config::{
     AwmEnvelopeConfig, EnvelopeConfig, FmEnvelopeConfig, LoopConfig, SevenSegEnvelopeConfig,
+};
+pub use control_rate::{
+    ControlRateAwmEnvelope, ControlRateEnvelope, ControlRateFmEnvelope, ControlRateSevenSegEnvelope,
 };
 pub use rates::{
     calculate_increment_f32, calculate_increment_f32_scaled, calculate_increment_f32_with_max_rate,
@@ -588,6 +592,140 @@ impl<const K: usize, const R: usize> Envelope<K, R> {
         } else {
             self.state.level_precise <= self.state.target_level as f32
         }
+    }
+
+    // =========================================================================
+    // Control-Rate Support
+    // =========================================================================
+
+    /// Advance envelope by multiple samples in a single step.
+    ///
+    /// This is an optimized method for control-rate processing that advances
+    /// the envelope state by `samples` worth of change without iterating
+    /// through each sample individually.
+    ///
+    /// For decay phases, this uses direct multiplication since the increment
+    /// is constant. For attack phases, it uses an average factor approximation
+    /// to account for the distance-dependent scaling.
+    ///
+    /// # Arguments
+    ///
+    /// * `samples` - Number of samples to advance (typically 32-128)
+    ///
+    /// # Note
+    ///
+    /// Segment transitions are checked after advancement, so timing may be
+    /// up to `samples-1` samples late. This is acceptable for control-rate
+    /// modulation (~1.45ms at 64 samples, 44.1kHz).
+    pub fn advance_by(&mut self, samples: u32) {
+        match self.state.phase {
+            EnvelopePhase::Idle | EnvelopePhase::Complete => {
+                // Nothing to do
+            }
+            EnvelopePhase::Delay => {
+                self.advance_delay(samples);
+            }
+            EnvelopePhase::KeyOn => {
+                self.advance_key_on(samples);
+            }
+            EnvelopePhase::Sustain => {
+                // Sustain holds level, nothing to advance
+            }
+            EnvelopePhase::Release => {
+                self.advance_release(samples);
+            }
+        }
+    }
+
+    /// Advance through delay phase by multiple samples.
+    #[inline]
+    fn advance_delay(&mut self, samples: u32) {
+        if self.state.delay_remaining > samples {
+            self.state.delay_remaining -= samples;
+        } else {
+            // Delay complete, start attack with remaining samples
+            let remaining = samples - self.state.delay_remaining;
+            self.start_key_on_phase();
+            if remaining > 0 {
+                self.advance_key_on(remaining);
+            }
+        }
+    }
+
+    /// Advance key-on phase by multiple samples using average factor approximation.
+    #[inline]
+    fn advance_key_on(&mut self, samples: u32) {
+        if self.state.rising {
+            // Attack: use average factor approximation
+            self.advance_attack(samples);
+        } else {
+            // Decay: direct multiplication (constant increment)
+            self.advance_decay(samples);
+        }
+
+        // Check for segment transition
+        if self.reached_target() {
+            self.advance_segment();
+        }
+    }
+
+    /// Advance release phase by multiple samples.
+    #[inline]
+    fn advance_release(&mut self, samples: u32) {
+        // Release always decays (constant increment)
+        self.advance_decay(samples);
+
+        // Check for segment transition
+        if self.reached_target() {
+            self.advance_release_segment();
+        }
+    }
+
+    /// Advance attack (rising) phase using average factor approximation.
+    ///
+    /// The attack increment is scaled by `(remaining_to_max / 256) + 1`,
+    /// which varies as the level rises. We approximate by using the average
+    /// of the start and estimated end factors.
+    #[inline]
+    fn advance_attack(&mut self, samples: u32) {
+        let samples_f32 = samples as f32;
+
+        // Calculate factor at current position
+        let remaining_start = LEVEL_MAX as f32 - self.state.level_precise;
+        let factor_start = (remaining_start / 256.0) + 1.0;
+
+        // Estimate where we'll end up using start factor
+        let estimated_delta = self.state.increment * factor_start * samples_f32;
+        let estimated_end = (self.state.level_precise + estimated_delta).min(LEVEL_MAX as f32);
+
+        // Calculate factor at estimated end position
+        let remaining_end = LEVEL_MAX as f32 - estimated_end;
+        let factor_end = (remaining_end / 256.0) + 1.0;
+
+        // Use average of start and end factors
+        let avg_factor = (factor_start + factor_end) * 0.5;
+
+        // Apply averaged increment
+        let delta = self.state.increment * avg_factor * samples_f32;
+        self.state.level_precise =
+            (self.state.level_precise + delta).min(self.state.target_level as f32);
+
+        // Quantize to Q8
+        self.state.level = self.state.level_precise as i16;
+    }
+
+    /// Advance decay (falling) phase by direct multiplication.
+    ///
+    /// Decay uses constant increment, so we can simply multiply.
+    #[inline]
+    fn advance_decay(&mut self, samples: u32) {
+        // Increment is negative for decay
+        let delta = self.state.increment * samples as f32;
+        self.state.level_precise =
+            (self.state.level_precise + delta).max(self.state.target_level as f32);
+
+        // Quantize to Q8
+        self.state.level = self.state.level_precise as i16;
     }
 }
 
