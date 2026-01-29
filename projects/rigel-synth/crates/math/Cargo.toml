@@ -36,7 +36,7 @@ rigel-simd = { path = "../simd", default-features = false }
 libm = "0.2"
 
 [dev-dependencies]
-proptest = "1.5"
+proptest = "1.6"
 criterion = { version = "0.7", features = ["html_reports"] }
 iai-callgrind = "0.16"
 
