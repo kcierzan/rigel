@@ -35,4 +35,4 @@ cpufeatures = "0.2"
 libm = "0.2"
 
 [dev-dependencies]
-proptest = "1.5"
+proptest = "1.6"

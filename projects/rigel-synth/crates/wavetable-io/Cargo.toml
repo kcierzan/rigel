@@ -25,7 +25,7 @@ prost-build = "0.14"
 # Test utilities
 tempfile = "3"
 # Benchmarking
-criterion = "0.5"
+criterion = { version = "0.7", features = ["html_reports"] }
 
 [[bench]]
 name = "loading_bench"
